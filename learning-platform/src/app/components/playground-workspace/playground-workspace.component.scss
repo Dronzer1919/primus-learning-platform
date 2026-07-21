@@ -1,0 +1,407 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.playground-container {
+  height: 100%;
+  display: flex;
+  background: var(--playground-page-bg);
+
+  &.fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+  }
+}
+
+// Left vertical language rail — shares the header colour so both match the active theme.
+.rail {
+  width: 56px;
+  flex-shrink: 0;
+  background: var(--editor-header-bg);
+  border-right: 1px solid var(--editor-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  overflow-y: auto;
+}
+
+.rail-item {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  // Keep the 40x40 footprint once the 1px border is added
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--editor-border);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  color: color-mix(in srgb, var(--editor-fg), transparent 45%);
+  flex-shrink: 0;
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+
+  ion-icon {
+    font-size: 20px;
+  }
+
+  .rail-text {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    line-height: 1;
+  }
+
+  &:hover {
+    background: color-mix(in srgb, var(--editor-fg), transparent 88%);
+    border-color: color-mix(in srgb, var(--editor-fg), transparent 55%);
+    color: var(--editor-fg);
+  }
+
+  &.active {
+    background: var(--ion-color-primary);
+    border-color: var(--ion-color-primary);
+    color: var(--ion-color-primary-contrast);
+  }
+
+  &.locked {
+    color: color-mix(in srgb, var(--editor-fg), transparent 65%);
+    border-color: color-mix(in srgb, var(--editor-border), transparent 40%);
+    cursor: not-allowed;
+
+    &:hover {
+      background: transparent;
+      border-color: color-mix(in srgb, var(--editor-border), transparent 40%);
+      color: color-mix(in srgb, var(--editor-fg), transparent 65%);
+    }
+  }
+}
+
+.lock-badge {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  font-size: 10px;
+}
+
+.playground-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.compiler-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: var(--editor-header-bg);
+  color: var(--editor-fg);
+  border-bottom: 1px solid var(--editor-border);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  ion-icon {
+    font-size: 28px;
+    color: var(--editor-fg);
+  }
+
+  h1 {
+    font-size: 16px;
+    margin: 0;
+    font-weight: 700;
+    color: var(--editor-fg);
+  }
+
+  p {
+    font-size: 12px;
+    margin: 0;
+    color: color-mix(in srgb, var(--editor-fg), transparent 35%);
+  }
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--editor-tab-bg);
+  border-bottom: 1px solid var(--editor-border);
+  flex-wrap: wrap;
+
+  // Outline buttons adapt to any theme's toolbar background.
+  // Targets buttons with no explicit color attribute (not Run which is color="primary").
+  ion-button[fill="outline"]:not([color]) {
+    --color: var(--editor-fg);
+    --border-color: color-mix(in srgb, var(--editor-fg), transparent 48%);
+    --background-hover: color-mix(in srgb, var(--editor-fg), transparent 88%);
+    --background-activated: color-mix(in srgb, var(--editor-fg), transparent 76%);
+    --background-focused: color-mix(in srgb, var(--editor-fg), transparent 84%);
+  }
+}
+
+.file-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.file-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 6px 6px 0 0;
+  color: color-mix(in srgb, var(--editor-fg), transparent 45%);
+  font-size: 13px;
+  cursor: pointer;
+  // Reserve border space so switching tabs doesn't cause layout shift
+  border: 1px solid transparent;
+
+  ion-icon {
+    font-size: 16px;
+  }
+
+  // Keep the file-type logos in their brand colors so they stay visible on
+  // inactive tabs (which otherwise dim their text/icon).
+  ion-icon[name="logo-html5"] { color: #e34f26; }
+  ion-icon[name="logo-css3"] { color: #1572b6; }
+  ion-icon[name="logo-javascript"] { color: #e8b800; }
+
+  &.active {
+    background: var(--editor-bg);
+    color: var(--editor-fg);
+    border-color: var(--editor-border);
+    // Bottom border blends into the editor panel below — classic open-tab look
+    border-bottom-color: var(--editor-bg);
+  }
+}
+
+// Primary actions sit right after the file tabs
+.tab-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto; // push the utility buttons to the far right of the toolbar
+}
+
+.panel-label {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--editor-fg);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.playground-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+
+  @media (max-width: 968px) {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr 1fr;
+  }
+
+  // Web mode and single-editor (JS/TS) both use flex + draggable divider
+  &.web-mode,
+  &.single-editor {
+    display: flex;
+
+    .editor-section {
+      flex: 0 0 var(--editor-w, 50%);
+      max-width: 75%;
+      min-width: 25%;
+    }
+
+    .preview-section,
+    .output-panel {
+      flex: 1;
+      min-width: 200px;
+    }
+  }
+}
+
+.resize-divider {
+  width: 5px;
+  flex-shrink: 0;
+  background: var(--editor-border);
+  cursor: col-resize;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 1;
+
+  &:hover, &:active {
+    background: var(--ion-color-primary, #3880ff);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0 -4px; // wider hit area
+  }
+}
+
+.hidden-runner {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: none;
+  visibility: hidden;
+}
+
+.editor-section {
+  display: flex;
+  flex-direction: column;
+  background: var(--editor-bg);
+  border-right: 1px solid var(--editor-border);
+  min-height: 0;
+  overflow: hidden;
+
+  @media (max-width: 968px) {
+    border-right: none;
+    border-bottom: 1px solid var(--editor-border);
+  }
+
+  app-code-editor {
+    flex: 1;
+    display: block;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  ::ng-deep {
+    .code-editor-host {
+      height: 100%;
+      display: block;
+    }
+    .cm-editor {
+      height: 100%;
+    }
+    .cm-scroller {
+      overflow-y: auto !important;
+    }
+  }
+}
+
+.console-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 15px;
+  background: var(--editor-tab-bg);
+  color: var(--editor-fg);
+  font-weight: 600;
+  font-size: 14px;
+  flex-shrink: 0;
+
+  ion-icon {
+    font-size: 18px;
+  }
+}
+
+.console-section {
+  height: 150px;
+  border-top: 1px solid var(--editor-border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.console-output,
+.output-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 15px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+}
+
+.output-panel {
+  background: var(--playground-surface-bg);
+  color: var(--ion-color-dark);
+}
+
+.console-line {
+  color: var(--editor-fg);
+  margin-bottom: 5px;
+  word-break: break-all;
+  white-space: pre-wrap;
+
+  .output-panel & {
+    color: var(--ion-color-dark);
+  }
+
+  // Error frames align a caret under the failing token, so they must not be
+  // broken mid-token like ordinary log lines; they scroll sideways instead.
+  &.console-error {
+    color: #e5484d;
+    word-break: normal;
+    white-space: pre;
+    overflow-x: auto;
+    margin: 8px 0;
+  }
+}
+
+.console-empty {
+  color: #888;
+  font-style: italic;
+}
+
+.preview-section {
+  display: flex;
+  flex-direction: column;
+  background: var(--playground-surface-bg);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.preview-content {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+
+  iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: white;
+  }
+}
+
+.preview-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--ion-color-medium);
+
+  ion-icon {
+    font-size: 80px;
+    margin-bottom: 15px;
+  }
+}

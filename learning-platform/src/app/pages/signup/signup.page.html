@@ -1,0 +1,183 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar class="auth-toolbar">
+    <ion-buttons slot="start">
+      <ion-button (click)="goToLogin()">
+        <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+    <ion-title>Create account</ion-title>
+    <ion-buttons slot="end">
+      <app-theme-selector></app-theme-selector>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="auth-content">
+  <div class="auth-bg"></div>
+
+  <div class="auth-wrap">
+    <div class="brand">
+      <div class="brand-badge">
+        <ion-icon name="school-outline"></ion-icon>
+      </div>
+      <h1>Join the Platform</h1>
+      <p>Master web development, one lesson at a time.</p>
+    </div>
+
+    <!-- Progress steps -->
+    <div class="steps" *ngIf="step !== 'done'">
+      <div class="step" [class.active]="step === 'details'" [class.complete]="step === 'otp'">
+        <span class="dot"><ion-icon *ngIf="step === 'otp'" name="checkmark-outline"></ion-icon><span *ngIf="step === 'details'">1</span></span>
+        <small>Details</small>
+      </div>
+      <div class="bar" [class.filled]="step === 'otp'"></div>
+      <div class="step" [class.active]="step === 'otp'">
+        <span class="dot">2</span>
+        <small>Verify</small>
+      </div>
+    </div>
+
+    <div class="auth-card">
+      <!-- ============ STEP 1: DETAILS ============ -->
+      <form *ngIf="step === 'details'" (ngSubmit)="onSubmitDetails()">
+        <div class="field">
+          <label>Full name <span class="req">*</span></label>
+          <div class="control">
+            <ion-icon name="person-outline"></ion-icon>
+            <input type="text" [(ngModel)]="form.name" name="name" placeholder="Jane Doe" autocomplete="name" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Email <span class="req">*</span></label>
+          <div class="control">
+            <ion-icon name="mail-outline"></ion-icon>
+            <input type="email" [(ngModel)]="form.email" name="email" placeholder="jane@example.com" autocomplete="email" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Phone number <span class="opt">optional</span></label>
+          <div class="control">
+            <ion-icon name="call-outline"></ion-icon>
+            <input type="tel" [(ngModel)]="form.phone" name="phone" placeholder="+1 555 123 4567" autocomplete="tel" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label>Country <span class="opt">optional</span></label>
+            <div class="control">
+              <ion-icon name="earth-outline"></ion-icon>
+              <input type="text" [(ngModel)]="form.country" name="country" placeholder="India" autocomplete="country-name" />
+            </div>
+          </div>
+          <div class="field">
+            <label>City <span class="opt">optional</span></label>
+            <div class="control">
+              <ion-icon name="business-outline"></ion-icon>
+              <input type="text" [(ngModel)]="form.city" name="city" placeholder="Mumbai" autocomplete="address-level2" />
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Address <span class="opt">optional</span></label>
+          <div class="control">
+            <ion-icon name="location-outline"></ion-icon>
+            <input type="text" [(ngModel)]="form.address" name="address" placeholder="Street, area, postal code" autocomplete="street-address" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Password <span class="req">*</span></label>
+          <div class="control">
+            <ion-icon name="lock-closed-outline"></ion-icon>
+            <input [type]="showPassword ? 'text' : 'password'" [(ngModel)]="form.password" name="password" placeholder="At least 6 characters" autocomplete="new-password" />
+            <button type="button" class="ghost" (click)="showPassword = !showPassword">
+              <ion-icon [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+            </button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Confirm password <span class="req">*</span></label>
+          <div class="control">
+            <ion-icon name="lock-closed-outline"></ion-icon>
+            <input [type]="showConfirm ? 'text' : 'password'" [(ngModel)]="form.confirmPassword" name="confirmPassword" placeholder="Re-enter password" autocomplete="new-password" />
+            <button type="button" class="ghost" (click)="showConfirm = !showConfirm">
+              <ion-icon [name]="showConfirm ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+            </button>
+          </div>
+        </div>
+
+        <p class="error" *ngIf="errorMessage">
+          <ion-icon name="alert-circle-outline"></ion-icon> {{ errorMessage }}
+        </p>
+
+        <button type="submit" class="primary-btn">
+          Continue <ion-icon name="arrow-forward-outline"></ion-icon>
+        </button>
+
+        <p class="switch">Already have an account? <a (click)="goToLogin()">Log in</a></p>
+      </form>
+
+      <!-- ============ STEP 2: OTP ============ -->
+      <div *ngIf="step === 'otp'" class="otp-step">
+        <div class="otp-icon"><ion-icon name="shield-checkmark-outline"></ion-icon></div>
+        <h2>Verify it's you</h2>
+        <p class="muted">We sent a 6-digit code to<br /><strong>{{ form.phone || form.email }}</strong></p>
+
+        <div class="demo-otp">
+          <ion-icon name="information-circle-outline"></ion-icon>
+          Demo code: <strong>{{ demoOtp }}</strong>
+        </div>
+
+        <div class="field otp-field">
+          <div class="control">
+            <ion-icon name="keypad-outline"></ion-icon>
+            <input
+              type="text"
+              inputmode="numeric"
+              [ngModel]="otpCode"
+              (ionInput)="onlyDigits($event)"
+              name="otp"
+              placeholder="Enter 6-digit code"
+              maxlength="6"
+              class="otp-input"
+            />
+          </div>
+        </div>
+
+        <p class="error" *ngIf="errorMessage">
+          <ion-icon name="alert-circle-outline"></ion-icon> {{ errorMessage }}
+        </p>
+
+        <button class="primary-btn" [disabled]="isLoading" (click)="verifyOtp()">
+          <ion-spinner *ngIf="isLoading" name="crescent"></ion-spinner>
+          <span *ngIf="!isLoading">Verify &amp; create account</span>
+        </button>
+
+        <div class="otp-actions">
+          <button class="link-btn" (click)="editDetails()">
+            <ion-icon name="pencil-outline"></ion-icon> Edit details
+          </button>
+          <button class="link-btn" [disabled]="resendCooldown > 0" (click)="resendOtp()">
+            <ion-icon name="refresh-outline"></ion-icon>
+            {{ resendCooldown > 0 ? 'Resend in ' + resendCooldown + 's' : 'Resend code' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- ============ STEP 3: DONE ============ -->
+      <div *ngIf="step === 'done'" class="done-step">
+        <div class="done-icon"><ion-icon name="checkmark-circle-outline"></ion-icon></div>
+        <h2>Welcome aboard! 🎉</h2>
+        <p class="muted">Your account has been created and verified.</p>
+        <button class="primary-btn" (click)="goToApp()">
+          Start learning <ion-icon name="rocket-outline"></ion-icon>
+        </button>
+      </div>
+    </div>
+  </div>
+</ion-content>

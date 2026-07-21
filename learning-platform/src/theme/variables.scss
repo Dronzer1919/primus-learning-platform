@@ -1,0 +1,68 @@
+// For information on how to create your own theme, please refer to:
+// https://ionicframework.com/docs/theming/
+
+:root {
+  // Theme base variables consumed by theme functions/mixins.
+  // Light/default fallbacks; each .theme-* class in themes.scss overrides these.
+  --theme-background: #ffffff;
+  --theme-surface: #f5f5f5;
+  --theme-card-background: #ffffff;
+  --theme-border-color: #e0e0e0;
+  --theme-shadow: rgba(0, 0, 0, 0.1);
+}
+
+// Playground / editor surfaces are derived from the active theme's variables so the editor, its
+// tabs, console and preview all tint with the selected theme. These MUST be declared on `body`
+// (not :root) because the .theme-* class lives on <body>: a custom property substitutes var()
+// using the referenced property's value on the SAME element, so declaring on <html> would only
+// ever see the :root default (white), never the active theme.
+body {
+  // Compiler surfaces form a 3-step hierarchy in the active theme's hue:
+  //   header  = a dark shade of the theme primary
+  //   toolbar = 20% lighter than the header
+  //   editor  = 35% lighter than the header  (where you write code)
+  --editor-header-bg: color-mix(in srgb, var(--ion-color-primary), #000 58%);
+  --editor-tab-bg: color-mix(in srgb, var(--editor-header-bg), #fff 20%);
+  --editor-bg: color-mix(in srgb, var(--editor-header-bg), #fff 35%);
+  --editor-border: color-mix(in srgb, var(--editor-header-bg), #fff 28%);
+  --editor-fg: #eef1f5;
+
+  // Left playground container + preview/output surfaces.
+  --playground-page-bg: var(--editor-header-bg);
+  --playground-surface-bg: var(--theme-surface);
+}
+
+// Default is a light/white compiler: white header, light toolbar, white code area (dark syntax).
+body.theme-default {
+  --editor-header-bg: #ffffff;
+  --editor-tab-bg: #f1f3f5;
+  --editor-bg: #ffffff;
+  --editor-border: #e3e6ea;
+  --editor-fg: #1f2933;
+}
+
+// Dark uses a neutral slate hierarchy (its blue primary would otherwise tint the compiler blue);
+// toolbar/editor still derive as +20%/+35% from this base.
+body.theme-dark {
+  --editor-header-bg: #15171c;
+}
+
+// Luminous sets every surface explicitly rather than deriving them: the shared +20%/+35%
+// white mix would lift the code area to a mid grey, which loses the near-black canvas this
+// theme is built around. Values stay dark and climb only slightly, keeping the green cast.
+body.theme-luminous {
+  --editor-header-bg: #0b100e;
+  --editor-tab-bg: #121a16;
+  --editor-bg: #0e1512;
+  --editor-border: #223028;
+  --editor-fg: #d9ece2;
+}
+
+// Cyan opts out of the shared derivation for the same reason as Luminous above.
+body.theme-cyan {
+  --editor-header-bg: #0a1013;
+  --editor-tab-bg: #111a1e;
+  --editor-bg: #0d1518;
+  --editor-border: #203036;
+  --editor-fg: #d5eaf0;
+}

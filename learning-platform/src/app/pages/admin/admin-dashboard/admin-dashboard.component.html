@@ -1,0 +1,171 @@
+<div class="dashboard-container">
+  <h1>Dashboard Overview</h1>
+  
+  <div class="stats-grid">
+    <ion-card class="stat-card">
+      <ion-card-content>
+        <div class="stat-icon">
+          <ion-icon name="book-outline" color="primary"></ion-icon>
+        </div>
+        <h2>{{ stats.totalTopics }}</h2>
+        <p>Total Topics</p>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-card class="stat-card">
+      <ion-card-content>
+        <div class="stat-icon">
+          <ion-icon name="list-outline" color="secondary"></ion-icon>
+        </div>
+        <h2>{{ stats.totalSubtopics }}</h2>
+        <p>Total Subtopics</p>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-card class="stat-card">
+      <ion-card-content>
+        <div class="stat-icon">
+          <ion-icon name="pricetags-outline" color="tertiary"></ion-icon>
+        </div>
+        <h2>{{ stats.languageTabs }}</h2>
+        <p>Language Tabs</p>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <h2 class="section-title">Topics by Difficulty</h2>
+  
+  <div class="difficulty-grid">
+    <ion-card class="difficulty-card beginner">
+      <ion-card-content>
+        <ion-icon name="leaf-outline"></ion-icon>
+        <h3>Beginner</h3>
+        <p class="count">{{ stats.beginner }} Topics</p>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-card class="difficulty-card intermediate">
+      <ion-card-content>
+        <ion-icon name="fitness-outline"></ion-icon>
+        <h3>Intermediate</h3>
+        <p class="count">{{ stats.intermediate }} Topics</p>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-card class="difficulty-card advance">
+      <ion-card-content>
+        <ion-icon name="rocket-outline"></ion-icon>
+        <h3>Advance</h3>
+        <p class="count">{{ stats.advance }} Topics</p>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-card class="difficulty-card expert">
+      <ion-card-content>
+        <ion-icon name="trophy-outline"></ion-icon>
+        <h3>Expert</h3>
+        <p class="count">{{ stats.expert }} Topics</p>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <ion-card class="info-card">
+    <ion-card-header>
+      <ion-card-title>Quick Start Guide</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <ol>
+        <li>Create language tabs that will appear in the user navigation</li>
+        <li>Add topics under different difficulty levels (Beginner, Intermediate, Advance, Expert)</li>
+        <li>Create subtopics and sub-subtopics with rich content</li>
+        <li>Add descriptions, code snippets, images, and YouTube videos</li>
+        <li>Configure the coding playground for hands-on practice</li>
+      </ol>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- ── Live User Stats ─────────────────────────────────────────────── -->
+  <h2 class="section-title">Live User Activity</h2>
+
+  <div *ngIf="userStatsLoading" class="ion-text-center ion-padding">
+    <ion-spinner name="crescent"></ion-spinner>
+  </div>
+
+  <ng-container *ngIf="!userStatsLoading && userStats">
+    <div class="stats-grid">
+      <ion-card class="stat-card active-card">
+        <ion-card-content>
+          <div class="stat-icon">
+            <ion-icon name="radio-button-on-outline" color="success"></ion-icon>
+          </div>
+          <h2>{{ userStats.activeNow }}</h2>
+          <p>Active Now</p>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card class="stat-card">
+        <ion-card-content>
+          <div class="stat-icon">
+            <ion-icon name="people-outline" color="primary"></ion-icon>
+          </div>
+          <h2>{{ userStats.totalUsers }}</h2>
+          <p>Total Users</p>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card class="stat-card">
+        <ion-card-content>
+          <div class="stat-icon">
+            <ion-icon name="today-outline" color="tertiary"></ion-icon>
+          </div>
+          <h2>{{ userStats.todayLogins }}</h2>
+          <p>Logins Today</p>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card class="stat-card">
+        <ion-card-content>
+          <div class="stat-icon">
+            <ion-icon name="logo-google" color="danger"></ion-icon>
+          </div>
+          <h2>{{ userStats.googleUsers }}</h2>
+          <p>Google Users</p>
+        </ion-card-content>
+      </ion-card>
+    </div>
+
+    <!-- Recent login activity table -->
+    <ion-card *ngIf="userStats.recentLogins.length">
+      <ion-card-header>
+        <ion-card-title>Recent Login Activity</ion-card-title>
+        <ion-card-subtitle>Last 10 sessions — refreshes every 30 s</ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="recent-logins">
+          <div class="login-row header-row">
+            <span>User</span>
+            <span>Method</span>
+            <span>Device</span>
+            <span>Logged In</span>
+            <span>Duration</span>
+          </div>
+          <div class="login-row" *ngFor="let s of userStats.recentLogins">
+            <span class="user-cell">
+              <img *ngIf="s.user?.avatar" [src]="s.user?.avatar" class="avatar-sm" alt="avatar" />
+              <ion-icon *ngIf="!s.user?.avatar" name="person-circle-outline" class="avatar-icon"></ion-icon>
+              <span>{{ s.user?.displayName || s.user?.username || '—' }}</span>
+            </span>
+            <span>
+              <ion-badge [color]="s.loginMethod === 'google' ? 'danger' : 'primary'">
+                {{ s.loginMethod }}
+              </ion-badge>
+            </span>
+            <span>{{ s.deviceType }}</span>
+            <span>{{ s.loginAt | date:'MMM d, h:mm a' }}</span>
+            <span>{{ s.durationMinutes != null ? s.durationMinutes + ' min' : '—' }}</span>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </ng-container>
+</div>

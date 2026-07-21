@@ -1,0 +1,76 @@
+.topics-list {
+  .topic-item {
+    margin-bottom: 5px;
+
+    .topic-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 15px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+      font-weight: 500;
+
+      &:hover {
+        background: rgba(var(--ion-color-primary-rgb), 0.1);
+      }
+
+      .topic-title {
+        flex: 1;
+        font-size: 14px;
+      }
+
+      ion-icon {
+        font-size: 18px;
+        color: var(--ion-color-medium);
+      }
+    }
+
+    .subtopics-list {
+      // Derived from the text colour so it recedes on light themes and lifts on dark ones;
+      // a flat rgba(0,0,0,.02) was invisible against the dark surfaces.
+      background: color-mix(in srgb, var(--ion-text-color), transparent 96%);
+      padding: 5px 0;
+
+      .subtopic-link {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 15px 10px 30px;
+        text-decoration: none;
+        color: var(--ion-text-color);
+        font-size: 13px;
+        transition: all 0.2s ease;
+
+        ion-icon {
+          font-size: 16px;
+          color: var(--ion-color-medium);
+        }
+
+        &:hover {
+          background: rgba(var(--ion-color-primary-rgb), 0.1);
+          padding-left: 35px;
+        }
+
+        // primary-contrast, not white: white on the luminous/cyan accents is only ~2:1.
+        &.active {
+          background: var(--ion-color-primary);
+          color: var(--ion-color-primary-contrast);
+          font-weight: 500;
+
+          ion-icon {
+            color: var(--ion-color-primary-contrast);
+          }
+        }
+      }
+    }
+  }
+}
+
+.empty-message {
+  padding: 20px 15px;
+  text-align: center;
+  color: var(--ion-color-medium);
+  font-size: 13px;
+  font-style: italic;
+}

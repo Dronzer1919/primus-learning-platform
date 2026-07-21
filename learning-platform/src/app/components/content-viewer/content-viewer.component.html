@@ -1,0 +1,76 @@
+<div class="loading-container" *ngIf="loading">
+  <ion-spinner name="crescent"></ion-spinner>
+  <p>Loading content...</p>
+</div>
+
+<div class="error-container" *ngIf="error && !loading">
+  <ion-icon name="alert-circle-outline" color="danger"></ion-icon>
+  <p>{{ error }}</p>
+</div>
+
+<div class="content-viewer" *ngIf="!loading && !error && topic && subtopic">
+  <div class="content-header">
+    <div class="breadcrumb">
+      <ion-chip color="primary">
+        <ion-label>{{ topic.languagePlatform }}</ion-label>
+      </ion-chip>
+      <ion-icon name="chevron-forward-outline"></ion-icon>
+      <span>{{ topic.title }}</span>
+      <ion-icon name="chevron-forward-outline"></ion-icon>
+      <span class="current">{{ subtopic.title }}</span>
+    </div>
+    <h1>{{ subtopic.title }}</h1>
+  </div>
+
+  <div class="content-body">
+    <div *ngFor="let block of contentBlocks" class="content-block">
+      <!-- Description Content -->
+      <div *ngIf="block.type === 'description'" class="description-block">
+        <p [innerHTML]="block.data.text"></p>
+      </div>
+
+      <!-- Code Content -->
+      <div *ngIf="block.type === 'code'" class="code-block">
+        <div class="code-header">
+          <span class="code-language">{{ block.data.language }}</span>
+          <span class="code-title" *ngIf="block.data.title">{{ block.data.title }}</span>
+          <ion-button size="small" fill="clear" (click)="copyCode(block.data.code)">
+            <ion-icon slot="start" name="copy-outline"></ion-icon>
+            Copy
+          </ion-button>
+        </div>
+        <pre><code [attr.data-language]="block.data.language">{{ block.data.code }}</code></pre>
+      </div>
+
+      <!-- Image Content -->
+      <div *ngIf="block.type === 'image'" class="image-block">
+        <img [src]="block.data.url" [alt]="block.data.alt" />
+        <p class="image-caption" *ngIf="block.data.caption">{{ block.data.caption }}</p>
+      </div>
+
+      <!-- YouTube Content -->
+      <div *ngIf="block.type === 'youtube'" class="youtube-block">
+        <h3 *ngIf="block.data.title">{{ block.data.title }}</h3>
+        <div class="video-container">
+          <iframe
+            [src]="getYoutubeUrl(block.data.videoId)"
+            frameborder="0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen
+          ></iframe>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="contentBlocks.length === 0" class="empty-content">
+      <ion-icon name="document-outline"></ion-icon>
+      <p>No content available for this subtopic yet.</p>
+    </div>
+  </div>
+</div>
+
+<div class="no-selection" *ngIf="!loading && !error && (!topic || !subtopic)">
+  <ion-icon name="file-tray-outline"></ion-icon>
+  <h2>Select a Topic</h2>
+  <p>Choose a topic from the sidebar to view its content</p>
+</div>

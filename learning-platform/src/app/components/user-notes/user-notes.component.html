@@ -1,0 +1,83 @@
+<div class="notes-container">
+  <div class="notes-header">
+    <h1>
+      <ion-icon name="document-text-outline"></ion-icon>
+      My Notes
+    </h1>
+    <ion-button (click)="openModal()" color="primary">
+      <ion-icon slot="start" name="add-outline"></ion-icon>
+      New Note
+    </ion-button>
+  </div>
+
+  <div class="notes-grid">
+    <ion-card *ngFor="let note of notes" class="note-card" [class.pinned]="note.isPinned">
+      <ion-card-header>
+        <div class="note-header-actions">
+          <ion-badge *ngIf="note.isPinned" color="warning">
+            <ion-icon name="pin"></ion-icon>
+            Pinned
+          </ion-badge>
+          <div class="actions">
+            <ion-button fill="clear" size="small" (click)="togglePin(note)">
+              <ion-icon [name]="note.isPinned ? 'pin' : 'pin-outline'"></ion-icon>
+            </ion-button>
+            <ion-button fill="clear" size="small" (click)="openModal(note)">
+              <ion-icon name="create-outline"></ion-icon>
+            </ion-button>
+            <ion-button fill="clear" size="small" color="danger" (click)="deleteNote(note)">
+              <ion-icon name="trash-outline"></ion-icon>
+            </ion-button>
+          </div>
+        </div>
+      </ion-card-header>
+      
+      <ion-card-content>
+        <p class="note-content">{{ note.content }}</p>
+        <div class="note-footer">
+          <ion-text color="medium">
+            <small>Updated: {{ formatDate(note.updatedAt) }}</small>
+          </ion-text>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <div *ngIf="notes.length === 0" class="empty-state">
+      <ion-icon name="document-text-outline"></ion-icon>
+      <h2>No Notes Yet</h2>
+      <p>Create your first note to start organizing your learning</p>
+      <ion-button (click)="openModal()">Create First Note</ion-button>
+    </div>
+  </div>
+
+  <ion-modal [isOpen]="isModalOpen" (didDismiss)="closeModal()">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>{{ editingNote ? 'Edit' : 'New' }} Note</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="closeModal()">Close</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <form (ngSubmit)="saveNote()">
+          <ion-item lines="none">
+            <ion-label position="stacked">Note Content</ion-label>
+            <ion-textarea
+              [(ngModel)]="noteContent"
+              name="content"
+              rows="15"
+              placeholder="Write your note here..."
+              required
+            ></ion-textarea>
+          </ion-item>
+
+          <ion-button expand="block" type="submit" class="ion-margin-top">
+            {{ editingNote ? 'Update' : 'Create' }} Note
+          </ion-button>
+        </form>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+</div>

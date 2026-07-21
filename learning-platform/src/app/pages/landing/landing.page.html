@@ -1,0 +1,60 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-title>
+      <ion-icon name="school-outline"></ion-icon>
+      Learning Platform
+    </ion-title>
+    <ion-buttons slot="end">
+      <app-theme-selector></app-theme-selector>
+      <ion-button routerLink="/login">Sign In</ion-button>
+      <ion-button fill="solid" color="light" routerLink="/signup">Sign Up</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <section class="hero">
+    <h1>Learn to Code. Practice Instantly.</h1>
+    <p>Write, run, and debug HTML, CSS, JavaScript and Python right in your browser — no installs required.</p>
+    <ion-button size="large" routerLink="/signup">Get Started Free</ion-button>
+  </section>
+
+  <section class="demo-section">
+    <h2>Try it now</h2>
+    <p class="demo-subtitle">No sign-up needed — write some JavaScript and hit Run.</p>
+    <div class="demo-frame">
+      <app-playground-workspace mode="javascript" [showModeTabs]="false" [showHeader]="false"></app-playground-workspace>
+    </div>
+  </section>
+
+  <section class="features">
+    <h2>Languages you can practice</h2>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <ion-icon name="logo-html5"></ion-icon>
+        <h3>HTML / CSS / JS</h3>
+        <p>Build and preview full web pages live.</p>
+      </div>
+      <div class="feature-card">
+        <ion-icon name="logo-python"></ion-icon>
+        <h3>Python</h3>
+        <p>Run Python instantly in your browser via WebAssembly.</p>
+      </div>
+      <div class="feature-card locked">
+        <ion-icon name="hardware-chip-outline"></ion-icon>
+        <h3>C <ion-badge color="medium">Coming Soon</ion-badge></h3>
+        <p>Backend compiler support is on the way.</p>
+      </div>
+      <div class="feature-card locked">
+        <ion-icon name="hardware-chip-outline"></ion-icon>
+        <h3>C++ <ion-badge color="medium">Coming Soon</ion-badge></h3>
+        <p>Backend compiler support is on the way.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta">
+    <h2>Ready to start learning?</h2>
+    <ion-button size="large" routerLink="/signup">Create your free account</ion-button>
+  </section>
+</ion-content>

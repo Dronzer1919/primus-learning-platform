@@ -1,0 +1,131 @@
+<div class="sessions-layout">
+  <!-- Sidebar: session history (Claude-style) -->
+  <aside class="session-sidebar">
+    <div class="sidebar-header">
+      <h2>Sessions</h2>
+      <ion-button size="small" (click)="createSession()">
+        <ion-icon slot="start" name="add-outline"></ion-icon>
+        New
+      </ion-button>
+    </div>
+
+    <div class="session-list">
+      <div
+        *ngFor="let session of sessions; trackBy: trackById"
+        class="session-item"
+        [class.active]="activeSession?._id === session._id"
+        (click)="selectSession(session)">
+        <div class="session-info">
+          <span class="session-title">{{ session.title }}</span>
+          <span class="session-meta">
+            {{ session.todos.length }} todos · {{ session.notes.length }} notes
+          </span>
+        </div>
+        <div class="session-actions">
+          <ion-icon name="create-outline" (click)="$event.stopPropagation(); renameSession(session)"></ion-icon>
+          <ion-icon name="trash-outline" color="danger" (click)="deleteSession(session, $event)"></ion-icon>
+        </div>
+      </div>
+
+      <p *ngIf="!loading && sessions.length === 0" class="empty-hint">
+        No sessions yet. Click <strong>New</strong> to create your first session.
+      </p>
+    </div>
+  </aside>
+
+  <!-- Main: active session with to-do list + notes -->
+  <section class="session-main" *ngIf="activeSession as session; else noSession">
+    <header class="session-main-header">
+      <h1>{{ session.title }}</h1>
+      <span class="updated">Updated {{ formatDate(session.updatedAt) }}</span>
+    </header>
+
+    <div class="panels">
+      <!-- To-Do list -->
+      <div class="panel todo-panel">
+        <div class="panel-header">
+          <h3>To-Do List</h3>
+          <span class="badge">{{ completedCount }}/{{ session.todos.length }} done</span>
+        </div>
+
+        <form class="todo-add" (ngSubmit)="addTodo()">
+          <ion-input
+            [(ngModel)]="newTodoText"
+            name="newTodo"
+            placeholder="Add a task and press Enter"
+            fill="outline"></ion-input>
+          <ion-button type="submit" [disabled]="!newTodoText.trim()">Add</ion-button>
+        </form>
+
+        <ul class="todo-items">
+          <li *ngFor="let todo of session.todos; trackBy: trackById" class="todo-item" [class.done]="todo.completed">
+            <ion-checkbox
+              [checked]="todo.completed"
+              (ionChange)="toggleTodo(todo._id, $event.detail.checked)"></ion-checkbox>
+            <span class="todo-text">{{ todo.text }}</span>
+            <ion-icon name="trash-outline" color="danger" (click)="deleteTodo(todo._id)"></ion-icon>
+          </li>
+          <li *ngIf="session.todos.length === 0" class="empty-hint">No tasks yet.</li>
+        </ul>
+      </div>
+
+      <!-- Notes -->
+      <div class="panel notes-panel">
+        <div class="panel-header">
+          <h3>Notes</h3>
+          <ion-button size="small" fill="outline" (click)="openNoteModal()">
+            <ion-icon slot="start" name="add-outline"></ion-icon>
+            Add Note
+          </ion-button>
+        </div>
+
+        <div class="note-cards">
+          <div class="note-card" *ngFor="let note of session.notes; trackBy: trackById">
+            <p class="note-content">{{ note.content }}</p>
+            <div class="note-footer">
+              <span class="note-date">{{ formatDate(note.updatedAt) }}</span>
+              <div class="note-actions">
+                <ion-icon name="create-outline" (click)="openNoteModal(note)"></ion-icon>
+                <ion-icon name="trash-outline" color="danger" (click)="deleteNote(note)"></ion-icon>
+              </div>
+            </div>
+          </div>
+          <p *ngIf="session.notes.length === 0" class="empty-hint">No notes yet.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <ng-template #noSession>
+    <section class="session-main empty-state">
+      <ion-icon name="documents-outline"></ion-icon>
+      <p>Select a session or create a new one to add todos and notes.</p>
+      <ion-button (click)="createSession()">New Session</ion-button>
+    </section>
+  </ng-template>
+</div>
+
+<!-- Note editor modal -->
+<ion-modal [isOpen]="isNoteModalOpen" (didDismiss)="closeNoteModal()">
+  <ng-template>
+    <ion-header>
+      <ion-toolbar>
+        <ion-title>{{ editingNote ? 'Edit Note' : 'New Note' }}</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="closeNoteModal()">Close</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      <ion-textarea
+        [(ngModel)]="noteContent"
+        [autoGrow]="true"
+        [rows]="8"
+        placeholder="Write your note..."
+        fill="outline"></ion-textarea>
+      <ion-button expand="block" class="ion-margin-top" [disabled]="!noteContent.trim()" (click)="saveNote()">
+        Save Note
+      </ion-button>
+    </ion-content>
+  </ng-template>
+</ion-modal>

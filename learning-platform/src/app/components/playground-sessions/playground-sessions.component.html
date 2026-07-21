@@ -1,0 +1,88 @@
+<div class="pgs-layout">
+  <!-- Sidebar: saved playground sessions -->
+  <aside class="pgs-sidebar">
+    <div class="pgs-header">
+      <h2>Playground</h2>
+      <ion-button size="small" (click)="createSession()">
+        <ion-icon slot="start" name="add-outline"></ion-icon>
+        New
+      </ion-button>
+    </div>
+
+    <div class="pgs-list">
+      <div
+        *ngFor="let session of sessions; trackBy: trackById"
+        class="pgs-item"
+        [class.active]="activeSession?._id === session._id"
+        (click)="selectSession(session)">
+
+        <!-- Active session: inline title edit + save/delete actions -->
+        <ng-container *ngIf="activeSession?._id === session._id; else inactiveItem">
+          <ion-input
+            [(ngModel)]="editingTitle"
+            placeholder="Session name"
+            class="title-input"
+            (click)="$event.stopPropagation()">
+          </ion-input>
+          <div class="pgs-item-actions active-actions">
+            <ion-icon
+              [name]="isSaving ? 'hourglass-outline' : 'save-outline'"
+              (click)="$event.stopPropagation(); saveSession()"
+              title="Save">
+            </ion-icon>
+            <ion-icon
+              name="trash-outline"
+              color="danger"
+              (click)="deleteSession(session, $event)"
+              title="Delete">
+            </ion-icon>
+          </div>
+        </ng-container>
+
+        <!-- Inactive session -->
+        <ng-template #inactiveItem>
+          <div class="pgs-item-info">
+            <span class="pgs-item-title">{{ session.title }}</span>
+            <span class="pgs-item-meta">
+              <span class="mode-badge">{{ session.mode }}</span>
+              · {{ formatDate(session.updatedAt) }}
+            </span>
+          </div>
+          <div class="pgs-item-actions">
+            <ion-icon name="trash-outline" color="danger" (click)="deleteSession(session, $event)"></ion-icon>
+          </div>
+        </ng-template>
+      </div>
+
+      <p *ngIf="!loading && sessions.length === 0" class="empty-hint">
+        No sessions yet. Click <strong>New</strong> to create your first playground session.
+      </p>
+
+      <div *ngIf="loading" class="loading-hint">
+        <ion-spinner name="dots"></ion-spinner>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main: playground workspace for the active session -->
+  <section class="pgs-workspace" *ngIf="activeSession; else noSession">
+    <app-playground-workspace
+      [showHeader]="false"
+      [showModeTabs]="true"
+      [showSave]="true"
+      [sessionUpdatedAt]="activeSession.updatedAt"
+      (saveClick)="openSaveDialog()">
+    </app-playground-workspace>
+  </section>
+
+  <ng-template #noSession>
+    <section class="pgs-workspace pgs-empty">
+      <ion-icon name="code-slash-outline" class="empty-icon"></ion-icon>
+      <p>Create a new playground session to start coding.</p>
+      <ion-button (click)="createSession()">
+        <ion-icon slot="start" name="add-outline"></ion-icon>
+        New Session
+      </ion-button>
+    </section>
+  </ng-template>
+</div>

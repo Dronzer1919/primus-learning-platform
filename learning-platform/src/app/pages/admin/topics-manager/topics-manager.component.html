@@ -1,0 +1,245 @@
+<div class="topics-container">
+  <div class="header-section">
+    <div class="title-group">
+      <ion-icon [name]="getDifficultyIcon()" class="level-icon"></ion-icon>
+      <h1>{{ getDifficultyLabel() }} Topics</h1>
+    </div>
+    <ion-button (click)="openTopicModal()" color="primary">
+      <ion-icon slot="start" name="add-outline"></ion-icon>
+      Add Topic
+    </ion-button>
+  </div>
+
+  <div class="topics-list">
+    <ion-card *ngFor="let topic of topics" class="topic-card">
+      <ion-card-header>
+        <div class="topic-header">
+          <div>
+            <ion-card-title>{{ topic.title }}</ion-card-title>
+            <ion-card-subtitle>
+              <ion-badge color="primary">{{ topic.languagePlatform }}</ion-badge>
+              <span class="order-badge">Order: {{ topic.order }}</span>
+            </ion-card-subtitle>
+          </div>
+          <div class="topic-actions">
+            <ion-button fill="clear" (click)="openTopicModal(topic)">
+              <ion-icon name="create-outline"></ion-icon>
+            </ion-button>
+            <ion-button fill="clear" color="danger" (click)="deleteTopic(topic)">
+              <ion-icon name="trash-outline"></ion-icon>
+            </ion-button>
+          </div>
+        </div>
+      </ion-card-header>
+      
+      <ion-card-content>
+        <p class="topic-description">{{ topic.description }}</p>
+        
+        <div class="subtopics-section">
+          <div class="subtopics-header">
+            <h3>Subtopics ({{ topic.subtopics.length }})</h3>
+            <ion-button size="small" (click)="openSubtopicModal(topic)">
+              <ion-icon slot="start" name="add-outline"></ion-icon>
+              Add Subtopic
+            </ion-button>
+          </div>
+          
+          <div class="subtopics-list" *ngIf="topic.subtopics.length > 0">
+            <div *ngFor="let subtopic of topic.subtopics" class="subtopic-item">
+              <div class="subtopic-info">
+                <span class="subtopic-order">{{ subtopic.order }}</span>
+                <div>
+                  <strong>{{ subtopic.title }}</strong>
+                  <p class="content-count">{{ subtopic.content.length }} content blocks</p>
+                </div>
+              </div>
+              <div class="subtopic-actions">
+                <ion-button size="small" fill="clear" (click)="openContentModal(topic, subtopic)">
+                  <ion-icon name="add-circle-outline"></ion-icon>
+                </ion-button>
+                <ion-button size="small" fill="clear" (click)="openSubtopicModal(topic, subtopic)">
+                  <ion-icon name="create-outline"></ion-icon>
+                </ion-button>
+                <ion-button size="small" fill="clear" color="danger" (click)="deleteSubtopic(topic, subtopic)">
+                  <ion-icon name="trash-outline"></ion-icon>
+                </ion-button>
+              </div>
+            </div>
+          </div>
+          
+          <div *ngIf="topic.subtopics.length === 0" class="empty-subtopics">
+            <p>No subtopics yet. Click "Add Subtopic" to create one.</p>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <div *ngIf="topics.length === 0" class="empty-state">
+      <ion-icon [name]="getDifficultyIcon()"></ion-icon>
+      <h2>No {{ getDifficultyLabel() }} Topics</h2>
+      <p>Create your first topic to get started</p>
+      <ion-button (click)="openTopicModal()">Create Topic</ion-button>
+    </div>
+  </div>
+
+  <!-- Topic Modal -->
+  <ion-modal [isOpen]="isTopicModalOpen" (didDismiss)="isTopicModalOpen = false">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>{{ editingTopic ? 'Edit' : 'Add' }} Topic</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="isTopicModalOpen = false">Close</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <form (ngSubmit)="saveTopic()">
+          <ion-item>
+            <ion-label position="floating">Title</ion-label>
+            <ion-input [(ngModel)]="topicForm.title" name="title" required></ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="floating">Description</ion-label>
+            <ion-textarea [(ngModel)]="topicForm.description" name="description" rows="4" required></ion-textarea>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="floating">Language Platform</ion-label>
+            <ion-select [(ngModel)]="topicForm.languagePlatform" name="language" required>
+              <ion-select-option *ngFor="let lang of availableLanguages" [value]="lang.code">
+                {{ lang.name }}
+              </ion-select-option>
+            </ion-select>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="floating">Display Order</ion-label>
+            <ion-input type="number" [(ngModel)]="topicForm.order" name="order" required></ion-input>
+          </ion-item>
+
+          <ion-button expand="block" type="submit" class="ion-margin-top">
+            {{ editingTopic ? 'Update' : 'Create' }} Topic
+          </ion-button>
+        </form>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+
+  <!-- Subtopic Modal -->
+  <ion-modal [isOpen]="isSubtopicModalOpen" (didDismiss)="isSubtopicModalOpen = false">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>{{ editingSubtopic ? 'Edit' : 'Add' }} Subtopic</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="isSubtopicModalOpen = false">Close</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <form (ngSubmit)="saveSubtopic()">
+          <ion-item>
+            <ion-label position="floating">Subtopic Title</ion-label>
+            <ion-input [(ngModel)]="subtopicForm.title" name="title" required></ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="floating">Display Order</ion-label>
+            <ion-input type="number" [(ngModel)]="subtopicForm.order" name="order" required></ion-input>
+          </ion-item>
+
+          <ion-button expand="block" type="submit" class="ion-margin-top">
+            {{ editingSubtopic ? 'Update' : 'Create' }} Subtopic
+          </ion-button>
+        </form>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+
+  <!-- Content Modal -->
+  <ion-modal [isOpen]="isContentModalOpen" (didDismiss)="isContentModalOpen = false">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>Add Content Block</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="isContentModalOpen = false">Close</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <form (ngSubmit)="saveContent()">
+          <ion-item>
+            <ion-label position="floating">Content Type</ion-label>
+            <ion-select [(ngModel)]="contentForm.type" name="type" required>
+              <ion-select-option *ngFor="let ct of contentTypes" [value]="ct.type">
+                {{ ct.label }}
+              </ion-select-option>
+            </ion-select>
+          </ion-item>
+
+          <!-- Description Content -->
+          <ion-item *ngIf="contentForm.type === 'description'">
+            <ion-label position="floating">Text Content</ion-label>
+            <ion-textarea [(ngModel)]="contentForm.data.text" name="text" rows="6" required></ion-textarea>
+          </ion-item>
+
+          <!-- Code Content -->
+          <ng-container *ngIf="contentForm.type === 'code'">
+            <ion-item>
+              <ion-label position="floating">Code Title (optional)</ion-label>
+              <ion-input [(ngModel)]="contentForm.data.title" name="codeTitle"></ion-input>
+            </ion-item>
+            <ion-item>
+              <ion-label position="floating">Language</ion-label>
+              <ion-input [(ngModel)]="contentForm.data.language" name="language" required></ion-input>
+            </ion-item>
+            <ion-item>
+              <ion-label position="floating">Code</ion-label>
+              <ion-textarea [(ngModel)]="contentForm.data.code" name="code" rows="10" required></ion-textarea>
+            </ion-item>
+          </ng-container>
+
+          <!-- Image Content -->
+          <ng-container *ngIf="contentForm.type === 'image'">
+            <ion-item>
+              <ion-label position="floating">Image URL</ion-label>
+              <ion-input [(ngModel)]="contentForm.data.url" name="url" required></ion-input>
+            </ion-item>
+            <ion-item>
+              <ion-label position="floating">Alt Text</ion-label>
+              <ion-input [(ngModel)]="contentForm.data.alt" name="alt" required></ion-input>
+            </ion-item>
+            <ion-item>
+              <ion-label position="floating">Caption (optional)</ion-label>
+              <ion-input [(ngModel)]="contentForm.data.caption" name="caption"></ion-input>
+            </ion-item>
+          </ng-container>
+
+          <!-- YouTube Content -->
+          <ng-container *ngIf="contentForm.type === 'youtube'">
+            <ion-item>
+              <ion-label position="floating">YouTube Video ID</ion-label>
+              <ion-input [(ngModel)]="contentForm.data.videoId" name="videoId" required></ion-input>
+            </ion-item>
+            <ion-item>
+              <ion-label position="floating">Video Title (optional)</ion-label>
+              <ion-input [(ngModel)]="contentForm.data.title" name="videoTitle"></ion-input>
+            </ion-item>
+          </ng-container>
+
+          <ion-item>
+            <ion-label position="floating">Display Order</ion-label>
+            <ion-input type="number" [(ngModel)]="contentForm.order" name="order" required></ion-input>
+          </ion-item>
+
+          <ion-button expand="block" type="submit" class="ion-margin-top">
+            Add Content
+          </ion-button>
+        </form>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+</div>

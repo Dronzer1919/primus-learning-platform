@@ -1,0 +1,258 @@
+.user-header {
+  ion-toolbar {
+    --padding-start: 10px;
+    --padding-end: 10px;
+  }
+}
+
+.language-tabs-toolbar {
+  --background: var(--theme-surface);
+  --border-color: var(--theme-border-color);
+  padding: 5px 10px;
+
+  .language-tabs {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 5px 0;
+
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--ion-color-medium);
+      border-radius: 4px;
+    }
+
+    ion-chip {
+      cursor: pointer;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+
+      // primary-contrast, not white: the lighter accents (luminous green, cyan) need dark
+      // text to stay readable.
+      &.active {
+        background: var(--ion-color-primary);
+        color: var(--ion-color-primary-contrast);
+      }
+
+      &:hover {
+        transform: translateY(-2px);
+      }
+
+      // Tabs with no content are pushed to the far right and cannot be selected
+      &.disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        pointer-events: none;
+
+        &:hover {
+          transform: none;
+        }
+      }
+    }
+  }
+}
+
+/* Enlarged profile avatar in the toolbar */
+.profile-btn {
+  --padding-start: 4px;
+  --padding-end: 4px;
+
+  .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 17px;
+    border: 2px solid rgba(255, 255, 255, 0.6);
+  }
+}
+
+/* Profile dropdown card */
+.profile-card {
+  padding: 20px 18px;
+  text-align: center;
+  min-width: 250px;
+
+  .avatar-lg {
+    width: 66px;
+    height: 66px;
+    border-radius: 50%;
+    background: var(--ion-color-primary);
+    color: var(--ion-color-primary-contrast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 700;
+    margin: 0 auto 12px;
+  }
+
+  .greeting {
+    margin: 0 0 4px;
+    font-weight: 600;
+    font-size: 16px;
+  }
+
+  .subtitle {
+    margin: 0 0 14px;
+    font-size: 12px;
+    color: var(--ion-color-medium);
+  }
+
+  .profile-rows {
+    text-align: left;
+    margin-bottom: 16px;
+  }
+
+  .profile-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    font-size: 14px;
+    color: var(--ion-color-medium-shade);
+
+    ion-icon {
+      font-size: 17px;
+      flex-shrink: 0;
+    }
+
+    span {
+      word-break: break-all;
+    }
+  }
+}
+
+.user-container {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  background: var(--theme-surface);
+  border-right: 1px solid var(--theme-border-color);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: width 0.3s ease, margin-left 0.3s ease, transform 0.3s ease;
+
+  // Collapse (desktop): narrow to an icon rail rather than sliding off-screen, so the
+  // difficulty levels stay reachable — same behaviour as the admin panel. The nested
+  // topic lists have no icon form, so they hide and return when the rail is reopened.
+  &:not(.sidebar-open) {
+    width: 70px;
+
+    .difficulty-header {
+      justify-content: center;
+      gap: 0;
+      padding: 12px 0;
+      cursor: pointer;
+
+      h4 {
+        display: none;
+      }
+    }
+
+    app-user-topic-list {
+      display: none;
+    }
+
+    .menu-divider {
+      margin: 12px 10px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    position: fixed;
+    left: 0;
+    top: 112px;
+    height: calc(100% - 112px);
+    z-index: 999;
+    transform: translateX(-100%);
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+
+    &.sidebar-open {
+      transform: translateX(0);
+    }
+
+    // Mobile keeps the full-width overlay: it slides out entirely instead of leaving a
+    // rail, so the desktop collapse rules above are reverted here.
+    &:not(.sidebar-open) {
+      width: 300px;
+      margin-left: 0;
+
+      .difficulty-header {
+        justify-content: flex-start;
+        gap: 10px;
+        padding: 10px 15px;
+
+        h4 { display: block; }
+      }
+
+      app-user-topic-list { display: block; }
+    }
+  }
+}
+
+.sidebar-menu {
+  flex: 1;
+  padding: 15px 0;
+}
+
+.difficulty-section {
+  margin-bottom: 20px;
+
+  .difficulty-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 15px;
+    background: rgba(var(--ion-color-primary-rgb), 0.1);
+    border-left: 4px solid var(--ion-color-primary);
+
+    ion-icon {
+      font-size: 24px;
+    }
+
+    h4 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+  }
+}
+
+.menu-divider {
+  height: 1px;
+  background: var(--theme-border-color);
+  margin: 20px 15px;
+}
+
+.extra-menu {
+  padding: 0 15px;
+
+  ion-button {
+    margin-bottom: 10px;
+  }
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  // Was hardcoded #fff, which stayed white in every dark theme.
+  background: var(--theme-background);
+  color: var(--ion-text-color);
+}

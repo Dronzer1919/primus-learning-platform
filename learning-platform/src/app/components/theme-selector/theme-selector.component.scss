@@ -1,0 +1,50 @@
+ion-popover {
+  --width: 300px;
+}
+
+.theme-list {
+  padding: 8px;
+
+  ion-list-header {
+    padding-bottom: 8px;
+
+    h2 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    p {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin: 0;
+    }
+  }
+
+  ion-item {
+    --padding-start: 12px;
+    --inner-padding-end: 8px;
+    margin-bottom: 4px;
+    border-radius: 10px;
+
+    ion-icon[slot='start'] {
+      font-size: 22px;
+      margin-right: 14px;
+    }
+
+    ion-icon[slot='end'] {
+      font-size: 22px;
+    }
+
+    h3 {
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    p {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin: 0;
+    }
+  }
+}

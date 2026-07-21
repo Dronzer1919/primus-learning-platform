@@ -1,0 +1,134 @@
+.admin-header {
+  ion-toolbar {
+    --padding-start: 10px;
+    --padding-end: 10px;
+  }
+
+  ion-button {
+    font-size: 14px;
+  }
+}
+
+.admin-container {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 260px;
+  background: var(--theme-surface);
+  border-right: 1px solid var(--theme-border-color);
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s ease;
+  overflow-x: hidden;
+
+  &.sidebar-collapsed {
+    width: 70px;
+  }
+}
+
+.sidebar-header {
+  padding: 20px 15px;
+  border-bottom: 1px solid var(--theme-border-color);
+  // Tinted panel with accent-coloured text rather than a solid primary slab, so it
+  // reads as branding on a light theme and stays dark on the dark themes.
+  background: var(--theme-card-background);
+  color: var(--ion-color-primary);
+
+  // 20px/700 qualifies as WCAG "large text", where 3:1 applies. Accent-on-card sits at
+  // ~4.4:1 on the light and dark themes — fine here, but short of the 4.5 normal text needs.
+  h3 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+}
+
+.sidebar-menu {
+  flex: 1;
+  padding: 10px 0;
+  overflow-y: auto;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 15px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  color: var(--ion-text-color);
+
+  ion-icon {
+    font-size: 24px;
+    min-width: 24px;
+    margin-right: 15px;
+  }
+
+  span {
+    font-size: 15px;
+    font-weight: 500;
+  }
+
+  &:hover {
+    background: color-mix(in srgb, var(--ion-text-color), transparent 92%);
+  }
+
+  // A tint of the accent rather than a solid fill: a saturated block is overpowering
+  // on the dark themes, and `color: white` failed contrast against the lighter accents.
+  // The label keeps full-contrast text (accent-coloured text over the tint only reaches
+  // ~3.4:1 on the light theme); the accent is carried by the border and icon, which are
+  // non-text and need 3:1.
+  &.active {
+    background: color-mix(in srgb, var(--ion-color-primary), transparent 86%);
+    color: var(--ion-text-color);
+    border-left: 4px solid var(--ion-color-primary);
+    font-weight: 600;
+
+    ion-icon {
+      color: var(--ion-color-primary);
+    }
+  }
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  // Was hardcoded #f5f5f5, which left headings (inheriting the theme's light text)
+  // invisible on the dark themes.
+  background: var(--theme-background);
+  color: var(--ion-text-color);
+  transition: margin-left 0.3s ease;
+
+  &.sidebar-collapsed {
+    margin-left: 0;
+  }
+}
+
+.content-wrapper {
+  padding: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: 0;
+    top: 56px;
+    height: calc(100% - 56px);
+    z-index: 999;
+    transform: translateX(0);
+
+    &.sidebar-collapsed {
+      transform: translateX(-100%);
+    }
+  }
+
+  .main-content {
+    margin-left: 0 !important;
+  }
+}

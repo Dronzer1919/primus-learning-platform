@@ -1,0 +1,200 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar class="auth-toolbar">
+    <ion-title>{{ mode === 'forgot' ? 'Reset password' : 'Welcome back' }}</ion-title>
+    <ion-buttons slot="end">
+      <app-theme-selector></app-theme-selector>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="auth-content">
+  <div class="auth-bg"></div>
+
+  <div class="auth-wrap">
+    <div class="brand">
+      <div class="brand-badge">
+        <ion-icon name="school-outline"></ion-icon>
+      </div>
+      <h1>Learning Platform</h1>
+      <p>Master Web Development</p>
+    </div>
+
+    <!-- ==================== LOGIN ==================== -->
+    <div class="auth-card" *ngIf="mode === 'login'">
+      <form (ngSubmit)="onLogin()">
+        <div class="field">
+          <label>Username or email</label>
+          <div class="control">
+            <ion-icon name="person-outline"></ion-icon>
+            <input type="text" [(ngModel)]="credentials.email" name="email" placeholder="you@example.com" autocomplete="username" />
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="label-row">
+            <label>Password</label>
+            <a class="forgot" (click)="openForgot()">Forgot?</a>
+          </div>
+          <div class="control">
+            <ion-icon name="lock-closed-outline"></ion-icon>
+            <input [type]="showPassword ? 'text' : 'password'" [(ngModel)]="credentials.password" name="password" placeholder="Your password" autocomplete="current-password" />
+            <button type="button" class="ghost" (click)="showPassword = !showPassword">
+              <ion-icon [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+            </button>
+          </div>
+        </div>
+
+        <p class="error" *ngIf="errorMessage">
+          <ion-icon name="alert-circle-outline"></ion-icon> {{ errorMessage }}
+        </p>
+
+        <button type="submit" class="primary-btn" [disabled]="isLoading">
+          <ion-spinner *ngIf="isLoading" name="crescent"></ion-spinner>
+          <span *ngIf="!isLoading">Log in</span>
+        </button>
+
+        <p class="switch">Don't have an account? <a (click)="goToSignup()">Sign up</a></p>
+      </form>
+
+      <div class="divider"><span>or</span></div>
+
+      <!-- Google Sign-In -->
+      <div class="google-btn-wrapper">
+        <ng-container *ngIf="googleConfigured; else googleNotConfigured">
+          <div #googleBtnContainer class="google-rendered-btn"></div>
+        </ng-container>
+
+        <ng-template #googleNotConfigured>
+          <div class="google-setup-notice">
+            <div class="google-login-btn disabled-look">
+              <svg class="google-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="20" height="20">
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+              </svg>
+              <span>Continue with Google</span>
+            </div>
+            <div class="setup-steps">
+              <p class="setup-title">To enable Google login:</p>
+              <ol>
+                <li>Go to <strong>console.cloud.google.com</strong></li>
+                <li>Create a project → APIs &amp; Services → Credentials</li>
+                <li>Create OAuth 2.0 Client ID (Web app)</li>
+                <li>Add <code>http://localhost:4200</code> to Authorized JavaScript origins</li>
+                <li>Copy the Client ID into <code>environment.ts</code> → <code>googleClientId</code></li>
+                <li>Add <code>GOOGLE_CLIENT_ID=your-id</code> to <code>backend/.env</code></li>
+              </ol>
+            </div>
+          </div>
+        </ng-template>
+      </div>
+
+      <div class="demo-credentials">
+        <p class="demo-title"><strong>Demo Credentials</strong></p>
+        <div class="cred-row" (click)="fillCredentials('admin', 'admin123')">
+          <ion-badge color="danger">Admin</ion-badge>
+          <span class="cred-item">Username: <strong>admin</strong> &nbsp;|&nbsp; Password: <strong>admin123</strong></span>
+        </div>
+        <div class="cred-row" (click)="fillCredentials('testuser', 'user123')">
+          <ion-badge color="primary">User</ion-badge>
+          <span class="cred-item">Username: <strong>testuser</strong> &nbsp;|&nbsp; Password: <strong>user123</strong></span>
+        </div>
+        <p class="tap-hint">Tap a row to auto-fill</p>
+      </div>
+    </div>
+
+    <!-- ==================== FORGOT PASSWORD ==================== -->
+    <div class="auth-card" *ngIf="mode === 'forgot'">
+      <!-- Step: email -->
+      <div *ngIf="forgotStep === 'email'">
+        <div class="otp-icon"><ion-icon name="mail-unread-outline"></ion-icon></div>
+        <h2 class="center">Forgot your password?</h2>
+        <p class="muted center">Enter your email and we'll send you a code to reset it.</p>
+
+        <div class="field">
+          <label>Email</label>
+          <div class="control">
+            <ion-icon name="mail-outline"></ion-icon>
+            <input type="email" [(ngModel)]="forgotEmail" name="forgotEmail" placeholder="you@example.com" autocomplete="email" />
+          </div>
+        </div>
+
+        <p class="error" *ngIf="errorMessage">
+          <ion-icon name="alert-circle-outline"></ion-icon> {{ errorMessage }}
+        </p>
+
+        <button class="primary-btn" (click)="sendResetCode()">Send code <ion-icon name="paper-plane-outline"></ion-icon></button>
+        <p class="switch"><a (click)="backToLogin()">← Back to login</a></p>
+      </div>
+
+      <!-- Step: otp -->
+      <div *ngIf="forgotStep === 'otp'" class="center">
+        <div class="otp-icon"><ion-icon name="shield-checkmark-outline"></ion-icon></div>
+        <h2>Enter the code</h2>
+        <p class="muted">Sent to <strong>{{ forgotEmail }}</strong></p>
+
+        <div class="demo-otp">
+          <ion-icon name="information-circle-outline"></ion-icon>
+          Demo code: <strong>{{ demoOtp }}</strong>
+        </div>
+
+        <div class="field otp-field">
+          <div class="control">
+            <ion-icon name="keypad-outline"></ion-icon>
+            <input type="text" inputmode="numeric" [ngModel]="forgotOtp" (ionInput)="onlyDigits($event)" name="forgotOtp" placeholder="6-digit code" maxlength="6" class="otp-input" />
+          </div>
+        </div>
+
+        <p class="error" *ngIf="errorMessage">
+          <ion-icon name="alert-circle-outline"></ion-icon> {{ errorMessage }}
+        </p>
+
+        <button class="primary-btn" (click)="verifyResetCode()">Verify code</button>
+        <div class="otp-actions">
+          <button class="link-btn" (click)="backToLogin()"><ion-icon name="arrow-back-outline"></ion-icon> Cancel</button>
+          <button class="link-btn" (click)="resendResetCode()"><ion-icon name="refresh-outline"></ion-icon> Resend code</button>
+        </div>
+      </div>
+
+      <!-- Step: reset -->
+      <div *ngIf="forgotStep === 'reset'">
+        <div class="otp-icon"><ion-icon name="key-outline"></ion-icon></div>
+        <h2 class="center">Set a new password</h2>
+
+        <div class="field">
+          <label>New password</label>
+          <div class="control">
+            <ion-icon name="lock-closed-outline"></ion-icon>
+            <input [type]="showNewPassword ? 'text' : 'password'" [(ngModel)]="newPassword" name="newPassword" placeholder="At least 6 characters" autocomplete="new-password" />
+            <button type="button" class="ghost" (click)="showNewPassword = !showNewPassword">
+              <ion-icon [name]="showNewPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+            </button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Confirm new password</label>
+          <div class="control">
+            <ion-icon name="lock-closed-outline"></ion-icon>
+            <input [type]="showNewPassword ? 'text' : 'password'" [(ngModel)]="confirmNewPassword" name="confirmNewPassword" placeholder="Re-enter password" autocomplete="new-password" />
+          </div>
+        </div>
+
+        <p class="error" *ngIf="errorMessage">
+          <ion-icon name="alert-circle-outline"></ion-icon> {{ errorMessage }}
+        </p>
+
+        <button class="primary-btn" (click)="submitNewPassword()">Update password</button>
+      </div>
+
+      <!-- Step: success -->
+      <div *ngIf="forgotStep === 'success'" class="center">
+        <div class="done-icon"><ion-icon name="checkmark-circle-outline"></ion-icon></div>
+        <h2>Password updated</h2>
+        <p class="muted">You can now log in with your new password.</p>
+        <button class="primary-btn" (click)="backToLogin()">Back to login</button>
+      </div>
+    </div>
+  </div>
+</ion-content>

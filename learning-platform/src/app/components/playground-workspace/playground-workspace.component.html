@@ -1,0 +1,234 @@
+<div class="playground-container" [class.fullscreen]="isFullscreen">
+  <div class="rail" *ngIf="showModeTabs">
+    <div
+      *ngFor="let lang of languages"
+      class="rail-item"
+      [class.active]="selectedMode === lang.id"
+      [class.locked]="lang.locked"
+      [title]="lang.locked ? lang.lockedMessage : lang.label"
+      (click)="selectMode(lang.id)"
+    >
+      <span *ngIf="lang.id === 'typescript'" class="rail-text">TS</span>
+      <ion-icon *ngIf="lang.id !== 'typescript'" [name]="lang.icon"></ion-icon>
+      <ion-icon *ngIf="lang.locked" name="lock-closed-outline" class="lock-badge"></ion-icon>
+    </div>
+  </div>
+
+  <div class="playground-main">
+    <div class="compiler-header" *ngIf="showHeader">
+      <div class="brand">
+        <ion-icon [name]="modeIcon"></ion-icon>
+        <div>
+          <h1>Learning Platform</h1>
+          <p>{{ modeTagline }}</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <app-theme-selector></app-theme-selector>
+        <ng-container *ngIf="(authService.currentUser | async) as user; else signInBtn">
+          <ion-button size="small" (click)="logout()">
+            <ion-icon slot="start" name="log-out-outline"></ion-icon>
+            Logout
+          </ion-button>
+        </ng-container>
+        <ng-template #signInBtn>
+          <ion-button size="small" routerLink="/login">
+            <ion-icon slot="start" name="log-in-outline"></ion-icon>
+            Sign In
+          </ion-button>
+        </ng-template>
+      </div>
+    </div>
+
+    <!-- Web Project mode (HTML/CSS/JS) -->
+    <ng-container *ngIf="selectedMode === 'web'">
+      <div class="toolbar">
+        <div class="file-tabs">
+          <div class="file-tab" [class.active]="selectedTab === 'html'" (click)="selectTab('html')">
+            <ion-icon name="logo-html5"></ion-icon> index.html
+          </div>
+          <div class="file-tab" [class.active]="selectedTab === 'css'" (click)="selectTab('css')">
+            <ion-icon name="logo-css3"></ion-icon> style.css
+          </div>
+          <div class="file-tab" [class.active]="selectedTab === 'js'" (click)="selectTab('js')">
+            <ion-icon name="logo-javascript"></ion-icon> script.js
+          </div>
+        </div>
+        <div class="tab-actions">
+          <ion-button size="small" color="primary" (click)="runCode()">
+            <ion-icon slot="start" name="play-outline"></ion-icon>
+            Run
+          </ion-button>
+          <ion-button *ngIf="showSave" size="small" color="success" fill="outline" (click)="saveClick.emit()">
+            <ion-icon slot="start" name="save-outline"></ion-icon>
+            Save
+          </ion-button>
+        </div>
+        <div class="toolbar-actions">
+          <ion-button size="small" fill="outline" (click)="resetCode()">
+            <ion-icon slot="start" name="refresh-outline"></ion-icon>
+            Reset
+          </ion-button>
+          <ion-button size="small" fill="outline" (click)="clearCode()">
+            <ion-icon slot="start" name="trash-outline"></ion-icon>
+            Clear
+          </ion-button>
+          <ion-button size="small" fill="outline" (click)="showConsole = !showConsole">
+            <ion-icon slot="start" [name]="showConsole ? 'terminal' : 'terminal-outline'"></ion-icon>
+            Console
+          </ion-button>
+        </div>
+      </div>
+
+      <div class="playground-body web-mode" [style.--editor-w]="editorWidthPercent + '%'">
+        <div class="editor-section">
+          <app-code-editor
+            *ngIf="selectedTab === 'html'"
+            [value]="htmlCode"
+            (valueChange)="htmlCode = $event"
+            language="html"
+          ></app-code-editor>
+          <app-code-editor
+            *ngIf="selectedTab === 'css'"
+            [value]="cssCode"
+            (valueChange)="cssCode = $event"
+            language="css"
+          ></app-code-editor>
+          <app-code-editor
+            *ngIf="selectedTab === 'js'"
+            [value]="jsCode"
+            (valueChange)="jsCode = $event"
+            language="javascript"
+          ></app-code-editor>
+
+          <div class="console-section" *ngIf="showConsole">
+            <div class="console-header">
+              <ion-icon name="terminal-outline"></ion-icon>
+              Console
+            </div>
+            <div class="console-output">
+              <div *ngFor="let log of consoleOutput" class="console-line" [class.console-error]="isErrorLine(log)">
+                {{ log }}
+              </div>
+              <div *ngIf="consoleOutput.length === 0" class="console-empty">
+                Console output will appear here...
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="resize-divider" (mousedown)="startResize($event)" title="Drag to resize"></div>
+
+        <div class="preview-section">
+          <div class="preview-content">
+            <iframe *ngIf="output" [srcdoc]="output" sandbox="allow-scripts allow-same-origin"></iframe>
+            <div *ngIf="!output" class="preview-empty">
+              <ion-icon name="play-circle-outline"></ion-icon>
+              <p>Click "Run" to see the output</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- JavaScript-only mode -->
+    <ng-container *ngIf="selectedMode === 'javascript'">
+      <div class="toolbar">
+        <div class="file-tabs">
+          <div class="file-tab active">{{ fileLabel }}</div>
+        </div>
+        <div class="tab-actions">
+          <ion-button size="small" color="primary" (click)="runJavaScriptOnly()">
+            <ion-icon slot="start" name="play-outline"></ion-icon>
+            Run
+          </ion-button>
+          <ion-button *ngIf="showSave" size="small" color="success" fill="outline" (click)="saveClick.emit()">
+            <ion-icon slot="start" name="save-outline"></ion-icon>
+            Save
+          </ion-button>
+        </div>
+        <div class="toolbar-actions">
+          <ion-button size="small" fill="outline" (click)="shareCode()">
+            <ion-icon slot="start" name="share-social-outline"></ion-icon>
+            Share
+          </ion-button>
+          <ion-button size="small" fill="outline" (click)="clearJavaScriptOutput(); jsOnlyCode = ''">
+            <ion-icon slot="start" name="trash-outline"></ion-icon>
+            Clear
+          </ion-button>
+        </div>
+      </div>
+
+      <div class="playground-body single-editor" [style.--editor-w]="editorWidthPercent + '%'">
+        <iframe
+          *ngIf="jsOnlyOutput"
+          [srcdoc]="jsOnlyOutput"
+          sandbox="allow-scripts allow-same-origin"
+          class="hidden-runner"
+        ></iframe>
+        <div class="editor-section">
+          <app-code-editor [value]="jsOnlyCode" (valueChange)="jsOnlyCode = $event" language="javascript"></app-code-editor>
+        </div>
+        <div class="resize-divider" (mousedown)="startResize($event)" title="Drag to resize"></div>
+        <div class="output-panel">
+          <div *ngFor="let log of jsOnlyConsole" class="console-line" [class.console-error]="isErrorLine(log)">
+            {{ log }}
+          </div>
+          <div *ngIf="jsOnlyConsole.length === 0" class="console-empty">
+            Console output will appear here...
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- TypeScript mode -->
+    <ng-container *ngIf="selectedMode === 'typescript'">
+      <div class="toolbar">
+        <div class="file-tabs">
+          <div class="file-tab active">{{ fileLabel }}</div>
+        </div>
+        <div class="tab-actions">
+          <ion-button size="small" color="primary" (click)="runTypeScript()">
+            <ion-icon slot="start" name="play-outline"></ion-icon>
+            Run
+          </ion-button>
+          <ion-button *ngIf="showSave" size="small" color="success" fill="outline" (click)="saveClick.emit()">
+            <ion-icon slot="start" name="save-outline"></ion-icon>
+            Save
+          </ion-button>
+        </div>
+        <div class="toolbar-actions">
+          <ion-button size="small" fill="outline" (click)="shareCode()">
+            <ion-icon slot="start" name="share-social-outline"></ion-icon>
+            Share
+          </ion-button>
+          <ion-button size="small" fill="outline" (click)="clearTypeScriptOutput(); tsCode = ''">
+            <ion-icon slot="start" name="trash-outline"></ion-icon>
+            Clear
+          </ion-button>
+        </div>
+      </div>
+
+      <div class="playground-body single-editor" [style.--editor-w]="editorWidthPercent + '%'">
+        <iframe
+          *ngIf="tsOutput"
+          [srcdoc]="tsOutput"
+          sandbox="allow-scripts allow-same-origin"
+          class="hidden-runner"
+        ></iframe>
+        <div class="editor-section">
+          <app-code-editor [value]="tsCode" (valueChange)="tsCode = $event" language="typescript"></app-code-editor>
+        </div>
+        <div class="resize-divider" (mousedown)="startResize($event)" title="Drag to resize"></div>
+        <div class="output-panel">
+          <div *ngFor="let log of tsConsole" class="console-line" [class.console-error]="isErrorLine(log)">
+            {{ log }}
+          </div>
+          <div *ngIf="tsConsole.length === 0" class="console-empty">
+            Console output will appear here...
+          </div>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+</div>

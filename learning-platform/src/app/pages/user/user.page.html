@@ -1,0 +1,138 @@
+<ion-header class="user-header">
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <!-- On the full-width routes (notes/sessions) the sidebar is not rendered, so the menu
+           toggle has nothing to toggle. Swap it for a way back to the topic view. -->
+      <ion-button *ngIf="hideSidebar" (click)="navigateHome()" title="Back to topics">
+        <ion-icon slot="start" name="arrow-back-outline"></ion-icon>
+        Topics
+      </ion-button>
+      <ion-button *ngIf="!hideSidebar" (click)="toggleSidebar()" title="Toggle sidebar">
+        <ion-icon slot="icon-only" name="menu-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+    <ion-title>Learning Platform</ion-title>
+    <ion-buttons slot="end">
+      <app-theme-selector></app-theme-selector>
+      <ion-button (click)="navigateToPlaygroundSessions()" title="Playground Sessions">
+        <ion-icon slot="icon-only" name="code-slash-outline"></ion-icon>
+      </ion-button>
+      <ion-button (click)="navigateToNotes()" title="My Notes">
+        <ion-icon slot="icon-only" name="document-text-outline"></ion-icon>
+      </ion-button>
+      <ion-button (click)="navigateToSessions()" title="My Sessions">
+        <ion-icon slot="icon-only" name="albums-outline"></ion-icon>
+      </ion-button>
+      <ion-button class="profile-btn" (click)="openProfile($event)">
+        <div class="avatar">
+          <img *ngIf="avatarUrl" [src]="avatarUrl" alt="avatar" />
+          <span *ngIf="!avatarUrl">{{ userInitial }}</span>
+        </div>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+
+  <!-- No color="light": a coloured toolbar paints from --ion-color-base and ignores the
+       --background set in .language-tabs-toolbar, so the theme surface would never apply. -->
+  <ion-toolbar class="language-tabs-toolbar" *ngIf="!isPlaygroundRoute">
+    <div class="language-tabs">
+      <ion-chip
+        *ngFor="let tab of orderedTabs"
+        [class.active]="selectedLanguage === tab.code"
+        [class.disabled]="tab.disabled"
+        (click)="selectLanguage(tab)"
+      >
+        <ion-label>{{ tab.name }}</ion-label>
+      </ion-chip>
+    </div>
+  </ion-toolbar>
+</ion-header>
+
+<!-- Profile dropdown: anchored under the avatar via [event] -->
+<ion-popover
+  [isOpen]="isProfileOpen"
+  [event]="profileEvent"
+  (didDismiss)="isProfileOpen = false"
+  side="bottom"
+  alignment="end"
+  class="profile-popover"
+>
+  <ng-template>
+    <div class="profile-card">
+      <div class="avatar-lg">
+        <img *ngIf="avatarUrl" [src]="avatarUrl" alt="avatar" />
+        <span *ngIf="!avatarUrl">{{ userInitial }}</span>
+      </div>
+      <p class="greeting">{{ greeting }}, {{ currentUser?.username }}</p>
+      <p class="subtitle">Continue your journey and achieve your target</p>
+
+      <div class="profile-rows">
+        <div class="profile-row">
+          <ion-icon name="mail-outline"></ion-icon>
+          <span>{{ currentUser?.email }}</span>
+        </div>
+        <div class="profile-row" *ngIf="userPhone">
+          <ion-icon name="call-outline"></ion-icon>
+          <span>{{ userPhone }}</span>
+        </div>
+      </div>
+
+      <!-- Pick an inbuilt cartoon avatar -->
+      <p class="section-label">Choose an avatar</p>
+      <div class="avatar-grid">
+        <button
+          *ngFor="let a of spookyAvatars"
+          type="button"
+          class="avatar-option"
+          [class.selected]="avatarUrl === a"
+          (click)="selectAvatar(a)"
+        >
+          <img [src]="a" alt="avatar option" />
+        </button>
+      </div>
+
+      <!-- Upload your own photo -->
+      <input #avatarInput type="file" accept="image/*" hidden (change)="onAvatarFile($event)" />
+      <ion-button expand="block" fill="outline" size="small" (click)="avatarInput.click()">
+        <ion-icon slot="start" name="cloud-upload-outline"></ion-icon>
+        Upload Photo
+      </ion-button>
+      <ion-button *ngIf="avatarUrl" expand="block" fill="clear" size="small" (click)="clearAvatar()">
+        Reset to initials
+      </ion-button>
+
+      <ion-button expand="block" color="danger" class="logout-btn" (click)="logout()">
+        <ion-icon slot="start" name="log-out-outline"></ion-icon>
+        Logout
+      </ion-button>
+    </div>
+  </ng-template>
+</ion-popover>
+
+<ion-content>
+  <div class="user-container">
+    <aside class="sidebar" *ngIf="!hideSidebar" [class.sidebar-open]="isSidebarOpen">
+      <nav class="sidebar-menu">
+        <div *ngFor="let level of difficultyLevels" class="difficulty-section">
+          <!-- title + click matter only while collapsed, where the label is hidden and the
+               icon is the sole affordance for reopening the rail. -->
+          <div class="difficulty-header" [title]="level.label" (click)="expandSidebarIfCollapsed()">
+            <ion-icon [name]="level.icon" [color]="level.color"></ion-icon>
+            <h4>{{ level.label }}</h4>
+          </div>
+          <app-user-topic-list
+            [difficultyLevel]="level.id"
+            [selectedLanguage]="selectedLanguage"
+            (topicSelected)="onTopicSelected()"
+          ></app-user-topic-list>
+        </div>
+
+
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+</ion-content>

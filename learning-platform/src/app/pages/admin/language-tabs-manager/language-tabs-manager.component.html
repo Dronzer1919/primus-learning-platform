@@ -1,0 +1,92 @@
+<div class="language-tabs-container">
+  <div class="header-section">
+    <h1>Language Tabs Management</h1>
+    <ion-button (click)="openModal()" color="primary">
+      <ion-icon slot="start" name="add-outline"></ion-icon>
+      Add Language Tab
+    </ion-button>
+  </div>
+
+  <ion-card>
+    <ion-card-header>
+      <ion-card-subtitle>Manage navigation tabs visible to users</ion-card-subtitle>
+    </ion-card-header>
+    <ion-card-content>
+      <div class="tabs-list">
+        <div *ngFor="let tab of languageTabs" class="tab-item">
+          <div class="tab-info">
+            <div class="tab-order">{{ tab.order }}</div>
+            <div class="tab-details">
+              <h3>{{ tab.name }}</h3>
+              <p>Code: {{ tab.code }}</p>
+            </div>
+          </div>
+          <div class="tab-actions">
+            <ion-badge [color]="tab.isActive ? 'success' : 'medium'">
+              {{ tab.isActive ? 'Active' : 'Inactive' }}
+            </ion-badge>
+            <ion-button fill="clear" (click)="toggleTabStatus(tab)">
+              <ion-icon [name]="tab.isActive ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+            </ion-button>
+            <ion-button fill="clear" (click)="openModal(tab)">
+              <ion-icon name="create-outline"></ion-icon>
+            </ion-button>
+            <ion-button fill="clear" color="danger" (click)="deleteTab(tab)">
+              <ion-icon name="trash-outline"></ion-icon>
+            </ion-button>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="languageTabs.length === 0" class="empty-state">
+        <ion-icon name="pricetags-outline"></ion-icon>
+        <p>No language tabs created yet</p>
+        <ion-button (click)="openModal()">Create First Tab</ion-button>
+      </div>
+    </ion-card-content>
+  </ion-card>
+
+  <ion-modal [isOpen]="isModalOpen" (didDismiss)="closeModal()">
+    <ng-template>
+      <ion-header>
+        <ion-toolbar>
+          <ion-title>{{ editingTab ? 'Edit' : 'Add' }} Language Tab</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="closeModal()">Close</ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="ion-padding">
+        <form (ngSubmit)="saveTab()">
+          <ion-item>
+            <ion-label position="floating">Tab Name</ion-label>
+            <ion-input [(ngModel)]="formData.name" name="name" required></ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="floating">Language Code</ion-label>
+            <ion-select [(ngModel)]="formData.code" name="code" required>
+              <ion-select-option *ngFor="let lang of availableLanguages" [value]="lang.code">
+                {{ lang.name }}
+              </ion-select-option>
+            </ion-select>
+          </ion-item>
+
+          <ion-item>
+            <ion-label position="floating">Display Order</ion-label>
+            <ion-input type="number" [(ngModel)]="formData.order" name="order" required></ion-input>
+          </ion-item>
+
+          <ion-item>
+            <ion-label>Active</ion-label>
+            <ion-toggle [(ngModel)]="formData.isActive" name="isActive"></ion-toggle>
+          </ion-item>
+
+          <ion-button expand="block" type="submit" class="ion-margin-top">
+            {{ editingTab ? 'Update' : 'Create' }} Tab
+          </ion-button>
+        </form>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+</div>

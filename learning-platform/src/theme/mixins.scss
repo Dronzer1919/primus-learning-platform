@@ -1,0 +1,136 @@
+// Theme Mixins
+// Reusable mixins for applying theme styles
+
+@use './functions.scss' as *;
+
+// Apply theme to buttons
+@mixin themed-button($color: 'primary', $style: 'filled') {
+  @if $style == 'filled' {
+    --background: var(--ion-color-#{$color});
+    --background-activated: var(--ion-color-#{$color}-shade);
+    --background-focused: var(--ion-color-#{$color}-shade);
+    --background-hover: var(--ion-color-#{$color}-tint);
+    --color: var(--ion-color-#{$color}-contrast);
+    --ripple-color: var(--ion-color-#{$color}-contrast);
+    --border-radius: 10px;
+    font-weight: 600;
+    text-transform: none;
+  } @else if $style == 'outline' {
+    --background: transparent;
+    --background-activated: var(--ion-color-#{$color});
+    --background-focused: var(--ion-color-#{$color});
+    --color: var(--ion-color-#{$color});
+    --color-activated: var(--ion-color-#{$color}-contrast);
+    --color-focused: var(--ion-color-#{$color}-contrast);
+    --border-color: var(--ion-color-#{$color});
+    --border-width: 2px;
+    --border-style: solid;
+    --border-radius: 10px;
+    font-weight: 600;
+    text-transform: none;
+  } @else if $style == 'clear' {
+    --background: transparent;
+    --background-activated: rgba(var(--ion-color-#{$color}-rgb), 0.1);
+    --background-focused: rgba(var(--ion-color-#{$color}-rgb), 0.1);
+    --background-hover: rgba(var(--ion-color-#{$color}-rgb), 0.05);
+    --color: var(--ion-color-#{$color});
+    --ripple-color: var(--ion-color-#{$color});
+    --border-radius: 10px;
+    font-weight: 600;
+    text-transform: none;
+  }
+}
+
+// Apply theme to cards
+@mixin themed-card($elevation: 1) {
+  background: get-background('card');
+  border-radius: 12px;
+  box-shadow: get-shadow($elevation);
+  border: 1px solid get-border-color();
+  color: get-text-color();
+  padding: 16px;
+}
+
+// Apply theme to inputs
+@mixin themed-input() {
+  --background: get-background('surface');
+  --color: get-text-color();
+  --placeholder-color: rgba(var(--ion-text-color-rgb), 0.5);
+  --border-color: get-border-color();
+  --border-radius: 8px;
+  --padding-start: 12px;
+  --padding-end: 12px;
+  --highlight-color-focused: var(--ion-color-primary);
+}
+
+// Apply theme to toolbar/header
+@mixin themed-toolbar($style: 'surface') {
+  @if $style == 'surface' {
+    --background: get-background('surface');
+    --color: get-text-color();
+    --border-color: get-border-color();
+  } @else if $style == 'primary' {
+    --background: var(--ion-color-primary);
+    --color: var(--ion-color-primary-contrast);
+    --border-color: var(--ion-color-primary-shade);
+  } @else if $style == 'transparent' {
+    --background: transparent;
+    --color: get-text-color();
+    --border-color: transparent;
+  }
+}
+
+// Apply theme to lists
+@mixin themed-list() {
+  --background: get-background('card');
+  --color: get-text-color();
+  --border-color: get-border-color();
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+// Apply theme to list items
+@mixin themed-list-item() {
+  --background: get-background('card');
+  --background-activated: get-background('surface');
+  --color: get-text-color();
+  --border-color: get-border-color();
+  --inner-border-width: 0 0 1px 0;
+}
+
+// Apply theme to the entire page
+@mixin themed-page() {
+  --background: get-background('base');
+  --color: get-text-color();
+}
+
+// Apply custom color to ion-color attribute
+@mixin create-custom-color($name, $base, $contrast) {
+  --ion-color-#{$name}: #{$base};
+  --ion-color-#{$name}-rgb: #{hex-to-rgb($base)};
+  --ion-color-#{$name}-contrast: #{$contrast};
+  --ion-color-#{$name}-contrast-rgb: #{hex-to-rgb($contrast)};
+  --ion-color-#{$name}-shade: #{darken($base, 10%)};
+  --ion-color-#{$name}-tint: #{lighten($base, 10%)};
+}
+
+// Apply spacing
+@mixin spacing($top: 16px, $right: 16px, $bottom: 16px, $left: 16px) {
+  padding-top: $top;
+  padding-right: $right;
+  padding-bottom: $bottom;
+  padding-left: $left;
+}
+
+// Apply responsive spacing
+@mixin responsive-spacing($mobile: 16px, $tablet: 24px, $desktop: 32px) {
+  padding: $mobile;
+
+  @media (min-width: 768px) {
+    padding: $tablet;
+  }
+
+  @media (min-width: 1024px) {
+    padding: $desktop;
+  }
+}

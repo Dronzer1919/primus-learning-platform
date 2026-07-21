@@ -1,0 +1,55 @@
+<ion-header class="admin-header">
+  <ion-toolbar color="primary">
+    <ion-buttons slot="start">
+      <ion-button (click)="toggleSidebar()">
+        <ion-icon slot="icon-only" name="menu-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+    <ion-title>Admin Panel - Learning Platform</ion-title>
+    <ion-buttons slot="end">
+      <app-theme-selector></app-theme-selector>
+      <ion-button>
+        <ion-icon slot="icon-only" name="notifications-outline"></ion-icon>
+      </ion-button>
+      <ion-button>
+        <ion-icon slot="start" name="person-circle-outline"></ion-icon>
+        {{ currentUser?.username }}
+      </ion-button>
+      <!-- No color="light": the dark palette redefines --ion-color-light to #222428, which
+           renders dark-on-dark in the dark themes. Inheriting the toolbar's contrast colour
+           keeps this consistent with the buttons above it in every theme. -->
+      <ion-button (click)="logout()">
+        <ion-icon slot="start" name="log-out-outline"></ion-icon>
+        Logout
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <div class="admin-container">
+    <aside class="sidebar" [class.sidebar-collapsed]="!isSidebarOpen">
+      <div class="sidebar-header">
+        <h3 *ngIf="isSidebarOpen">Content Management</h3>
+      </div>
+      
+      <nav class="sidebar-menu">
+        <div
+          *ngFor="let item of menuItems"
+          class="menu-item"
+          [class.active]="selectedMenu === item.id"
+          (click)="selectMenu(item.id, item.route)"
+        >
+          <ion-icon [name]="item.icon"></ion-icon>
+          <span *ngIf="isSidebarOpen">{{ item.label }}</span>
+        </div>
+      </nav>
+    </aside>
+
+    <main class="main-content" [class.sidebar-collapsed]="!isSidebarOpen">
+      <div class="content-wrapper">
+        <router-outlet></router-outlet>
+      </div>
+    </main>
+  </div>
+</ion-content>

@@ -1,0 +1,27 @@
+<div class="topics-list" *ngIf="topics.length > 0">
+  <div *ngFor="let topic of topics" class="topic-item">
+    <div class="topic-header" (click)="toggleTopic(topic.id)">
+      <span class="topic-title">{{ topic.title }}</span>
+      <ion-icon 
+        [name]="isExpanded(topic.id) ? 'chevron-down-outline' : 'chevron-forward-outline'"
+      ></ion-icon>
+    </div>
+    
+    <div class="subtopics-list" *ngIf="isExpanded(topic.id)" [@slideDown]>
+      <a
+        *ngFor="let subtopic of topic.subtopics"
+        [routerLink]="['/user/content', topic.id, subtopic.id]"
+        routerLinkActive="active"
+        class="subtopic-link"
+        (click)="onSubtopicClick()"
+      >
+        <ion-icon name="document-outline"></ion-icon>
+        <span>{{ subtopic.title }}</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="topics.length === 0" class="empty-message">
+  <p>No topics available</p>
+</div>

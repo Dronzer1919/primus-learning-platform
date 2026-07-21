@@ -1,0 +1,60 @@
+// Theme Functions
+// Helper functions for theme calculations and color manipulations
+
+// Get a theme color variable
+@function get-color($color-name, $variant: 'base') {
+  @if $variant == 'base' {
+    @return var(--ion-color-#{$color-name});
+  } @else {
+    @return var(--ion-color-#{$color-name}-#{$variant});
+  }
+}
+
+// Get theme background
+@function get-background($type: 'base') {
+  @if $type == 'base' {
+    @return var(--theme-background);
+  } @else if $type == 'surface' {
+    @return var(--theme-surface);
+  } @else if $type == 'card' {
+    @return var(--theme-card-background);
+  }
+  @return var(--theme-background);
+}
+
+// Get text color
+@function get-text-color($type: 'primary') {
+  @if $type == 'primary' {
+    @return var(--ion-text-color);
+  } @else if $type == 'secondary' {
+    @return var(--ion-color-medium);
+  }
+  @return var(--ion-text-color);
+}
+
+// Get border color
+@function get-border-color($type: 'base') {
+  @if $type == 'light' or $type == 'base' {
+    @return var(--theme-border-color);
+  } @else if $type == 'dark' {
+    @return var(--ion-color-medium-shade);
+  }
+  @return var(--theme-border-color);
+}
+
+// Get shadow
+@function get-shadow($intensity: 'medium') {
+  @if $intensity == 'small' or $intensity == 1 {
+    @return 0 2px 4px var(--theme-shadow);
+  } @else if $intensity == 'medium' or $intensity == 2 {
+    @return 0 4px 8px var(--theme-shadow);
+  } @else if $intensity == 'large' or $intensity == 3 {
+    @return 0 8px 16px var(--theme-shadow);
+  }
+  @return 0 4px 8px var(--theme-shadow);
+}
+
+// Calculate RGB from hex (for use in rgba)
+@function hex-to-rgb($hex) {
+  @return red($hex), green($hex), blue($hex);
+}

@@ -1,0 +1,161 @@
+/*
+ * App Global CSS
+ * ----------------------------------------------------------------------------
+ * Put style rules here that you want to apply globally.
+ */
+
+/**
+ * Custom Theme System
+ * -----------------------------------------------------
+ * Import theme variables, mixins and theme definitions.
+ * NOTE: @use rules must come before @import rules.
+ */
+@use './theme/variables.scss';
+@use './theme/mixins.scss' as *;
+@use './theme/themes.scss';
+
+/* Core CSS required for Ionic components to work properly */
+@import "@ionic/angular/css/core.css";
+
+/* Basic CSS for apps built with Ionic */
+@import "@ionic/angular/css/normalize.css";
+@import "@ionic/angular/css/structure.css";
+@import "@ionic/angular/css/typography.css";
+@import "@ionic/angular/css/display.css";
+
+/* Optional CSS utils that can be commented out */
+@import "@ionic/angular/css/padding.css";
+@import "@ionic/angular/css/float-elements.css";
+@import "@ionic/angular/css/text-alignment.css";
+@import "@ionic/angular/css/text-transformation.css";
+@import "@ionic/angular/css/flex-utils.css";
+
+/**
+ * Ionic Dark Mode
+ * -----------------------------------------------------
+ * Kept as the class-based palette; toggled via .ion-palette-dark by ThemeService
+ * so the dark theme also picks up Ionic's stepped dark colors.
+ */
+@import "@ionic/angular/css/palettes/dark.class.css";
+
+/**
+ * Global Themed Styles
+ * -----------------------------------------------------
+ * Apply the theme system to all Ionic components.
+ */
+
+// Themed buttons
+ion-button {
+  @include themed-button('primary', 'filled');
+
+  &[fill="outline"] { @include themed-button('primary', 'outline'); }
+  &[fill="clear"] { @include themed-button('primary', 'clear'); }
+
+  &[color="secondary"] {
+    @include themed-button('secondary', 'filled');
+    &[fill="outline"] { @include themed-button('secondary', 'outline'); }
+    &[fill="clear"] { @include themed-button('secondary', 'clear'); }
+  }
+
+  &[color="tertiary"] {
+    @include themed-button('tertiary', 'filled');
+    &[fill="outline"] { @include themed-button('tertiary', 'outline'); }
+    &[fill="clear"] { @include themed-button('tertiary', 'clear'); }
+  }
+
+  &[color="success"] {
+    @include themed-button('success', 'filled');
+    &[fill="outline"] { @include themed-button('success', 'outline'); }
+    &[fill="clear"] { @include themed-button('success', 'clear'); }
+  }
+
+  &[color="warning"] {
+    @include themed-button('warning', 'filled');
+    &[fill="outline"] { @include themed-button('warning', 'outline'); }
+    &[fill="clear"] { @include themed-button('warning', 'clear'); }
+  }
+
+  &[color="danger"] {
+    @include themed-button('danger', 'filled');
+    &[fill="outline"] { @include themed-button('danger', 'outline'); }
+    &[fill="clear"] { @include themed-button('danger', 'clear'); }
+  }
+}
+
+// Themed cards
+ion-card {
+  @include themed-card(1);
+
+  &.elevation-2 { @include themed-card(2); }
+  &.elevation-3 { @include themed-card(3); }
+}
+
+// Themed inputs
+ion-input, ion-textarea, ion-searchbar {
+  @include themed-input();
+}
+
+// Themed lists
+ion-list {
+  @include themed-list();
+}
+
+ion-item {
+  @include themed-list-item();
+}
+
+// Themed toolbars
+ion-toolbar {
+  @include themed-toolbar('surface');
+
+  &.toolbar-primary { @include themed-toolbar('primary'); }
+  &.toolbar-transparent { @include themed-toolbar('transparent'); }
+}
+
+// On the dark themes a primary-filled toolbar becomes a large slab of saturated colour
+// across the top of every page, which fights the near-black canvas. Match it to the sidebar
+// (--theme-surface) so the chrome reads as one frame, and let the accent show through the
+// icons and buttons instead.
+//
+// Two things make this fiddlier than it looks:
+//   1. `<ion-toolbar color="primary">` gets Ionic's `.ion-color .ion-color-primary` classes.
+//      There is no `.toolbar-primary` class — a selector by that name silently matches nothing.
+//   2. For a coloured toolbar Ionic paints from `--ion-color-base`, not `--background`:
+//        :host(.ion-color) .toolbar-background { background: var(--ion-color-base) }
+//      and it sets that variable with !important, so overriding it needs !important too.
+body.theme-dark,
+body.theme-luminous,
+body.theme-cyan {
+  ion-toolbar.ion-color-primary {
+    --ion-color-base: var(--theme-surface) !important;
+    --ion-color-contrast: var(--ion-text-color) !important;
+    --border-color: var(--theme-border-color);
+    --border-width: 0 0 1px 0;
+    --border-style: solid;
+  }
+}
+
+// Accent-coloured title so the header still reads as branded. Every dark theme's accent
+// clears AA against --theme-surface: dark 5.10:1, luminous 10.48:1, cyan 10.29:1.
+body.theme-dark,
+body.theme-luminous,
+body.theme-cyan {
+  ion-toolbar.ion-color-primary ion-title {
+    color: var(--ion-color-primary);
+    font-weight: 600;
+  }
+}
+
+// Themed pages
+ion-content {
+  @include themed-page();
+}
+
+// Smooth transitions for theme changes
+ion-button,
+ion-card,
+ion-item,
+ion-toolbar,
+ion-content {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
