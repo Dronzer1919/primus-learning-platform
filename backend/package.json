@@ -7,6 +7,9 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "seed": "node seed.js",
+    "seed:html-interview": "node seed-html-interview.js",
+    "seed:css-interview": "node seed-css-interview.js",
+    "seed:js-interview": "node seed-js-interview.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

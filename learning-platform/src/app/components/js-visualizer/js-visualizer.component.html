@@ -49,7 +49,7 @@
     <div class="viz-body">
       <!-- Left: code with the executing line highlighted -->
       <div class="viz-code">
-        @for (ln of codeLines; track ln) {
+        @for (ln of codeLines; track ln.number) {
           <div
             class="code-row"
             [class.active]="ln.number === activeLine"
@@ -70,7 +70,7 @@
             }
           </div>
           <div class="var-list">
-            @for (v of vars; track v) {
+            @for (v of vars; track v.name) {
               <div class="var-row">
                 <span class="var-name">{{ v.name }}</span>
                 <span class="var-eq">=</span>
@@ -88,7 +88,7 @@
             Console
           </div>
           <div class="console-body">
-            @for (line of consoleLines; track line) {
+            @for (line of consoleLines; track $index) {
               <div class="console-line">&gt; {{ line }}</div>
             }
             @if (consoleLines.length === 0) {

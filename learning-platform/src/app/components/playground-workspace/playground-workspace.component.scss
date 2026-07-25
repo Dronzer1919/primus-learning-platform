@@ -26,6 +26,58 @@
   align-items: center;
   padding: 8px 0;
   overflow-y: auto;
+  // The hover preview escapes the rail via position:fixed, so no clipping needed.
+  overflow-x: visible;
+}
+
+// Ganpati thumbnail pinned at the top of the rail; hovering reveals a large preview.
+.rail-deity {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+  cursor: pointer;
+
+  .rail-deity-thumb {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid var(--editor-border);
+    background: color-mix(in srgb, var(--editor-fg), transparent 92%);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .rail-deity-big {
+    position: fixed;
+    left: 66px;                 // just clear of the 56px rail
+    top: 14px;
+    width: 440px;
+    max-width: 60vw;
+    height: auto;
+    border-radius: 14px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+    border: 1px solid var(--editor-border);
+    background: var(--editor-header-bg);
+    opacity: 0;
+    transform: scale(0.9) translateX(-10px);
+    transform-origin: left top;
+    pointer-events: none;       // never blocks clicks / its own hover
+    transition: opacity 0.18s ease, transform 0.18s ease;
+    z-index: 2000;
+  }
+
+  &:hover {
+    .rail-deity-thumb {
+      transform: scale(1.06);
+      box-shadow: 0 0 0 2px color-mix(in srgb, #f0b429, transparent 40%);
+    }
+    .rail-deity-big {
+      opacity: 1;
+      transform: scale(1) translateX(0);
+    }
+  }
 }
 
 .rail-item {
@@ -355,20 +407,55 @@
     color: var(--ion-color-dark);
   }
 
-  // Error frames align a caret under the failing token, so they must not be
-  // broken mid-token like ordinary log lines; they scroll sideways instead.
+  // Plain 'ERROR: ' messages are just red text that WRAPS like any other line
+  // (no horizontal scrollbar).
   &.console-error {
     color: #e5484d;
+    margin: 8px 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  // Only multi-line code frames keep a caret aligned under the failing token, so
+  // they must not wrap — they scroll sideways instead.
+  &.console-frame {
     word-break: normal;
+    overflow-wrap: normal;
     white-space: pre;
     overflow-x: auto;
-    margin: 8px 0;
   }
 }
 
 .console-empty {
   color: #888;
   font-style: italic;
+}
+
+// The step-through visualizer swaps in for the console output. It brings its own
+// toolbar and <app-js-visualizer>, so it drops the console's monospace/padding
+// and lets the visualizer fill the remaining height.
+.visualizer-panel {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  font-family: inherit;
+
+  .visualizer-bar {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px;
+    border-bottom: 1px solid var(--editor-border);
+    flex-shrink: 0;
+  }
+
+  app-js-visualizer {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+  }
 }
 
 .preview-section {
@@ -403,5 +490,91 @@
   ion-icon {
     font-size: 80px;
     margin-bottom: 15px;
+  }
+}
+
+// 🎉 Success celebration: shown IN-FLOW below the console output after a run with
+// no errors — a divider, a light-green "code executed successfully" line, then a
+// short confetti + emoji-pop animation beneath it.
+.run-success {
+  animation: run-success-in 0.25s ease both;
+}
+
+@keyframes run-success-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.run-success-hr {
+  border: none;
+  border-top: 1px dashed color-mix(in srgb, #4ade80, transparent 40%);
+  margin: 12px 0 8px;
+}
+
+.run-success-text {
+  text-align: center;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  color: #86efac;                    // light green
+  word-break: break-word;
+}
+
+// The animation plays inside this fixed-height strip below the success line.
+.run-success-anim {
+  position: relative;
+  height: 96px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.celebration-emoji {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-size: 46px;
+  transform: translate(-50%, -50%) scale(0);
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.3));
+  animation: celebrate-pop 1.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+
+@keyframes celebrate-pop {
+  0%   { transform: translate(-50%, -50%) scale(0) rotate(-25deg); opacity: 0; }
+  25%  { transform: translate(-50%, -50%) scale(1.2) rotate(10deg); opacity: 1; }
+  50%  { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+  85%  { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(0.9); opacity: 0; }
+}
+
+.confetti {
+  position: absolute;
+  top: -14px;
+  width: 7px;
+  height: 12px;
+  border-radius: 2px;
+  opacity: 0.95;
+  animation-name: confetti-fall;
+  animation-timing-function: ease-in;
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+}
+
+@keyframes confetti-fall {
+  0%   { transform: translateY(0) translateX(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(120px) translateX(var(--drift, 0px)) rotate(560deg); opacity: 0; }
+}
+
+// Respect reduced-motion: keep a gentle emoji fade, drop the flying confetti.
+@media (prefers-reduced-motion: reduce) {
+  .confetti { display: none; }
+  .celebration-emoji {
+    animation: celebrate-fade 1.6s ease forwards;
+  }
+  @keyframes celebrate-fade {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+    20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
   }
 }

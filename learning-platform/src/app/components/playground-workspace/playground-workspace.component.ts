@@ -7,6 +7,7 @@ import { CodeExecutionService } from '../../services/code-execution.service';
 import { PLAYGROUND_LANGUAGES, PlaygroundLanguage, PlaygroundModeId } from '../../models/playground.model';
 import { CodeEditorComponent } from '../code-editor/code-editor.component';
 import { ThemeSelectorComponent } from '../theme-selector/theme-selector.component';
+import { JsVisualizerComponent } from '../js-visualizer/js-visualizer.component';
 import { AuthService } from '../../services/auth.service';
 
 const DEFAULT_HTML = `<!DOCTYPE html>
@@ -53,7 +54,7 @@ console.log(message);`;
   templateUrl: './playground-workspace.component.html',
   styleUrls: ['./playground-workspace.component.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, RouterModule, CodeEditorComponent, ThemeSelectorComponent]
+  imports: [IonicModule, CommonModule, RouterModule, CodeEditorComponent, ThemeSelectorComponent, JsVisualizerComponent]
 })
 export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
   @Input() mode: PlaygroundModeId = 'web';
@@ -90,6 +91,18 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
   jsOnlyOutput: SafeHtml = '';
   jsOnlyConsole: string[] = [];
 
+  // Step-through execution visualizer (swaps in for the console when open).
+  showVisualizer = false;
+  visualizerCode = '';
+
+  // 🎉 Success feedback. `runSucceeded` persists the "code executed successfully"
+  // line until the next run/clear; `showCelebration` is the transient confetti burst.
+  runSucceeded = false;
+  showCelebration = false;
+  confetti: Array<{ left: number; color: string; delay: number; duration: number; drift: number }> = [];
+  private celebrationCheckTimer: any = null;
+  private celebrationHideTimer: any = null;
+
   // TypeScript state
   tsCode = DEFAULT_TS;
   tsOutput: SafeHtml = '';
@@ -118,6 +131,8 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
     window.removeEventListener('message', this.messageListener);
     document.removeEventListener('mousemove', this.onResizeMoveRef);
     document.removeEventListener('mouseup', this.onResizeEndRef);
+    clearTimeout(this.celebrationCheckTimer);
+    clearTimeout(this.celebrationHideTimer);
   }
 
   get modeIcon(): string {
@@ -208,6 +223,7 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
   runCode(): void {
     this.consoleOutput = [];
     this.output = this.codeExecutionService.runWebProject(this.htmlCode, this.cssCode, this.jsCode);
+    this.scheduleCelebration(() => this.consoleOutput);
   }
 
   clearCode(): void {
@@ -216,6 +232,8 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
     this.jsCode = '';
     this.output = '';
     this.consoleOutput = [];
+    this.runSucceeded = false;
+    this.showCelebration = false;
   }
 
   resetCode(): void {
@@ -229,25 +247,71 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
   runJavaScriptOnly(): void {
     this.jsOnlyConsole = [];
     this.jsOnlyOutput = this.codeExecutionService.runJavaScript(this.jsOnlyCode);
+    this.scheduleCelebration(() => this.jsOnlyConsole);
   }
 
   clearJavaScriptOutput(): void {
     this.jsOnlyConsole = [];
     this.jsOnlyOutput = '';
+    this.runSucceeded = false;
+    this.showCelebration = false;
+  }
+
+  /** Opens the step-through visualizer for the current JavaScript code. */
+  visualizeJavaScript(): void {
+    this.visualizerCode = this.jsOnlyCode;
+    this.showVisualizer = true;
+  }
+
+  closeVisualizer(): void {
+    this.showVisualizer = false;
   }
 
   async runTypeScript(): Promise<void> {
     this.tsConsole = [];
     try {
       this.tsOutput = await this.codeExecutionService.runTypeScript(this.tsCode);
+      this.scheduleCelebration(() => this.tsConsole);
     } catch (error: any) {
       this.tsConsole.push('ERROR: ' + (error?.message ?? 'Failed to compile TypeScript.'));
     }
   }
 
+  // Waits briefly for console/error output to arrive (logs come async via postMessage),
+  // then celebrates only if no error line showed up for that panel.
+  private scheduleCelebration(getConsole: () => string[]): void {
+    // A fresh run clears the previous success line until this run proves clean.
+    this.runSucceeded = false;
+    this.showCelebration = false;
+    clearTimeout(this.celebrationCheckTimer);
+    this.celebrationCheckTimer = setTimeout(() => {
+      const hasError = getConsole().some((line) => this.isErrorLine(line));
+      if (!hasError) {
+        this.triggerCelebration();
+      }
+    }, 500);
+  }
+
+  private triggerCelebration(): void {
+    this.runSucceeded = true; // persists until the next run/clear
+    const colors = ['#2dd4a7', '#58a6ff', '#f0b429', '#e5484d', '#8b5cf6', '#ec4899'];
+    this.confetti = Array.from({ length: 30 }, (_, i) => ({
+      left: Math.round(Math.random() * 100),
+      color: colors[i % colors.length],
+      delay: Math.round(Math.random() * 250) / 1000,
+      duration: 1.1 + Math.round(Math.random() * 700) / 1000,
+      drift: Math.round((Math.random() * 2 - 1) * 70)
+    }));
+    this.showCelebration = true;
+    clearTimeout(this.celebrationHideTimer);
+    this.celebrationHideTimer = setTimeout(() => (this.showCelebration = false), 1900);
+  }
+
   clearTypeScriptOutput(): void {
     this.tsConsole = [];
     this.tsOutput = '';
+    this.runSucceeded = false;
+    this.showCelebration = false;
   }
 
   async shareCode(): Promise<void> {
@@ -317,6 +381,12 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
 
   isErrorLine(log: string): boolean {
     return log.startsWith('ERROR!') || log.startsWith('ERROR: ');
+  }
+
+  // Multi-line code frames (a SyntaxError with a caret) must keep their alignment,
+  // so only these scroll sideways. Plain 'ERROR: ' messages wrap normally.
+  isErrorFrame(log: string): boolean {
+    return log.startsWith('ERROR!');
   }
 
   private async showLockedToast(message: string): Promise<void> {

@@ -7,6 +7,17 @@
 
   <base href="/" />
 
+  <!-- Resolve the bare "source-map-support" specifier that TypeScript's browser
+       bundle imports to a local no-op stub, so the lazily-loaded compiler chunk
+       (used by the TS playground) can load. Must precede any module scripts. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "source-map-support": "./assets/shims/source-map-support.js"
+      }
+    }
+  </script>
+
   <meta name="color-scheme" content="light dark" />
   <script>
     (function () {

@@ -1,5 +1,10 @@
 <div class="playground-container" [class.fullscreen]="isFullscreen">
   <div class="rail" *ngIf="showModeTabs">
+    <!-- Ganpati blessing: small in the rail, enlarges on hover -->
+    <div class="rail-deity" title="Ganpati Bappa Morya">
+      <img src="assets/icon/ganpati.webp" alt="Ganpati" class="rail-deity-thumb" />
+      <img src="assets/icon/ganpati.webp" alt="Ganpati Bappa Morya" class="rail-deity-big" />
+    </div>
     <div
       *ngFor="let lang of languages"
       class="rail-item"
@@ -25,6 +30,10 @@
       </div>
       <div class="header-actions">
         <app-theme-selector></app-theme-selector>
+        <ion-button size="small" fill="outline" routerLink="/flowchart">
+          <ion-icon slot="start" name="git-network-outline"></ion-icon>
+          Flowchart
+        </ion-button>
         <ng-container *ngIf="(authService.currentUser | async) as user; else signInBtn">
           <ion-button size="small" (click)="logout()">
             <ion-icon slot="start" name="log-out-outline"></ion-icon>
@@ -107,7 +116,7 @@
               Console
             </div>
             <div class="console-output">
-              <div *ngFor="let log of consoleOutput" class="console-line" [class.console-error]="isErrorLine(log)">
+              <div *ngFor="let log of consoleOutput" class="console-line" [class.console-error]="isErrorLine(log)" [class.console-frame]="isErrorFrame(log)">
                 {{ log }}
               </div>
               <div *ngIf="consoleOutput.length === 0" class="console-empty">
@@ -142,6 +151,10 @@
             <ion-icon slot="start" name="play-outline"></ion-icon>
             Run
           </ion-button>
+          <ion-button size="small" color="tertiary" fill="outline" (click)="visualizeJavaScript()">
+            <ion-icon slot="start" name="git-network-outline"></ion-icon>
+            Visualize
+          </ion-button>
           <ion-button *ngIf="showSave" size="small" color="success" fill="outline" (click)="saveClick.emit()">
             <ion-icon slot="start" name="save-outline"></ion-icon>
             Save
@@ -170,13 +183,26 @@
           <app-code-editor [value]="jsOnlyCode" (valueChange)="jsOnlyCode = $event" language="javascript"></app-code-editor>
         </div>
         <div class="resize-divider" (mousedown)="startResize($event)" title="Drag to resize"></div>
-        <div class="output-panel">
-          <div *ngFor="let log of jsOnlyConsole" class="console-line" [class.console-error]="isErrorLine(log)">
+        <div class="output-panel" *ngIf="!showVisualizer">
+          <div *ngFor="let log of jsOnlyConsole" class="console-line" [class.console-error]="isErrorLine(log)" [class.console-frame]="isErrorFrame(log)">
             {{ log }}
           </div>
           <div *ngIf="jsOnlyConsole.length === 0" class="console-empty">
             Console output will appear here...
           </div>
+          <ng-container *ngTemplateOutlet="celebrationTpl"></ng-container>
+        </div>
+        <div class="output-panel visualizer-panel" *ngIf="showVisualizer">
+          <div class="visualizer-bar">
+            <ion-button size="small" fill="clear" (click)="visualizeJavaScript()" title="Re-trace current code">
+              <ion-icon slot="start" name="refresh-outline"></ion-icon>
+              Refresh
+            </ion-button>
+            <ion-button size="small" fill="clear" color="medium" (click)="closeVisualizer()" title="Close visualizer">
+              <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+            </ion-button>
+          </div>
+          <app-js-visualizer [code]="visualizerCode"></app-js-visualizer>
         </div>
       </div>
     </ng-container>
@@ -221,14 +247,37 @@
         </div>
         <div class="resize-divider" (mousedown)="startResize($event)" title="Drag to resize"></div>
         <div class="output-panel">
-          <div *ngFor="let log of tsConsole" class="console-line" [class.console-error]="isErrorLine(log)">
+          <div *ngFor="let log of tsConsole" class="console-line" [class.console-error]="isErrorLine(log)" [class.console-frame]="isErrorFrame(log)">
             {{ log }}
           </div>
           <div *ngIf="tsConsole.length === 0" class="console-empty">
             Console output will appear here...
           </div>
+          <ng-container *ngTemplateOutlet="celebrationTpl"></ng-container>
         </div>
       </div>
     </ng-container>
   </div>
 </div>
+
+<!-- 🎉 Shown in-flow below the output after a clean run: divider, success line, animation -->
+<ng-template #celebrationTpl>
+  <div class="run-success" *ngIf="runSucceeded">
+    <hr class="run-success-hr" />
+    <div class="run-success-text">================ code executed successfully =====</div>
+    <div class="run-success-anim" *ngIf="showCelebration">
+      <div class="celebration-emoji">🎉</div>
+      <span
+        class="confetti"
+        *ngFor="let c of confetti"
+        [ngStyle]="{
+          left: c.left + '%',
+          background: c.color,
+          'animation-delay': c.delay + 's',
+          'animation-duration': c.duration + 's',
+          '--drift': c.drift + 'px'
+        }"
+      ></span>
+    </div>
+  </div>
+</ng-template>
