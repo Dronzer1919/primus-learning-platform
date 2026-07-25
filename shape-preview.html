@@ -1,0 +1,428 @@
+<title>Flowchart Shape Gallery</title>
+<style>
+  :root {
+    --ground: #f7f7f8;
+    --panel: #ffffff;
+    --ink: #22262f;
+    --muted: #8a8f9a;
+    --hairline: #e4e5e8;
+    --hairline-strong: #d3d5da;
+    --accent: #3b6ef5;
+    --shape-fill: #ffffff;
+    --shape-stroke: #2b303b;
+    --tile-bg:
+      radial-gradient(color-mix(in srgb, var(--ink), transparent 90%) 1px, transparent 1px);
+    --sans: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #15171c;
+      --panel: #1c1f26;
+      --ink: #e7e8ec;
+      --muted: #868b96;
+      --hairline: #2a2e37;
+      --hairline-strong: #363b45;
+      --accent: #6b93ff;
+      --shape-fill: #232732;
+      --shape-stroke: #c7ccd6;
+    }
+  }
+  :root[data-theme="light"] {
+    --ground: #f7f7f8; --panel: #ffffff; --ink: #22262f; --muted: #8a8f9a;
+    --hairline: #e4e5e8; --hairline-strong: #d3d5da; --accent: #3b6ef5;
+    --shape-fill: #ffffff; --shape-stroke: #2b303b;
+  }
+  :root[data-theme="dark"] {
+    --ground: #15171c; --panel: #1c1f26; --ink: #e7e8ec; --muted: #868b96;
+    --hairline: #2a2e37; --hairline-strong: #363b45; --accent: #6b93ff;
+    --shape-fill: #232732; --shape-stroke: #c7ccd6;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 40px 24px 72px; }
+
+  header { margin-bottom: 8px; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-size: clamp(26px, 4vw, 38px);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    font-weight: 700;
+    text-wrap: balance;
+    margin: 0 0 12px;
+  }
+  .lede {
+    max-width: 62ch;
+    color: var(--muted);
+    font-size: 15px;
+    margin: 0;
+  }
+  .lede code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    color: var(--ink);
+    background: color-mix(in srgb, var(--accent), transparent 88%);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  .count {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-top: 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .count b { color: var(--ink); font-size: 13px; }
+
+  section { margin-top: 44px; }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--hairline-strong);
+    margin-bottom: 20px;
+  }
+  .section-head h2 {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    margin: 0;
+  }
+  .section-head .n {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 14px;
+  }
+
+  .tile {
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    padding: 12px 12px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+  .tile:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+  }
+  .preview {
+    height: 78px;
+    background: var(--tile-bg);
+    background-size: 14px 14px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+  }
+  .preview svg { width: 100%; height: 100%; overflow: visible; }
+
+  .shape { fill: var(--shape-fill); stroke: var(--shape-stroke); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+  .shape.nofill { fill: none; }
+  .shape-line { fill: none; stroke: var(--shape-stroke); stroke-width: 2; vector-effect: non-scaling-stroke; }
+
+  .meta { display: flex; flex-direction: column; gap: 2px; }
+  .name { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
+  .type { font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+  .meaning { font-size: 11.5px; color: var(--muted); line-height: 1.35; margin-top: 2px; }
+
+  footer {
+    margin-top: 56px;
+    padding-top: 20px;
+    border-top: 1px solid var(--hairline);
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  footer code { font-family: var(--mono); color: var(--ink); }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Flowchart Builder · reference</p>
+    <h1>Shape gallery</h1>
+    <p class="lede">
+      Every shape the builder can draw, rendered with the <em>exact</em> path math from
+      <code>flowchart.component.ts</code>. Use it to compare against draw.io and spot any shape
+      whose geometry looks off — the SVG here is identical to what appears on the canvas.
+    </p>
+    <div class="count"><b id="total">0</b> shapes across <b id="groups">0</b> sections</div>
+  </header>
+
+  <div id="sections"></div>
+
+  <footer>
+    Rendered from a direct JavaScript port of the component's shape builders. Fill and border
+    use the same theme tokens as the app, so an uncoloured shape here looks as it does on the canvas.
+  </footer>
+</div>
+
+<!-- Shared arrowhead marker, referenced by the arrow/line shapes. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="ph-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"></path>
+    </marker>
+  </defs>
+</svg>
+
+<script>
+  const SVGNS = "http://www.w3.org/2000/svg";
+  const round = (n) => Math.round(n * 100) / 100;
+  const poly = (pts) => pts.map((p) => `${round(p[0])},${round(p[1])}`).join(" ");
+
+  // --- Path builders: 1:1 port of flowchart.component.ts --------------------
+  function cylinderPath(w, h) {
+    const rx = w / 2, ry = Math.min(h * 0.18, 14);
+    return `M0,${ry} A${rx},${ry} 0 0 1 ${w},${ry} L${w},${h - ry} A${rx},${ry} 0 0 0 0,${h - ry} Z ` +
+           `M${w},${ry} A${rx},${ry} 0 0 0 0,${ry}`;
+  }
+  function documentPath(w, h) {
+    const wave = h * 0.16;
+    return `M0,0 L${w},0 L${w},${round(h - wave)} ` +
+           `C${round(w * 0.72)},${round(h + wave * 0.6)} ${round(w * 0.28)},${round(h - wave * 1.8)} 0,${round(h - wave)} Z`;
+  }
+  function internalStoragePath(w, h) {
+    const top = Math.min(h * 0.28, 20), left = Math.min(w * 0.2, 20);
+    return `M0,0 L${w},0 L${w},${h} L0,${h} Z M0,${round(top)} L${w},${round(top)} M${round(left)},0 L${round(left)},${h}`;
+  }
+  function cubePath(w, h) {
+    const d = Math.min(w, h) * 0.25;
+    return `M0,${round(d)} L${round(d)},0 L${w},0 L${w},${round(h - d)} L${round(w - d)},${h} L0,${h} Z ` +
+           `M0,${round(d)} L${round(w - d)},${round(d)} L${w},0 M${round(w - d)},${round(d)} L${round(w - d)},${h}`;
+  }
+  function tapePath(w, h) {
+    const wave = h * 0.14;
+    return `M0,${round(wave)} C${round(w * 0.28)},${round(-wave)} ${round(w * 0.72)},${round(wave * 2.4)} ${w},${round(wave * 0.5)} ` +
+           `L${w},${round(h - wave)} C${round(w * 0.72)},${round(h + wave)} ${round(w * 0.28)},${round(h - wave * 2.4)} 0,${round(h - wave * 0.5)} Z`;
+  }
+  function orPath(w, h) { return `M0,0 Q${w},0 ${w},${round(h / 2)} Q${w},${h} 0,${h} Z`; }
+  function andPath(w, h) {
+    return `M0,0 Q${w},0 ${w},${round(h / 2)} Q${w},${h} 0,${h} Q${round(w * 0.4)},${round(h / 2)} 0,0 Z`;
+  }
+  function dataStoragePath(w, h) {
+    const c = Math.min(w * 0.16, 20);
+    return `M${round(c)},0 L${w},0 Q${round(w - c)},${round(h / 2)} ${w},${h} L${round(c)},${h} Q0,${round(h / 2)} ${round(c)},0 Z`;
+  }
+  function listPath(w, h) {
+    const title = Math.min(h * 0.28, 28);
+    return `M0,0 L${w},0 L${w},${h} L0,${h} Z M0,${round(title)} L${w},${round(title)}`;
+  }
+  function notePath(w, h) {
+    const f = Math.min(w, h) * 0.28;
+    return `M0,0 L${round(w - f)},0 L${w},${round(f)} L${w},${h} L0,${h} Z M${round(w - f)},0 L${round(w - f)},${round(f)} L${w},${round(f)}`;
+  }
+  function cardPath(w, h) {
+    const c = Math.min(w, h) * 0.28;
+    return `M${round(c)},0 L${w},0 L${w},${h} L0,${h} L0,${round(c)} Z`;
+  }
+  function calloutPath(w, h) {
+    const r = 10, bodyH = h * 0.72;
+    return `M${r},0 L${w - r},0 Q${w},0 ${w},${r} L${w},${round(bodyH - r)} Q${w},${round(bodyH)} ${w - r},${round(bodyH)} ` +
+           `L${round(w * 0.42)},${round(bodyH)} L${round(w * 0.24)},${h} L${round(w * 0.3)},${round(bodyH)} L${r},${round(bodyH)} ` +
+           `Q0,${round(bodyH)} 0,${round(bodyH - r)} L0,${r} Q0,0 ${r},0 Z`;
+  }
+  function cloudPath(w, h) {
+    return `M${round(0.28 * w)},${round(0.9 * h)} ` +
+           `C${round(0.06 * w)},${round(0.9 * h)} ${round(0.04 * w)},${round(0.58 * h)} ${round(0.22 * w)},${round(0.52 * h)} ` +
+           `C${round(0.16 * w)},${round(0.26 * h)} ${round(0.42 * w)},${round(0.14 * h)} ${round(0.52 * w)},${round(0.32 * h)} ` +
+           `C${round(0.62 * w)},${round(0.12 * h)} ${round(0.92 * w)},${round(0.18 * h)} ${round(0.82 * w)},${round(0.44 * h)} ` +
+           `C${round(1.0 * w)},${round(0.5 * h)} ${round(0.94 * w)},${round(0.86 * h)} ${round(0.74 * w)},${round(0.86 * h)} Z`;
+  }
+  function actorPath(w, h) {
+    const cx = w / 2, headR = Math.min(w * 0.32, h * 0.16), headCy = headR + 2;
+    const shoulder = headCy + headR + 2, hip = h * 0.62, arms = shoulder + (hip - shoulder) * 0.3;
+    return `M${round(cx - headR)},${round(headCy)} a${round(headR)},${round(headR)} 0 1 0 ${round(headR * 2)},0 a${round(headR)},${round(headR)} 0 1 0 ${round(-headR * 2)},0 ` +
+           `M${cx},${round(shoulder)} L${cx},${round(hip)} M${round(w * 0.18)},${round(arms)} L${round(w * 0.82)},${round(arms)} ` +
+           `M${cx},${round(hip)} L${round(w * 0.24)},${h} M${cx},${round(hip)} L${round(w * 0.76)},${h}`;
+  }
+  function arrowPoints(w, h, both) {
+    const head = Math.min(w * (both ? 0.24 : 0.32), h * 0.9), top = h * 0.28, bottom = h * 0.72, tail = both ? head : 0;
+    const pts = [];
+    if (both) pts.push([0, h / 2], [head, 0], [head, top]); else pts.push([0, top]);
+    pts.push([w - head, top], [w - head, 0], [w, h / 2], [w - head, h], [w - head, bottom]);
+    if (both) pts.push([tail, bottom], [tail, h]); else pts.push([0, bottom]);
+    return poly(pts);
+  }
+  function curvedArrowPath(w, h) {
+    return `M${round(w * 0.1)},${round(h * 0.92)} ` +
+           `C${round(w * 0.1)},${round(h * 0.25)} ${round(w * 0.45)},${round(h * 0.1)} ${round(w * 0.92)},${round(h * 0.14)}`;
+  }
+
+  function shapeFor(type, w, h) {
+    switch (type) {
+      case "rectangle": case "square": return { kind: "rect", rx: 0 };
+      case "rounded": return { kind: "rect", rx: 12 };
+      case "ellipse": case "circle": return { kind: "ellipse" };
+      case "process": return { kind: "process" };
+      case "diamond": return { kind: "polygon", points: poly([[w/2,0],[w,h/2],[w/2,h],[0,h/2]]) };
+      case "parallelogram": { const s = Math.min(w*0.25,36); return { kind:"polygon", points: poly([[s,0],[w,0],[w-s,h],[0,h]]) }; }
+      case "triangle": return { kind:"polygon", points: poly([[w/2,0],[w,h],[0,h]]) };
+      case "hexagon": { const s = Math.min(w*0.22,28); return { kind:"polygon", points: poly([[s,0],[w-s,0],[w,h/2],[w-s,h],[s,h],[0,h/2]]) }; }
+      case "trapezoid": { const s = Math.min(w*0.2,30); return { kind:"polygon", points: poly([[s,0],[w-s,0],[w,h],[0,h]]) }; }
+      case "step": { const s = Math.min(w*0.2,24); return { kind:"polygon", points: poly([[0,0],[w-s,0],[w,h/2],[w-s,h],[0,h],[s,h/2]]) }; }
+      case "cylinder": return { kind:"path", d: cylinderPath(w,h) };
+      case "document": return { kind:"path", d: documentPath(w,h) };
+      case "internal-storage": return { kind:"path", d: internalStoragePath(w,h) };
+      case "cube": return { kind:"path", d: cubePath(w,h) };
+      case "tape": return { kind:"path", d: tapePath(w,h) };
+      case "or": return { kind:"path", d: orPath(w,h) };
+      case "and": return { kind:"path", d: andPath(w,h) };
+      case "data-storage": return { kind:"path", d: dataStoragePath(w,h) };
+      case "list": return { kind:"path", d: listPath(w,h) };
+      case "note": return { kind:"path", d: notePath(w,h) };
+      case "card": return { kind:"path", d: cardPath(w,h) };
+      case "callout": return { kind:"path", d: calloutPath(w,h) };
+      case "cloud": return { kind:"path", d: cloudPath(w,h) };
+      case "actor": return { kind:"path", d: actorPath(w,h), noFill: true };
+      case "arrow": return { kind:"polygon", points: arrowPoints(w,h,false) };
+      case "arrow-double": return { kind:"polygon", points: arrowPoints(w,h,true) };
+      case "arrow-curved": return { kind:"path", d: curvedArrowPath(w,h), noFill: true, arrowEnd: true };
+      case "line": return { kind:"line" };
+      case "line-dashed": return { kind:"line", dash:"8 5" };
+      case "line-dotted": return { kind:"line", dash:"2 4" };
+      case "line-arrow": return { kind:"line", arrowEnd: true };
+      case "line-double-arrow": return { kind:"line", arrowStart: true, arrowEnd: true };
+      case "text": return { kind:"none" };
+      default: return { kind:"rect", rx: 0 };
+    }
+  }
+
+  // --- Shape catalogue (mirrors SHAPE_GROUPS) -------------------------------
+  const GROUPS = [
+    { title: "General", shapes: [
+      ["rectangle","Rectangle",120,60,"A step or action — the default box."],
+      ["rounded","Rounded",120,60,"Start or End of the flow."],
+      ["text","Text",100,40,"A plain label, no box."],
+      ["ellipse","Ellipse",120,70,"Start or End point."],
+      ["square","Square",80,80,"A step / action, equal-sided."],
+      ["circle","Circle",80,80,"Connector to a matching circle."],
+      ["process","Process",120,60,"Predefined process / subroutine."],
+      ["diamond","Decision",120,80,"A yes/no branch."],
+      ["parallelogram","Data",120,60,"Input or Output."],
+      ["hexagon","Preparation",120,70,"Setup before a step."],
+      ["triangle","Triangle",100,80,"Extract or merge."],
+      ["cylinder","Database",100,80,"Stored data / database."],
+      ["cloud","Cloud",120,80,"Network or external service."],
+      ["document","Document",120,70,"A document or report."],
+      ["internal-storage","Internal Storage",120,70,"Data in working memory."],
+      ["cube","Cube",100,80,"A system or component."],
+      ["step","Step",120,60,"One stage in a sequence."],
+      ["trapezoid","Manual Op",120,60,"A manual operation."],
+      ["tape","Tape",120,70,"Sequential data / log."],
+      ["note","Note",110,80,"A comment on the diagram."],
+      ["card","Card",120,70,"A punched card / record."],
+      ["callout","Callout",120,80,"A speech bubble."],
+      ["actor","Actor",60,90,"A person using the system."],
+      ["or","Or",90,70,"Logical OR."],
+      ["and","And",90,70,"Logical AND."],
+      ["data-storage","Data Storage",120,70,"Generic stored data."],
+      ["list","List",140,100,"A titled container."],
+    ]},
+    { title: "Arrows & Lines", shapes: [
+      ["arrow","Arrow",120,60,"Direction of flow (block)."],
+      ["arrow-double","Bidirectional",120,60,"A two-way relationship."],
+      ["arrow-curved","Curved Arrow",100,70,"Flow that loops or bends."],
+      ["line","Line",120,24,"A plain association."],
+      ["line-dashed","Dashed",120,24,"A weaker / optional link."],
+      ["line-dotted","Dotted",120,24,"An indirect / implied link."],
+      ["line-arrow","Directional",120,24,"Flow pointing one way."],
+      ["line-double-arrow","Bidirectional Line",120,24,"Flow both ways."],
+    ]},
+  ];
+
+  function svgEl(name, attrs) {
+    const el = document.createElementNS(SVGNS, name);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+
+  function buildPreview(type, w, h) {
+    const r = shapeFor(type, w, h);
+    const svg = svgEl("svg", { viewBox: `-2 -2 ${w + 4} ${h + 4}`, preserveAspectRatio: "xMidYMid meet" });
+    const add = (el) => svg.appendChild(el);
+    const markers = (el) => {
+      if (r.arrowStart) el.setAttribute("marker-start", "url(#ph-arrow)");
+      if (r.arrowEnd) el.setAttribute("marker-end", "url(#ph-arrow)");
+    };
+    switch (r.kind) {
+      case "rect": add(svgEl("rect", { class: "shape", x: 0, y: 0, width: w, height: h, rx: r.rx })); break;
+      case "ellipse": add(svgEl("ellipse", { class: "shape", cx: w/2, cy: h/2, rx: w/2, ry: h/2 })); break;
+      case "polygon": add(svgEl("polygon", { class: "shape", points: r.points })); break;
+      case "path": { const p = svgEl("path", { class: "shape" + (r.noFill ? " nofill" : ""), d: r.d }); markers(p); add(p); break; }
+      case "line": { const l = svgEl("line", { class: "shape-line", x1: 0, y1: h/2, x2: w, y2: h/2 }); if (r.dash) l.setAttribute("stroke-dasharray", r.dash); markers(l); add(l); break; }
+      case "process":
+        add(svgEl("rect", { class: "shape", x: 0, y: 0, width: w, height: h }));
+        add(svgEl("line", { class: "shape-line", x1: 8, y1: 0, x2: 8, y2: h }));
+        add(svgEl("line", { class: "shape-line", x1: w - 8, y1: 0, x2: w - 8, y2: h }));
+        break;
+      case "none": {
+        const t = svgEl("text", { x: w/2, y: h/2, "text-anchor": "middle", "dominant-baseline": "central", fill: "var(--muted)", "font-size": 18, "font-family": "var(--sans)" });
+        t.textContent = "Text";
+        add(t);
+        break;
+      }
+    }
+    return svg;
+  }
+
+  const sections = document.getElementById("sections");
+  let total = 0;
+  for (const group of GROUPS) {
+    const sec = document.createElement("section");
+    const head = document.createElement("div");
+    head.className = "section-head";
+    head.innerHTML = `<h2>${group.title}</h2><span class="n">${group.shapes.length} shapes</span>`;
+    sec.appendChild(head);
+
+    const grid = document.createElement("div");
+    grid.className = "grid";
+    for (const [type, label, w, h, meaning] of group.shapes) {
+      total++;
+      const tile = document.createElement("div");
+      tile.className = "tile";
+      tile.title = `${label} — ${meaning}`;
+      const prev = document.createElement("div");
+      prev.className = "preview";
+      prev.appendChild(buildPreview(type, w, h));
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.innerHTML = `<span class="name">${label}</span><span class="type">${type}</span><span class="meaning">${meaning}</span>`;
+      tile.appendChild(prev);
+      tile.appendChild(meta);
+      grid.appendChild(tile);
+    }
+    sec.appendChild(grid);
+    sections.appendChild(sec);
+  }
+  document.getElementById("total").textContent = total;
+  document.getElementById("groups").textContent = GROUPS.length;
+</script>

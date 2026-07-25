@@ -18,7 +18,10 @@ import {
   arrowBackOutline, arrowForwardOutline, businessOutline, checkmarkCircleOutline, checkmarkOutline,
   documentsOutline, earthOutline, informationCircleOutline, keyOutline, keypadOutline, locationOutline,
   logoGoogle, mailUnreadOutline, paperPlaneOutline, pencilOutline, peopleOutline, radioButtonOnOutline,
-  shieldCheckmarkOutline, todayOutline
+  shieldCheckmarkOutline, todayOutline,
+  // Flowchart builder: header, empty state, and the four directional connect handles.
+  gitNetworkOutline, shapesOutline,
+  caretUpOutline, caretDownOutline, caretForwardOutline, caretBackOutline
 } from 'ionicons/icons';
 import { authInterceptor } from './app/interceptors/auth.interceptor';
 
@@ -47,7 +50,9 @@ addIcons({
   arrowBackOutline, arrowForwardOutline, businessOutline, checkmarkCircleOutline, checkmarkOutline,
   documentsOutline, earthOutline, informationCircleOutline, keyOutline, keypadOutline, locationOutline,
   logoGoogle, mailUnreadOutline, paperPlaneOutline, pencilOutline, peopleOutline, radioButtonOnOutline,
-  shieldCheckmarkOutline, todayOutline
+  shieldCheckmarkOutline, todayOutline,
+  gitNetworkOutline, shapesOutline,
+  caretUpOutline, caretDownOutline, caretForwardOutline, caretBackOutline
 });
 
 bootstrapApplication(AppComponent, {

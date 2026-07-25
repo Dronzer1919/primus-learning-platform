@@ -1,0 +1,723 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+// Hidden <svg> holding the shared arrowhead marker.
+.marker-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+
+  #shape-arrow path {
+    fill: var(--editor-fg);
+    // Modern browsers: take the colour of the line being marked, so selected
+    // shapes get primary-coloured heads for free.
+    fill: context-stroke;
+  }
+}
+
+.flow-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--playground-page-bg);
+  color: var(--editor-fg);
+}
+
+// --- Header -------------------------------------------------------------
+.flow-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--editor-header-bg);
+  border-bottom: 1px solid var(--editor-border);
+  flex-shrink: 0;
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    > ion-icon {
+      font-size: 28px;
+      color: var(--ion-color-primary);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    p {
+      margin: 0;
+      font-size: 12px;
+      color: color-mix(in srgb, var(--editor-fg), transparent 45%);
+    }
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+// --- Body layout --------------------------------------------------------
+.flow-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+// --- Palette ------------------------------------------------------------
+.palette {
+  width: 188px;
+  flex-shrink: 0;
+  background: var(--editor-header-bg);
+  border-right: 1px solid var(--editor-border);
+  padding: 12px 10px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+
+  .palette-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+    color: color-mix(in srgb, var(--editor-fg), transparent 40%);
+    margin-bottom: 10px;
+
+    // Section headings after the first need breathing room from the grid above.
+    &:not(:first-child) {
+      margin-top: 18px;
+    }
+  }
+
+  .palette-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .palette-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 5px 2px 4px;
+    border: 1px solid var(--editor-border);
+    border-radius: 6px;
+    cursor: grab;
+    background: var(--playground-page-bg);
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+
+    &:hover {
+      border-color: var(--ion-color-primary);
+    }
+
+    &:active {
+      cursor: grabbing;
+    }
+  }
+
+  .palette-preview {
+    width: 100%;
+    height: 22px;
+
+    // Palette icons are drawn outline-only (no fill) like a standard diagram
+    // toolbox. Without these rules the SVG defaults to a solid black fill —
+    // the `.shape` colours elsewhere are scoped to the canvas (.shape-svg).
+    .shape {
+      fill: none;
+      stroke: var(--editor-fg);
+      stroke-width: 1.5;
+      vector-effect: non-scaling-stroke;
+      stroke-linejoin: round;
+    }
+
+    .shape-line {
+      fill: none;
+      stroke: var(--editor-fg);
+      stroke-width: 1.5;
+      vector-effect: non-scaling-stroke;
+    }
+  }
+
+  .palette-label {
+    font-size: 9px;
+    text-align: center;
+    line-height: 1.1;
+    color: color-mix(in srgb, var(--editor-fg), transparent 25%);
+  }
+
+  .palette-hint {
+    margin-top: 14px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: color-mix(in srgb, var(--editor-fg), transparent 45%);
+
+    ion-icon {
+      vertical-align: middle;
+      font-size: 13px;
+    }
+  }
+}
+
+// --- Canvas area --------------------------------------------------------
+.canvas-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--editor-border);
+  background: var(--editor-header-bg);
+  flex-shrink: 0;
+
+  .toolbar-note {
+    font-size: 12px;
+    color: var(--ion-color-primary);
+  }
+}
+
+// --- Colour controls for the selected shape -----------------------------
+.color-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-left: 6px;
+  margin-left: 2px;
+  border-left: 1px solid var(--editor-border);
+}
+
+.color-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  .color-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: color-mix(in srgb, var(--editor-fg), transparent 40%);
+    margin-right: 2px;
+  }
+}
+
+.swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--editor-fg), transparent 55%);
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+
+  &:hover {
+    transform: scale(1.15);
+  }
+
+  &.active {
+    box-shadow: 0 0 0 2px var(--ion-color-primary);
+    border-color: var(--ion-color-primary);
+  }
+
+  // "Default" swatch: a diagonal line over the theme background.
+  &.none {
+    background:
+      linear-gradient(
+        to top right,
+        transparent 0%, transparent 44%,
+        #e5484d 44%, #e5484d 56%,
+        transparent 56%, transparent 100%
+      ),
+      var(--editor-header-bg);
+  }
+
+  // The custom-colour picker: a "+" tile hiding a native colour input.
+  &.custom {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+    color: color-mix(in srgb, var(--editor-fg), transparent 25%);
+    background: var(--editor-header-bg);
+    position: relative;
+    overflow: hidden;
+
+    input[type='color'] {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+    }
+  }
+}
+
+.canvas {
+  position: relative;
+  flex: 1;
+  overflow: auto;
+  background-color: var(--playground-page-bg);
+  // Dotted grid for a diagram-editor feel.
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--editor-fg), transparent 82%) 1px,
+    transparent 1px
+  );
+  background-size: 20px 20px;
+
+  &.connecting {
+    cursor: crosshair;
+  }
+}
+
+.edges {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+
+  .edge {
+    fill: none;
+    stroke: color-mix(in srgb, var(--editor-fg), transparent 20%);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    pointer-events: stroke;
+    cursor: pointer;
+
+    &:hover {
+      stroke: var(--ion-color-primary);
+    }
+
+    &.selected {
+      stroke: var(--ion-color-primary);
+      stroke-width: 3;
+    }
+  }
+
+  .edge-preview {
+    fill: none;
+    stroke: var(--ion-color-primary);
+    stroke-width: 2;
+    stroke-dasharray: 5 4;
+    stroke-linejoin: round;
+    pointer-events: none;
+  }
+
+  #flow-arrow path {
+    fill: color-mix(in srgb, var(--editor-fg), transparent 20%);
+  }
+}
+
+// --- Nodes --------------------------------------------------------------
+.node {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: move;
+  user-select: none;
+
+  &.selected {
+    outline: 1px dashed var(--ion-color-primary);
+    outline-offset: 3px;
+  }
+}
+
+// The SVG draws the actual shape outline + fill.
+.shape-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+
+  .shape {
+    // --node-fill / --node-stroke are set per node from its saved colours;
+    // they fall back to the theme so uncoloured shapes look as before.
+    fill: var(--node-fill, var(--editor-header-bg));
+    stroke: var(--node-stroke, var(--editor-fg));
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+    stroke-linejoin: round;
+    // The shape body catches drag/click even though the SVG itself is pass-through.
+    pointer-events: fill;
+  }
+
+  .shape-nofill {
+    fill: none;
+    pointer-events: stroke;
+  }
+
+  .shape-line {
+    fill: none;
+    stroke: var(--node-stroke, var(--editor-fg));
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+    pointer-events: stroke;
+  }
+}
+
+.node.selected .shape,
+.node.selected .shape-line {
+  stroke: var(--ion-color-primary);
+}
+
+.node.connect-source .shape {
+  stroke: var(--ion-color-primary);
+}
+
+// Valid drop target while dragging a connection.
+.node.connect-target .shape {
+  stroke: var(--ion-color-success, #2dd36f);
+  stroke-width: 3;
+  fill: color-mix(in srgb, var(--ion-color-success, #2dd36f), transparent 82%);
+}
+
+.node-label {
+  position: relative;
+  z-index: 1;
+  font-size: 13px;
+  text-align: center;
+  padding: 4px;
+  // Fill the node so text-align (from the Text panel) actually shifts the text.
+  width: 100%;
+  max-width: 100%;
+  outline: none;
+  word-break: break-word;
+  pointer-events: none;
+
+  &.text-only {
+    color: var(--editor-fg);
+  }
+
+  // Shapes are dropped blank, so hint at how to fill them in — on hover only.
+  &:empty::after {
+    content: 'Double-click';
+    font-size: 10px;
+    color: color-mix(in srgb, var(--editor-fg), transparent 55%);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .node:hover &:empty::after {
+    opacity: 1;
+  }
+}
+
+// A real form control, so keyboard input Just Works regardless of the parent's
+// user-select. Sits over the shape and mimics the label's look.
+.node-input {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 4px;
+  border: none;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  color: var(--editor-fg);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.25;
+  text-align: center;
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.connect-handle {
+  position: absolute;
+  z-index: 3;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--ion-color-primary);
+  color: var(--ion-color-primary-contrast);
+  cursor: crosshair;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+
+  ion-icon {
+    font-size: 12px;
+  }
+
+  &:hover {
+    transform: scale(1.15);
+  }
+
+  &.handle-top {
+    top: -26px;
+    left: 50%;
+    margin-left: -10px;
+  }
+
+  &.handle-right {
+    right: -26px;
+    top: 50%;
+    margin-top: -10px;
+  }
+
+  &.handle-bottom {
+    bottom: -26px;
+    left: 50%;
+    margin-left: -10px;
+  }
+
+  &.handle-left {
+    left: -26px;
+    top: 50%;
+    margin-top: -10px;
+  }
+
+  // Reveal on hover/selection; keep visible on the source while dragging.
+  .node:hover &,
+  .node.selected &,
+  .node.connect-source & {
+    opacity: 1;
+  }
+}
+
+// While actively dragging a connection, don't let handles/labels swallow the
+// pointer so the drop target underneath can be detected.
+.node.connect-source .connect-handle {
+  pointer-events: none;
+}
+
+// --- Properties / Text panel -------------------------------------------
+.props-panel {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--editor-header-bg);
+  border-left: 1px solid var(--editor-border);
+  padding: 14px 14px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  .props-header {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--editor-fg);
+    padding-bottom: 10px;
+  }
+
+  .props-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 0;
+    border-top: 1px solid var(--editor-border);
+  }
+
+  .props-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--editor-fg);
+  }
+
+  .props-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--editor-fg);
+  }
+
+  .props-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    &.spread {
+      justify-content: space-between;
+    }
+  }
+
+  .props-select {
+    width: 100%;
+    padding: 7px 8px;
+    border: 1px solid var(--editor-border);
+    border-radius: 6px;
+    background: var(--playground-page-bg);
+    color: var(--editor-fg);
+    font-size: 13px;
+    cursor: pointer;
+  }
+}
+
+// Bold / italic / align button clusters.
+.btn-group {
+  display: flex;
+  gap: 4px;
+
+  &.align-group {
+    margin-top: 2px;
+  }
+}
+
+.icon-btn {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--editor-border);
+  border-radius: 6px;
+  background: var(--playground-page-bg);
+  color: var(--editor-fg);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+
+  b, i, u {
+    font-style: inherit;
+  }
+  i { font-style: italic; }
+
+  ion-icon {
+    font-size: 16px;
+  }
+
+  .align-icon {
+    width: 16px;
+    height: 16px;
+
+    line {
+      stroke: currentColor;
+      stroke-width: 1.6;
+      stroke-linecap: round;
+    }
+  }
+
+  &:hover {
+    border-color: var(--ion-color-primary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ion-color-primary);
+    outline-offset: 1px;
+  }
+
+  &.active {
+    background: color-mix(in srgb, var(--ion-color-primary), transparent 82%);
+    border-color: var(--ion-color-primary);
+    color: var(--ion-color-primary);
+  }
+
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+}
+
+.num-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--editor-border);
+  border-radius: 6px;
+  background: var(--playground-page-bg);
+
+  input {
+    width: 42px;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--editor-fg);
+    font-size: 13px;
+    text-align: right;
+  }
+
+  .unit {
+    font-size: 12px;
+    color: color-mix(in srgb, var(--editor-fg), transparent 35%);
+  }
+}
+
+// The Font Color chip: a filled tile hiding a native colour input.
+.color-field {
+  position: relative;
+  width: 40px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--editor-fg), transparent 55%);
+  cursor: pointer;
+  overflow: hidden;
+
+  input[type='color'] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+}
+
+// Swatch grid inside the panel.
+.swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.canvas-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+  color: color-mix(in srgb, var(--editor-fg), transparent 55%);
+
+  ion-icon {
+    font-size: 48px;
+  }
+
+  p {
+    margin: 0;
+    font-size: 14px;
+  }
+}

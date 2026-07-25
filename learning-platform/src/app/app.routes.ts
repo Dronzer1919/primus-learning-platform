@@ -75,6 +75,11 @@ export const routes: Routes = [
     loadComponent: () => import('./components/code-playground/code-playground.component').then((m) => m.CodePlaygroundComponent),
   },
   {
+    // Standalone flowchart / diagram builder.
+    path: 'flowchart',
+    loadComponent: () => import('./components/flowchart/flowchart.component').then((m) => m.FlowchartComponent),
+  },
+  {
     path: '**',
     redirectTo: '',
   },

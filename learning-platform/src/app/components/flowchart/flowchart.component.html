@@ -1,0 +1,496 @@
+<!-- Arrowheads for the arrow/line shapes. Kept in one hidden <svg> so palette
+previews and canvas nodes can both reference them by id. -->
+<svg class="marker-defs" aria-hidden="true" focusable="false">
+  <defs>
+    <marker
+      id="shape-arrow"
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="6"
+      markerHeight="6"
+      orient="auto-start-reverse"
+      >
+      <path d="M 0 0 L 10 5 L 0 10 z"></path>
+    </marker>
+  </defs>
+</svg>
+
+<div class="flow-page">
+  <!-- Header -->
+  <div class="flow-header">
+    <div class="brand">
+      <ion-icon name="git-network-outline"></ion-icon>
+      <div>
+        <h1>Flowchart Builder</h1>
+        <p>Drag shapes, connect them, build your diagram</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <app-theme-selector></app-theme-selector>
+      <ion-button size="small" fill="outline" routerLink="/">
+        <ion-icon slot="start" name="arrow-back-outline"></ion-icon>
+        Back
+      </ion-button>
+    </div>
+  </div>
+
+  <div class="flow-body">
+    <!-- Shape palette -->
+    <div class="palette">
+      @for (group of paletteGroups; track group) {
+        <div class="palette-title">{{ group.title }}</div>
+        <div class="palette-grid">
+          @for (p of group.items; track p) {
+            <div
+              class="palette-item"
+              draggable="true"
+              [title]="p.shape.label + ' — ' + p.shape.meaning"
+              (dragstart)="onPaletteDragStart($event, p.shape.type)"
+              >
+              <svg class="palette-preview" viewBox="-2 -2 50 32" preserveAspectRatio="xMidYMid meet">
+                <ng-container
+                  *ngTemplateOutlet="shapeTpl; context: { r: p.render, w: previewW, h: previewH }"
+                ></ng-container>
+              </svg>
+              <span class="palette-label">{{ p.shape.label }}</span>
+            </div>
+          }
+        </div>
+      }
+      <div class="palette-hint">
+        Hover a palette shape to see what it means, then drag it onto the canvas.
+        <strong>Double-click a shape (or press F2) to type inside it</strong> — Enter
+        saves, Escape cancels. Hover a shape to reveal its side arrows, then drag from
+        an arrow onto another shape to connect them.
+      </div>
+    </div>
+
+    <!-- Canvas -->
+    <div class="canvas-wrap">
+      <div class="toolbar">
+        <ion-button
+          size="small"
+          fill="outline"
+          color="danger"
+          [disabled]="!selectedNodeId && !selectedEdgeId"
+          (click)="deleteSelected()"
+          >
+          <ion-icon slot="start" name="trash-outline"></ion-icon>
+          Delete
+        </ion-button>
+        <ion-button size="small" fill="outline" (click)="clear()">
+          <ion-icon slot="start" name="refresh-outline"></ion-icon>
+          Clear
+        </ion-button>
+        @if (connectFromId) {
+          <span class="toolbar-note">
+            Drag onto a target shape to connect — release on empty space to cancel.
+          </span>
+        }
+      </div>
+
+      <div
+        #canvas
+        class="canvas"
+        [class.connecting]="connectFromId"
+        (dragover)="onCanvasDragOver($event)"
+        (drop)="onCanvasDrop($event)"
+        (click)="onCanvasClick()"
+        >
+        <!-- Edges -->
+        <svg class="edges">
+          <defs>
+            <marker
+              id="flow-arrow"
+              viewBox="0 0 10 10"
+              refX="9"
+              refY="5"
+              markerWidth="7"
+              markerHeight="7"
+              orient="auto-start-reverse"
+              >
+              <path d="M 0 0 L 10 5 L 0 10 z"></path>
+            </marker>
+          </defs>
+          @for (g of edgeGeometries; track trackEdge($index, g)) {
+            <polyline
+              class="edge"
+              [class.selected]="selectedEdgeId === g.edge.id"
+              [attr.points]="g.points"
+              marker-end="url(#flow-arrow)"
+              (click)="onEdgeClick($event, g.edge)"
+            ></polyline>
+          }
+
+          <!-- Live preview while dragging a new connection -->
+          @if (connectPreview; as p) {
+            <polyline
+              class="edge-preview"
+              [attr.points]="p.points"
+              marker-end="url(#flow-arrow)"
+            ></polyline>
+          }
+        </svg>
+
+        <!-- Nodes -->
+        @for (v of nodeViews; track trackNode($index, v)) {
+          <div
+            class="node"
+            [attr.data-node-id]="v.node.id"
+            [class.selected]="selectedNodeId === v.node.id"
+            [class.connect-source]="connectFromId === v.node.id"
+            [class.connect-target]="connectTargetId === v.node.id"
+            [style.left.px]="v.node.x"
+            [style.top.px]="v.node.y"
+            [style.width.px]="v.node.w"
+            [style.height.px]="v.node.h"
+            [style.--node-fill]="v.node.fill"
+            [style.--node-stroke]="v.node.stroke"
+            (mousedown)="onNodeMouseDown($event, v.node)"
+            (click)="onNodeClick($event, v.node)"
+            (dblclick)="startEditing($event, v.node)"
+            >
+            @if (v.shape.kind !== 'none') {
+              <svg
+                class="shape-svg"
+                [attr.viewBox]="'0 0 ' + v.node.w + ' ' + v.node.h"
+                preserveAspectRatio="none"
+                >
+                <ng-container
+                  *ngTemplateOutlet="shapeTpl; context: { r: v.shape, w: v.node.w, h: v.node.h }"
+                ></ng-container>
+              </svg>
+            }
+            @if (editingNodeId !== v.node.id) {
+              <div
+                class="node-label"
+                [class.text-only]="v.node.type === 'text'"
+                [ngStyle]="labelStyle(v.node)"
+              >{{ v.node.text }}</div>
+            }
+            @if (editingNodeId === v.node.id) {
+              <textarea
+                class="node-input"
+                [ngStyle]="labelStyle(v.node)"
+                [value]="v.node.text"
+                (mousedown)="$event.stopPropagation()"
+                (click)="$event.stopPropagation()"
+                (keydown)="onInputKeydown($event, v.node)"
+                (blur)="commitEdit($event, v.node)"
+              ></textarea>
+            }
+            <!-- Directional connection handles: drag from one onto another shape to link. -->
+            <button
+              type="button"
+              class="connect-handle handle-top"
+              title="Drag to another shape to connect"
+              (mousedown)="startConnect($event, v.node)"
+              >
+              <ion-icon name="caret-up-outline"></ion-icon>
+            </button>
+            <button
+              type="button"
+              class="connect-handle handle-right"
+              title="Drag to another shape to connect"
+              (mousedown)="startConnect($event, v.node)"
+              >
+              <ion-icon name="caret-forward-outline"></ion-icon>
+            </button>
+            <button
+              type="button"
+              class="connect-handle handle-bottom"
+              title="Drag to another shape to connect"
+              (mousedown)="startConnect($event, v.node)"
+              >
+              <ion-icon name="caret-down-outline"></ion-icon>
+            </button>
+            <button
+              type="button"
+              class="connect-handle handle-left"
+              title="Drag to another shape to connect"
+              (mousedown)="startConnect($event, v.node)"
+              >
+              <ion-icon name="caret-back-outline"></ion-icon>
+            </button>
+          </div>
+        }
+
+        <!-- Empty state -->
+        @if (diagram.nodes.length === 0) {
+          <div class="canvas-empty">
+            <ion-icon name="shapes-outline"></ion-icon>
+            <p>Drag a shape from the left to get started</p>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Properties / Text panel for the selected shape -->
+    @if (selectedNode; as sel) {
+      <div
+        class="props-panel"
+        role="region"
+        aria-labelledby="props-heading"
+        >
+        <h2 class="props-header" id="props-heading">Text</h2>
+        <!-- Font -->
+        <div class="props-section" role="group" aria-labelledby="font-title">
+          <div class="props-title" id="font-title">Font</div>
+          <select
+            class="props-select"
+            aria-label="Font family"
+            [value]="sel.fontFamily || fontFamilies[0]"
+            (change)="setFontFamily($any($event.target).value)"
+            >
+            @for (f of fontFamilies; track f) {
+              <option [value]="f">{{ f }}</option>
+            }
+          </select>
+          <div class="props-row">
+            <div class="btn-group" role="toolbar" aria-label="Font style" aria-orientation="horizontal">
+              <button
+                type="button"
+                class="icon-btn"
+                [class.active]="sel.bold"
+                [attr.aria-pressed]="!!sel.bold"
+                aria-label="Bold"
+                (click)="toggleText('bold')"
+              ><b aria-hidden="true">B</b></button>
+              <button
+                type="button"
+                class="icon-btn"
+                [class.active]="sel.italic"
+                [attr.aria-pressed]="!!sel.italic"
+                aria-label="Italic"
+                (click)="toggleText('italic')"
+              ><i aria-hidden="true">I</i></button>
+              <button
+                type="button"
+                class="icon-btn"
+                [class.active]="sel.underline"
+                [attr.aria-pressed]="!!sel.underline"
+                aria-label="Underline"
+                (click)="toggleText('underline')"
+              ><u aria-hidden="true">U</u></button>
+            </div>
+
+            <div class="num-field">
+              <input
+                type="number"
+                min="6"
+                max="200"
+                aria-label="Font size in pixels"
+                [value]="sel.fontSize ?? defaultFontSize"
+                (change)="setFontSize($any($event.target).valueAsNumber)"
+              />
+              <span class="unit" aria-hidden="true">px</span>
+            </div>
+          </div>
+
+          <div
+            class="btn-group align-group"
+            role="radiogroup"
+            aria-label="Text alignment"
+            (keydown)="onAlignKeydown($event)"
+          >
+            <button
+              type="button"
+              class="icon-btn"
+              role="radio"
+              [class.active]="(sel.align ?? 'center') === 'left'"
+              [attr.aria-checked]="(sel.align ?? 'center') === 'left'"
+              [attr.tabindex]="(sel.align ?? 'center') === 'left' ? 0 : -1"
+              aria-label="Align left"
+              (click)="setAlign('left')"
+            >
+              <svg class="align-icon" viewBox="0 0 16 16" aria-hidden="true">
+                <line x1="2" y1="3" x2="14" y2="3" />
+                <line x1="2" y1="6.5" x2="9" y2="6.5" />
+                <line x1="2" y1="10" x2="14" y2="10" />
+                <line x1="2" y1="13.5" x2="9" y2="13.5" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="icon-btn"
+              role="radio"
+              [class.active]="(sel.align ?? 'center') === 'center'"
+              [attr.aria-checked]="(sel.align ?? 'center') === 'center'"
+              [attr.tabindex]="(sel.align ?? 'center') === 'center' ? 0 : -1"
+              aria-label="Align center"
+              (click)="setAlign('center')"
+            >
+              <svg class="align-icon" viewBox="0 0 16 16" aria-hidden="true">
+                <line x1="2" y1="3" x2="14" y2="3" />
+                <line x1="4.5" y1="6.5" x2="11.5" y2="6.5" />
+                <line x1="2" y1="10" x2="14" y2="10" />
+                <line x1="4.5" y1="13.5" x2="11.5" y2="13.5" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="icon-btn"
+              role="radio"
+              [class.active]="(sel.align ?? 'center') === 'right'"
+              [attr.aria-checked]="(sel.align ?? 'center') === 'right'"
+              [attr.tabindex]="(sel.align ?? 'center') === 'right' ? 0 : -1"
+              aria-label="Align right"
+              (click)="setAlign('right')"
+            >
+              <svg class="align-icon" viewBox="0 0 16 16" aria-hidden="true">
+                <line x1="2" y1="3" x2="14" y2="3" />
+                <line x1="7" y1="6.5" x2="14" y2="6.5" />
+                <line x1="2" y1="10" x2="14" y2="10" />
+                <line x1="7" y1="13.5" x2="14" y2="13.5" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <!-- Font colour -->
+                <div class="props-section">
+                  <div class="props-row spread">
+                    <span class="props-label" id="text-color-label">Font Color</span>
+                    <label class="color-field" [style.background]="sel.textColor || 'var(--editor-fg)'">
+                      <input
+                        type="color"
+                        aria-labelledby="text-color-label"
+                        [value]="sel.textColor || '#111827'"
+                        (input)="setTextColor($any($event.target).value)"
+                        />
+                    </label>
+                  </div>
+                </div>
+                <!-- Fill / border swatches -->
+                <div class="props-section" role="group" aria-labelledby="fill-title">
+                  <div class="props-title" id="fill-title">Fill</div>
+                  <div class="swatch-row" role="radiogroup" aria-label="Fill colour">
+                    @for (c of fillSwatches; track c) {
+                      <button
+                        type="button"
+                        class="swatch"
+                        role="radio"
+                        [class.none]="c === null"
+                        [class.active]="(sel.fill ?? null) === c"
+                        [attr.aria-checked]="(sel.fill ?? null) === c"
+                        [style.background]="c"
+                        [attr.aria-label]="c === null ? 'Default fill' : 'Fill ' + c"
+                        (click)="setFill(c)"
+                      ></button>
+                    }
+                    <label class="swatch custom">
+                      <input
+                        type="color"
+                        aria-label="Custom fill colour"
+                        [value]="sel.fill || '#ffffff'"
+                        (input)="setFill($any($event.target).value)"
+                        />
+                      <span aria-hidden="true">+</span>
+                    </label>
+                  </div>
+                  <div class="props-title" id="border-title">Border</div>
+                  <div class="swatch-row" role="radiogroup" aria-label="Border colour">
+                    @for (c of strokeSwatches; track c) {
+                      <button
+                        type="button"
+                        class="swatch"
+                        role="radio"
+                        [class.none]="c === null"
+                        [class.active]="(sel.stroke ?? null) === c"
+                        [attr.aria-checked]="(sel.stroke ?? null) === c"
+                        [style.background]="c"
+                        [attr.aria-label]="c === null ? 'Default border' : 'Border ' + c"
+                        (click)="setStroke(c)"
+                      ></button>
+                    }
+                    <label class="swatch custom">
+                      <input
+                        type="color"
+                        aria-label="Custom border colour"
+                        [value]="sel.stroke || '#111827'"
+                        (input)="setStroke($any($event.target).value)"
+                        />
+                      <span aria-hidden="true">+</span>
+                    </label>
+                  </div>
+                </div>
+                <!-- Line height -->
+                <div class="props-section">
+                  <div class="props-row spread">
+                    <span class="props-label" id="line-height-label">Line Height</span>
+                    <div class="num-field">
+                      <input
+                        type="number"
+                        min="50"
+                        max="300"
+                        step="10"
+                        aria-labelledby="line-height-label"
+                        [value]="sel.lineHeight ?? defaultLineHeight"
+                        (change)="setLineHeight($any($event.target).valueAsNumber)"
+                        />
+                      <span class="unit" aria-hidden="true">%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <!-- Reusable shape renderer, shared by palette previews and canvas nodes.
+        svg: namespace prefixes are required because these elements live in an
+        <ng-template> without a lexical <svg> parent. -->
+          <ng-template #shapeTpl let-r="r" let-w="w" let-h="h">
+            @switch (r.kind) {
+              @case ('rect') {
+                <svg:rect
+                  class="shape"
+                  x="0"
+                  y="0"
+                  [attr.width]="w"
+                  [attr.height]="h"
+                  [attr.rx]="r.rx"
+                  ></svg:rect>
+                }
+                @case ('ellipse') {
+                  <svg:ellipse
+                    class="shape"
+                    [attr.cx]="w / 2"
+                    [attr.cy]="h / 2"
+                    [attr.rx]="w / 2"
+                    [attr.ry]="h / 2"
+                    ></svg:ellipse>
+                  }
+                  @case ('polygon') {
+                    <svg:polygon class="shape" [attr.points]="r.points"></svg:polygon>
+                    }
+                    @case ('path') {
+                      <svg:path
+                        class="shape"
+                        [class.shape-nofill]="r.noFill"
+                        [attr.d]="r.d"
+                        [attr.marker-start]="r.arrowStart ? 'url(#shape-arrow)' : null"
+                        [attr.marker-end]="r.arrowEnd ? 'url(#shape-arrow)' : null"
+                        ></svg:path>
+                      }
+                      @case ('line') {
+                        <svg:line
+                          class="shape-line"
+                          x1="0"
+                          [attr.y1]="h / 2"
+                          [attr.x2]="w"
+                          [attr.y2]="h / 2"
+                          [attr.stroke-dasharray]="r.dash"
+                          [attr.marker-start]="r.arrowStart ? 'url(#shape-arrow)' : null"
+                          [attr.marker-end]="r.arrowEnd ? 'url(#shape-arrow)' : null"
+                          ></svg:line>
+                        }
+                        @case ('process') {
+                          <svg:g>
+                            <svg:rect class="shape" x="0" y="0" [attr.width]="w" [attr.height]="h"></svg:rect>
+                              <svg:line class="shape-line" [attr.x1]="8" y1="0" [attr.x2]="8" [attr.y2]="h"></svg:line>
+                                <svg:line class="shape-line" [attr.x1]="w - 8" y1="0" [attr.x2]="w - 8" [attr.y2]="h"></svg:line>
+                                  </svg:g>
+                                }
+                              }
+                            </ng-template>

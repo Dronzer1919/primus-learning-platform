@@ -1,0 +1,135 @@
+<div class="viz">
+  <!-- Header + complexity badges -->
+  <div class="viz-header">
+    <div class="viz-title">
+      <ion-icon name="git-network-outline"></ion-icon>
+      <span>Visual Flow</span>
+    </div>
+    @if (result) {
+      <div class="viz-badges">
+        <span class="badge time" title="Estimated time complexity">{{ result.complexity.time }}</span>
+        <span class="badge space" title="Estimated space complexity">{{ result.complexity.space }}</span>
+        @if (totalSteps > 0) {
+          <span class="badge step">
+            Step {{ current + 1 }} / {{ totalSteps }}
+          </span>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- Progress bar -->
+  @if (totalSteps > 0) {
+    <div class="viz-progress">
+      <div class="viz-progress-fill" [style.width.%]="((current + 1) / totalSteps) * 100"></div>
+    </div>
+  }
+
+  <!-- Error / empty states -->
+  @if (result?.error) {
+    <div class="viz-message error">
+      <ion-icon name="alert-circle-outline"></ion-icon>
+      <span>{{ result?.error }}</span>
+    </div>
+  }
+  @if (result && !result.error && totalSteps === 0) {
+    <div class="viz-message">
+      <ion-icon name="information-circle-outline"></ion-icon>
+      <span>No executable steps were traced. Add statements inside a function or block.</span>
+    </div>
+  }
+  @if (result?.truncated) {
+    <div class="viz-message warn">
+      <ion-icon name="warning-outline"></ion-icon>
+      <span>Trace stopped early at {{ totalSteps }} steps (possible large/infinite loop).</span>
+    </div>
+  }
+
+  @if (totalSteps > 0) {
+    <div class="viz-body">
+      <!-- Left: code with the executing line highlighted -->
+      <div class="viz-code">
+        @for (ln of codeLines; track ln) {
+          <div
+            class="code-row"
+            [class.active]="ln.number === activeLine"
+            >
+            <span class="gutter">{{ ln.number }}</span>
+            <span class="code-text">{{ ln.text || ' ' }}</span>
+          </div>
+        }
+      </div>
+      <!-- Right: live variable/memory + console -->
+      <div class="viz-side">
+        <div class="panel memory">
+          <div class="panel-title">
+            <ion-icon name="server-outline"></ion-icon>
+            Memory
+            @if (inLoop) {
+              <span class="loop-tag">in loop</span>
+            }
+          </div>
+          <div class="var-list">
+            @for (v of vars; track v) {
+              <div class="var-row">
+                <span class="var-name">{{ v.name }}</span>
+                <span class="var-eq">=</span>
+                <span class="var-value">{{ v.value }}</span>
+              </div>
+            }
+            @if (vars.length === 0) {
+              <div class="var-empty">No variables in scope yet.</div>
+            }
+          </div>
+        </div>
+        <div class="panel console">
+          <div class="panel-title">
+            <ion-icon name="terminal-outline"></ion-icon>
+            Console
+          </div>
+          <div class="console-body">
+            @for (line of consoleLines; track line) {
+              <div class="console-line">&gt; {{ line }}</div>
+            }
+            @if (consoleLines.length === 0) {
+              <div class="var-empty">No output yet.</div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Controls -->
+  @if (totalSteps > 0) {
+    <div class="viz-controls">
+      <ion-button size="small" fill="outline" (click)="prev()" [disabled]="atStart">
+        <ion-icon slot="start" name="play-back-outline"></ion-icon>
+        Prev
+      </ion-button>
+      <ion-button size="small" fill="outline" (click)="next()" [disabled]="atEnd">
+        Next
+        <ion-icon slot="end" name="play-forward-outline"></ion-icon>
+      </ion-button>
+      <ion-button size="small" color="primary" (click)="togglePlay()">
+        <ion-icon slot="start" [name]="playing ? 'pause-outline' : 'play-outline'"></ion-icon>
+        {{ playing ? 'Pause' : 'Play' }}
+      </ion-button>
+      <ion-button
+        size="small"
+        color="warning"
+        fill="outline"
+        (click)="skipLoop()"
+        [disabled]="!inLoop"
+        title="Jump past the current loop"
+        >
+        <ion-icon slot="start" name="play-skip-forward-outline"></ion-icon>
+        Skip Loop
+      </ion-button>
+      <ion-button size="small" fill="outline" (click)="reset()">
+        <ion-icon slot="start" name="refresh-outline"></ion-icon>
+        Reset
+      </ion-button>
+    </div>
+  }
+</div>
