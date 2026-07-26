@@ -209,15 +209,8 @@ export class UserPage implements OnInit, OnDestroy {
   // out and not restored on return — leaving the main area blank. If the outlet came
   // back empty, re-navigate to the same URL to re-render the child page.
   ionViewDidEnter(): void {
-    // DEBUG
-    console.log(
-      '%c[USER] ionViewDidEnter', 'color:#f0b429',
-      '| url:', this.router.url,
-      '| childOutlet.isActivated:', this.childOutlet?.isActivated
-    );
     if (this.childOutlet && !this.childOutlet.isActivated) {
       const url = this.router.url;
-      console.log('%c[USER] child outlet EMPTY → reloading via / then', 'color:#f0b429', url);
       this.router
         .navigateByUrl('/', { skipLocationChange: true })
         .then(() => this.router.navigateByUrl(url));

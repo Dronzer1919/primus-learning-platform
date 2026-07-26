@@ -1,0 +1,42 @@
+name: Deploy Dev to Hostinger
+
+# Auto-deploy on every push to `dev` (a merge into dev is also a push).
+# Mirrors the ionic-ecom pattern: SSH into the VPS and run one deploy script that
+# pulls the code, rebuilds and brings the app back up (here via PM2 + Nginx).
+on:
+  push:
+    branches:
+      - dev
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -e
+            cd "${{ secrets.VPS_APP_DIR }}"
+            chmod +x deployment-scripts/deploy-hostinger.sh
+            APP_ROOT="${{ secrets.VPS_APP_DIR }}" BRANCH="dev" bash deployment-scripts/deploy-hostinger.sh
+
+  summary:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: always()
+    steps:
+      - name: Print summary
+        run: |
+          echo "Workflow: Deploy Dev to Hostinger"
+          echo "Branch: dev"
+          echo "Result: ${{ needs.deploy.result }}"

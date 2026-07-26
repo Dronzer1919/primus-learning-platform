@@ -11,8 +11,11 @@ echo ""
 
 # Configuration
 APP_NAME="learning-platform-backend"
-APP_DIR="/var/www/learning-platform-backend"
-BRANCH="main"
+# The full monorepo is git-cloned here; the Node app lives in its backend/ subfolder.
+REPO_DIR="/var/www/learning-platform-backend"
+APP_DIR="$REPO_DIR/backend"
+# Branch to deploy. Override with:  BRANCH=main bash deploy-backend.sh
+BRANCH="${BRANCH:-dev}"
 
 # Colors
 RED='\033[0;31m'
@@ -26,17 +29,17 @@ if [ "$EUID" -eq 0 ]; then
   exit 1
 fi
 
-# Go to app directory
-echo -e "${YELLOW}Navigating to $APP_DIR ...${NC}"
-cd "$APP_DIR" || { echo -e "${RED}Directory not found${NC}"; exit 1; }
-
-# Pull latest code
-echo -e "${YELLOW}Pulling latest changes ($BRANCH)...${NC}"
+# Pull latest code at the repo root
+echo -e "${YELLOW}Pulling latest changes ($BRANCH) in $REPO_DIR ...${NC}"
+cd "$REPO_DIR" || { echo -e "${RED}Repo not found: $REPO_DIR${NC}"; exit 1; }
 git fetch origin
+git checkout "$BRANCH" 2>/dev/null || true
 git pull origin "$BRANCH" || { echo -e "${RED}Git pull failed${NC}"; exit 1; }
 
-# Install production dependencies
-echo -e "${YELLOW}Installing dependencies...${NC}"
+# Move into the Node app and install production dependencies
+echo -e "${YELLOW}Installing dependencies in $APP_DIR ...${NC}"
+cd "$APP_DIR" || { echo -e "${RED}Backend folder not found: $APP_DIR${NC}"; exit 1; }
+mkdir -p logs
 npm install --production || { echo -e "${RED}npm install failed${NC}"; exit 1; }
 
 # Start (first time) or reload the PM2 process using the ecosystem file
