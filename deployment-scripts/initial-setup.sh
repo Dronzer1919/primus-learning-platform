@@ -26,9 +26,9 @@ fi
 echo -e "${YELLOW}Updating system packages...${NC}"
 apt update && apt upgrade -y
 
-# Node.js 18.x LTS
-echo -e "${YELLOW}Installing Node.js 18.x LTS...${NC}"
-curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+# Node.js 20.x LTS (Angular 20 requires Node 20+)
+echo -e "${YELLOW}Installing Node.js 20.x LTS...${NC}"
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 apt install -y nodejs
 echo -e "${GREEN}Node.js: $(node --version)  npm: $(npm --version)${NC}"
 
@@ -56,12 +56,16 @@ ufw allow 80/tcp    # HTTP
 ufw allow 443/tcp   # HTTPS
 ufw status
 
+# The user that will own the app dirs and run PM2 (root when run directly as root).
+DEPLOY_USER="${SUDO_USER:-root}"
+if [ "$DEPLOY_USER" = "root" ]; then DEPLOY_HOME="/root"; else DEPLOY_HOME="/home/$DEPLOY_USER"; fi
+
 # Application directories
 echo -e "${YELLOW}Creating application directories...${NC}"
 mkdir -p /var/www/learning-platform-backend/logs
 mkdir -p /var/www/learning-platform-frontend
-chown -R $SUDO_USER:$SUDO_USER /var/www/learning-platform-backend
-chown -R $SUDO_USER:$SUDO_USER /var/www/learning-platform-frontend
+chown -R "$DEPLOY_USER":"$DEPLOY_USER" /var/www/learning-platform-backend
+chown -R "$DEPLOY_USER":"$DEPLOY_USER" /var/www/learning-platform-frontend
 
 # Nginx upload limits
 echo -e "${YELLOW}Configuring Nginx upload limits...${NC}"
@@ -72,7 +76,7 @@ EOF
 
 # PM2 startup on boot (for the deploy user)
 echo -e "${YELLOW}Configuring PM2 startup...${NC}"
-sudo -u $SUDO_USER pm2 startup systemd -u $SUDO_USER --hp /home/$SUDO_USER
+sudo -u "$DEPLOY_USER" pm2 startup systemd -u "$DEPLOY_USER" --hp "$DEPLOY_HOME"
 
 # System tuning
 echo -e "${YELLOW}Optimizing system for Node.js...${NC}"
