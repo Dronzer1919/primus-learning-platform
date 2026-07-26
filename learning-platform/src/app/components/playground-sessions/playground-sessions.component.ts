@@ -174,7 +174,8 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
     event?.stopPropagation();
     const alert = await this.alertController.create({
       header: 'Delete Session',
-      message: `Delete "<strong>${session.title}</strong>"? This cannot be undone.`,
+      cssClass: 'delete-alert',
+      message: `Delete "${session.title}"? This cannot be undone.`,
       buttons: [
         { text: 'Cancel', role: 'cancel' },
         {

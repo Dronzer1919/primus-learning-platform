@@ -28,7 +28,7 @@ previews and canvas nodes can both reference them by id. -->
     </div>
     <div class="header-actions">
       <app-theme-selector></app-theme-selector>
-      <ion-button size="small" fill="outline" routerLink="/">
+      <ion-button size="small" fill="outline" (click)="goBack()">
         <ion-icon slot="start" name="arrow-back-outline"></ion-icon>
         Back
       </ion-button>

@@ -1,5 +1,5 @@
 <div class="viz">
-  <!-- Header + complexity badges -->
+  <!-- Header: title, complexity badges and controls — all on one row -->
   <div class="viz-header">
     <div class="viz-title">
       <ion-icon name="git-network-outline"></ion-icon>
@@ -7,15 +7,23 @@
     </div>
     @if (result) {
       <div class="viz-badges">
-        <span class="badge time" title="Estimated time complexity">{{ result.complexity.time }}</span>
-        <span class="badge space" title="Estimated space complexity">{{ result.complexity.space }}</span>
+        <span class="badge time" title="Time complexity (estimated)">
+          <span class="badge-label">Time</span>{{ result.complexity.time }}
+        </span>
+        <span class="badge space" title="Space complexity (estimated)">
+          <span class="badge-label">Space</span>{{ result.complexity.space }}
+        </span>
         @if (totalSteps > 0) {
-          <span class="badge step">
+          <span class="badge step" title="Current step">
             Step {{ current + 1 }} / {{ totalSteps }}
           </span>
         }
       </div>
     }
+    <div class="viz-tools">
+      <button type="button" class="viz-tool" title="Re-trace current code" (click)="refresh.emit()">↻</button>
+      <button type="button" class="viz-tool" title="Close visualizer" (click)="close.emit()">✕</button>
+    </div>
   </div>
 
   <!-- Progress bar -->

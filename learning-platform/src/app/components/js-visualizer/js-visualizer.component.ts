@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, OnDestroy, SimpleChanges } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnChanges, OnDestroy, SimpleChanges } from '@angular/core';
 
 import { IonicModule } from '@ionic/angular';
 import { JsTraceService, TraceResult, TraceStep } from '../../services/js-trace.service';
@@ -23,6 +23,10 @@ interface VarView {
 export class JsVisualizerComponent implements OnChanges, OnDestroy {
   /** JavaScript source to trace and step through. */
   @Input() code = '';
+  /** Ask the host to re-trace with the latest editor code. */
+  @Output() refresh = new EventEmitter<void>();
+  /** Ask the host to close the visualizer. */
+  @Output() close = new EventEmitter<void>();
 
   result: TraceResult | null = null;
   codeLines: CodeLine[] = [];

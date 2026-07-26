@@ -4,7 +4,6 @@ import { ActivatedRoute } from '@angular/router';
 import { IonicModule } from '@ionic/angular';
 import { ContentService } from '../../services/content.service';
 import { Topic, Subtopic, ContentBlock } from '../../models/content.model';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-content-viewer',
@@ -22,8 +21,7 @@ export class ContentViewerComponent implements OnInit {
 
   constructor(
     private route: ActivatedRoute,
-    private contentService: ContentService,
-    private sanitizer: DomSanitizer
+    private contentService: ContentService
   ) {}
 
   ngOnInit() {
@@ -71,9 +69,14 @@ export class ContentViewerComponent implements OnInit {
     });
   }
 
-  getYoutubeUrl(videoId: string): SafeResourceUrl {
-    const url = `https://www.youtube.com/embed/${videoId}`;
-    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  // Thumbnail + watch-page URL for a no-iframe YouTube link card. hqdefault always
+  // exists for a valid video id (maxres does not), so it is the safe default.
+  getYoutubeThumbnail(videoId: string): string {
+    return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+  }
+
+  getYoutubeWatchUrl(videoId: string): string {
+    return `https://www.youtube.com/watch?v=${videoId}`;
   }
 
   copyCode(code: string) {

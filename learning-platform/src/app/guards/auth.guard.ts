@@ -10,7 +10,7 @@ export const authGuard = () => {
     return true;
   }
 
-  router.navigate(['/login']);
+  router.navigate(['/']);
   return false;
 };
 
@@ -22,6 +22,6 @@ export const adminGuard = () => {
     return true;
   }
 
-  router.navigate(['/login']);
+  router.navigate(['/']);
   return false;
 };

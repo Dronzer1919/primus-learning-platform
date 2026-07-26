@@ -64,6 +64,7 @@
     width: 36px;
     height: 36px;
     border-radius: 50%;
+    overflow: hidden;                 // clip the image into the circle
     background: rgba(255, 255, 255, 0.25);
     color: #fff;
     display: flex;
@@ -72,6 +73,12 @@
     font-weight: 700;
     font-size: 17px;
     border: 2px solid rgba(255, 255, 255, 0.6);
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
   }
 }
 
@@ -85,6 +92,7 @@
     width: 66px;
     height: 66px;
     border-radius: 50%;
+    overflow: hidden;                 // clip the image into the circle
     background: var(--ion-color-primary);
     color: var(--ion-color-primary-contrast);
     display: flex;
@@ -93,6 +101,12 @@
     font-size: 28px;
     font-weight: 700;
     margin: 0 auto 12px;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
   }
 
   .greeting {
@@ -252,6 +266,7 @@
 .main-content {
   flex: 1;
   overflow-y: auto;
+  min-width: 0;
   // Was hardcoded #fff, which stayed white in every dark theme.
   background: var(--theme-background);
   color: var(--ion-text-color);

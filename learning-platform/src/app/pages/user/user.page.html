@@ -81,8 +81,7 @@
       </div>
 
       <!-- Pick an inbuilt cartoon avatar -->
-      <p class="section-label">Choose an avatar</p>
-      <div class="avatar-grid">
+      <!-- <div class="avatar-grid">
         <button
           *ngFor="let a of spookyAvatars"
           type="button"
@@ -92,7 +91,7 @@
         >
           <img [src]="a" alt="avatar option" />
         </button>
-      </div>
+      </div> -->
 
       <!-- Upload your own photo -->
       <input #avatarInput type="file" accept="image/*" hidden (change)="onAvatarFile($event)" />

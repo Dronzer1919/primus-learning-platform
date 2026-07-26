@@ -1,5 +1,10 @@
 <ion-header class="ion-no-border">
   <ion-toolbar class="auth-toolbar">
+    <ion-buttons slot="start">
+      <ion-button (click)="goBack()" aria-label="Go back">
+        <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
     <ion-title>{{ mode === 'forgot' ? 'Reset password' : 'Welcome back' }}</ion-title>
     <ion-buttons slot="end">
       <app-theme-selector></app-theme-selector>
@@ -26,7 +31,7 @@
           <label>Username or email</label>
           <div class="control">
             <ion-icon name="person-outline"></ion-icon>
-            <input type="text" [(ngModel)]="credentials.email" name="email" placeholder="you@example.com" autocomplete="username" />
+            <input type="text" [(ngModel)]="credentials.email" name="email" placeholder="you@example.com" autocomplete="username" readonly />
           </div>
         </div>
 
@@ -37,7 +42,7 @@
           </div>
           <div class="control">
             <ion-icon name="lock-closed-outline"></ion-icon>
-            <input [type]="showPassword ? 'text' : 'password'" [(ngModel)]="credentials.password" name="password" placeholder="Your password" autocomplete="current-password" />
+            <input [type]="showPassword ? 'text' : 'password'" [(ngModel)]="credentials.password" name="password" placeholder="Your password" autocomplete="current-password" readonly />
             <button type="button" class="ghost" (click)="showPassword = !showPassword">
               <ion-icon [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
             </button>
@@ -50,10 +55,13 @@
 
         <button type="submit" class="primary-btn" [disabled]="isLoading">
           <ion-spinner *ngIf="isLoading" name="crescent"></ion-spinner>
-          <span *ngIf="!isLoading">Log in</span>
+          <span *ngIf="!isLoading">
+            <ion-icon name="person-circle-outline"></ion-icon>
+            Login as Guest
+          </span>
         </button>
 
-        <p class="switch">Don't have an account? <a (click)="goToSignup()">Sign up</a></p>
+        <!-- <p class="switch">Don't have an account? <a (click)="goToSignup()">Sign up</a></p> -->
       </form>
 
       <div class="divider"><span>or</span></div>
@@ -90,18 +98,6 @@
         </ng-template>
       </div>
 
-      <div class="demo-credentials">
-        <p class="demo-title"><strong>Demo Credentials</strong></p>
-        <div class="cred-row" (click)="fillCredentials('admin', 'admin123')">
-          <ion-badge color="danger">Admin</ion-badge>
-          <span class="cred-item">Username: <strong>admin</strong> &nbsp;|&nbsp; Password: <strong>admin123</strong></span>
-        </div>
-        <div class="cred-row" (click)="fillCredentials('testuser', 'user123')">
-          <ion-badge color="primary">User</ion-badge>
-          <span class="cred-item">Username: <strong>testuser</strong> &nbsp;|&nbsp; Password: <strong>user123</strong></span>
-        </div>
-        <p class="tap-hint">Tap a row to auto-fill</p>
-      </div>
     </div>
 
     <!-- ==================== FORGOT PASSWORD ==================== -->

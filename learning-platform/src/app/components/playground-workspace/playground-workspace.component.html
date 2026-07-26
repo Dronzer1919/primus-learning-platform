@@ -130,7 +130,7 @@
 
         <div class="preview-section">
           <div class="preview-content">
-            <iframe *ngIf="output" [srcdoc]="output" sandbox="allow-scripts allow-same-origin"></iframe>
+            <div *ngIf="output" class="web-render" [innerHTML]="output"></div>
             <div *ngIf="!output" class="preview-empty">
               <ion-icon name="play-circle-outline"></ion-icon>
               <p>Click "Run" to see the output</p>
@@ -173,12 +173,6 @@
       </div>
 
       <div class="playground-body single-editor" [style.--editor-w]="editorWidthPercent + '%'">
-        <iframe
-          *ngIf="jsOnlyOutput"
-          [srcdoc]="jsOnlyOutput"
-          sandbox="allow-scripts allow-same-origin"
-          class="hidden-runner"
-        ></iframe>
         <div class="editor-section">
           <app-code-editor [value]="jsOnlyCode" (valueChange)="jsOnlyCode = $event" language="javascript"></app-code-editor>
         </div>
@@ -193,16 +187,11 @@
           <ng-container *ngTemplateOutlet="celebrationTpl"></ng-container>
         </div>
         <div class="output-panel visualizer-panel" *ngIf="showVisualizer">
-          <div class="visualizer-bar">
-            <ion-button size="small" fill="clear" (click)="visualizeJavaScript()" title="Re-trace current code">
-              <ion-icon slot="start" name="refresh-outline"></ion-icon>
-              Refresh
-            </ion-button>
-            <ion-button size="small" fill="clear" color="medium" (click)="closeVisualizer()" title="Close visualizer">
-              <ion-icon slot="icon-only" name="close-outline"></ion-icon>
-            </ion-button>
-          </div>
-          <app-js-visualizer [code]="visualizerCode"></app-js-visualizer>
+          <app-js-visualizer
+            [code]="visualizerCode"
+            (refresh)="visualizeJavaScript()"
+            (close)="closeVisualizer()"
+          ></app-js-visualizer>
         </div>
       </div>
     </ng-container>
@@ -236,12 +225,6 @@
       </div>
 
       <div class="playground-body single-editor" [style.--editor-w]="editorWidthPercent + '%'">
-        <iframe
-          *ngIf="tsOutput"
-          [srcdoc]="tsOutput"
-          sandbox="allow-scripts allow-same-origin"
-          class="hidden-runner"
-        ></iframe>
         <div class="editor-section">
           <app-code-editor [value]="tsCode" (valueChange)="tsCode = $event" language="typescript"></app-code-editor>
         </div>

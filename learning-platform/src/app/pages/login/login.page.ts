@@ -1,5 +1,5 @@
 import { Component, AfterViewInit, NgZone, ElementRef, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { IonicModule } from '@ionic/angular';
@@ -24,7 +24,8 @@ export class LoginPage implements AfterViewInit {
   // 'login' -> normal sign in, 'forgot' -> password recovery flow
   mode: 'login' | 'forgot' = 'login';
 
-  credentials: LoginCredentials = { email: '', password: '' };
+  // Pre-filled (read-only) guest credentials — the page signs in as this user.
+  credentials: LoginCredentials = { email: 'testuser', password: 'user123' };
   showPassword = false;
 
   // Forgot-password flow state
@@ -44,8 +45,19 @@ export class LoginPage implements AfterViewInit {
     private authService: AuthService,
     private otpService: OtpService,
     private router: Router,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    private location: Location
   ) {}
+
+  // Back arrow: leave the forgot-password flow first, otherwise go to the previous page.
+  goBack(): void {
+    if (this.mode === 'forgot') {
+      this.backToLogin();
+      return;
+    }
+    this.location.back();
+  }
+
 
   ngAfterViewInit(): void {
     if (!this.googleConfigured) return;
@@ -54,18 +66,22 @@ export class LoginPage implements AfterViewInit {
 
   private renderGoogleButton(): void {
     const tryRender = () => {
-      if (typeof google !== 'undefined' && google?.accounts?.id && this.googleBtnContainer?.nativeElement) {
+      const el = this.googleBtnContainer?.nativeElement;
+      // Wait until the container has a real laid-out width, so the Google button
+      // renders at the SAME width as the full-width "Login as Guest" button.
+      // Google caps the button at 400px, so clamp to avoid a mismatch on wide cards.
+      if (typeof google !== 'undefined' && google?.accounts?.id && el && el.offsetWidth > 0) {
         google.accounts.id.initialize({
           client_id: environment.googleClientId,
           callback: (response: any) => this.handleGoogleCallback(response)
         });
-        google.accounts.id.renderButton(this.googleBtnContainer.nativeElement, {
+        google.accounts.id.renderButton(el, {
           type: 'standard',
           theme: 'outline',
           size: 'large',
           text: 'continue_with',
           shape: 'rectangular',
-          width: this.googleBtnContainer.nativeElement.offsetWidth || 340
+          width: Math.min(el.offsetWidth, 400)
         });
       } else {
         setTimeout(tryRender, 300);
@@ -93,12 +109,6 @@ export class LoginPage implements AfterViewInit {
         }
       });
     });
-  }
-
-  fillCredentials(username: string, password: string): void {
-    this.credentials.email = username;
-    this.credentials.password = password;
-    this.errorMessage = '';
   }
 
   onLogin(): void {

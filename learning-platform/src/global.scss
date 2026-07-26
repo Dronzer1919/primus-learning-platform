@@ -159,3 +159,10 @@ ion-toolbar,
 ion-content {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
+
+/* Delete-session confirmation alert: add a visible bordered card. */
+.delete-alert .alert-wrapper {
+  border: 1px solid color-mix(in srgb, var(--ion-color-success, #2dd4a7), transparent 55%);
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+}

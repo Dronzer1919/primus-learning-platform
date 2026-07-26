@@ -1,7 +1,7 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterModule, NavigationEnd } from '@angular/router';
+import { Router, RouterModule, RouterOutlet, NavigationEnd } from '@angular/router';
 import { IonicModule } from '@ionic/angular';
 import { combineLatest, Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
@@ -40,6 +40,10 @@ import { ThemeSelectorComponent } from '../../components/theme-selector/theme-se
   imports: [IonicModule, CommonModule, FormsModule, RouterModule, UserTopicListComponent, ThemeSelectorComponent]
 })
 export class UserPage implements OnInit, OnDestroy {
+  // The nested child outlet (home/notes/sessions). Used to detect when it comes back
+  // empty after returning from a sibling top-level route (e.g. /flowchart).
+  @ViewChild(RouterOutlet) private childOutlet?: RouterOutlet;
+
   currentUser: User | null = null;
   orderedTabs: OrderedTab[] = [];
   selectedLanguage: LanguagePlatform = 'html';
@@ -199,9 +203,35 @@ export class UserPage implements OnInit, OnDestroy {
     this.routeSub?.unsubscribe();
   }
 
+  // Ionic lifecycle: fires when this shell becomes the active view, including when
+  // returning via Back from a sibling top-level route (e.g. /flowchart). The nested
+  // plain <router-outlet> isn't Ionic-managed, so its child is destroyed on the way
+  // out and not restored on return — leaving the main area blank. If the outlet came
+  // back empty, re-navigate to the same URL to re-render the child page.
+  ionViewDidEnter(): void {
+    // DEBUG
+    console.log(
+      '%c[USER] ionViewDidEnter', 'color:#f0b429',
+      '| url:', this.router.url,
+      '| childOutlet.isActivated:', this.childOutlet?.isActivated
+    );
+    if (this.childOutlet && !this.childOutlet.isActivated) {
+      const url = this.router.url;
+      console.log('%c[USER] child outlet EMPTY → reloading via / then', 'color:#f0b429', url);
+      this.router
+        .navigateByUrl('/', { skipLocationChange: true })
+        .then(() => this.router.navigateByUrl(url));
+    }
+  }
+
   logout() {
+    // Close the profile popover first — an [isOpen] popover overlay can linger on
+    // screen after navigation if it isn't dismissed. Clear the session immediately,
+    // then navigate to the public home page once the popover has had a moment to
+    // animate closed. replaceUrl drops /user from history so Back can't return here.
+    this.isProfileOpen = false;
     this.authService.logout();
-    this.router.navigate(['/login']);
+    setTimeout(() => this.router.navigate(['/'], { replaceUrl: true }), 150);
   }
 
   navigateToPlayground() {

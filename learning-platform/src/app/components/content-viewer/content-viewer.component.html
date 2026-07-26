@@ -48,17 +48,28 @@
         <p class="image-caption" *ngIf="block.data.caption">{{ block.data.caption }}</p>
       </div>
 
-      <!-- YouTube Content -->
+      <!-- YouTube Content: a no-iframe thumbnail card that opens the video on YouTube -->
       <div *ngIf="block.type === 'youtube'" class="youtube-block">
         <h3 *ngIf="block.data.title">{{ block.data.title }}</h3>
-        <div class="video-container">
-          <iframe
-            [src]="getYoutubeUrl(block.data.videoId)"
-            frameborder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowfullscreen
-          ></iframe>
-        </div>
+        <a
+          class="youtube-card"
+          [href]="getYoutubeWatchUrl(block.data.videoId)"
+          target="_blank"
+          rel="noopener noreferrer"
+          [title]="block.data.title || 'Watch on YouTube'"
+        >
+          <img
+            class="youtube-thumb"
+            [src]="getYoutubeThumbnail(block.data.videoId)"
+            [alt]="block.data.title || 'YouTube video thumbnail'"
+            loading="lazy"
+          />
+          <span class="youtube-play"><ion-icon name="play"></ion-icon></span>
+          <span class="youtube-badge">
+            <ion-icon name="logo-youtube"></ion-icon>
+            Watch on YouTube
+          </span>
+        </a>
       </div>
     </div>
 

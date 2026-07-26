@@ -1,6 +1,6 @@
 import { Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { CommonModule, Location } from '@angular/common';
+import { Router, RouterModule } from '@angular/router';
 import { IonicModule } from '@ionic/angular';
 import { ThemeSelectorComponent } from '../theme-selector/theme-selector.component';
 import { FlowchartStoreService } from '../../services/flowchart-store.service';
@@ -93,7 +93,21 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   private readonly onConnectMoveRef = (e: MouseEvent) => this.onConnectMove(e);
   private readonly onConnectEndRef = () => this.onConnectEnd();
 
-  constructor(private store: FlowchartStoreService) {}
+  constructor(
+    private store: FlowchartStoreService,
+    private location: Location,
+    private router: Router
+  ) {}
+
+  // Return to the page the user came from (e.g. /user/home), not a hardcoded route.
+  // Falls back to the home page if the flowchart was opened directly (no history).
+  goBack(): void {
+    if (window.history.length > 1) {
+      this.location.back();
+    } else {
+      this.router.navigate(['/']);
+    }
+  }
 
   ngOnInit(): void {
     this.diagram = this.store.load();

@@ -88,7 +88,6 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
 
   // JavaScript-only state
   jsOnlyCode = DEFAULT_JS_ONLY;
-  jsOnlyOutput: SafeHtml = '';
   jsOnlyConsole: string[] = [];
 
   // Step-through execution visualizer (swaps in for the console when open).
@@ -105,10 +104,7 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
 
   // TypeScript state
   tsCode = DEFAULT_TS;
-  tsOutput: SafeHtml = '';
   tsConsole: string[] = [];
-
-  private messageListener = (event: MessageEvent) => this.handleMessage(event);
 
   constructor(
     private codeExecutionService: CodeExecutionService,
@@ -119,16 +115,14 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
 
   logout(): void {
     this.authService.logout();
-    this.router.navigate(['/login']);
+    this.router.navigate(['/'], { replaceUrl: true });
   }
 
   ngOnInit(): void {
     this.selectedMode = this.mode;
-    window.addEventListener('message', this.messageListener);
   }
 
   ngOnDestroy(): void {
-    window.removeEventListener('message', this.messageListener);
     document.removeEventListener('mousemove', this.onResizeMoveRef);
     document.removeEventListener('mouseup', this.onResizeEndRef);
     clearTimeout(this.celebrationCheckTimer);
@@ -222,8 +216,13 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
 
   runCode(): void {
     this.consoleOutput = [];
-    this.output = this.codeExecutionService.runWebProject(this.htmlCode, this.cssCode, this.jsCode);
-    this.scheduleCelebration(() => this.consoleOutput);
+    // Render the HTML/CSS into the in-page preview container (no iframe).
+    this.output = this.codeExecutionService.buildWebMarkup(this.htmlCode, this.cssCode);
+    // Run the JS after Angular paints the markup so document queries resolve.
+    setTimeout(() => {
+      this.consoleOutput = this.codeExecutionService.runInPage(this.jsCode);
+      this.scheduleCelebration(() => this.consoleOutput);
+    });
   }
 
   clearCode(): void {
@@ -245,14 +244,12 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
   }
 
   runJavaScriptOnly(): void {
-    this.jsOnlyConsole = [];
-    this.jsOnlyOutput = this.codeExecutionService.runJavaScript(this.jsOnlyCode);
+    this.jsOnlyConsole = this.codeExecutionService.runInPage(this.jsOnlyCode);
     this.scheduleCelebration(() => this.jsOnlyConsole);
   }
 
   clearJavaScriptOutput(): void {
     this.jsOnlyConsole = [];
-    this.jsOnlyOutput = '';
     this.runSucceeded = false;
     this.showCelebration = false;
   }
@@ -270,15 +267,15 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
   async runTypeScript(): Promise<void> {
     this.tsConsole = [];
     try {
-      this.tsOutput = await this.codeExecutionService.runTypeScript(this.tsCode);
+      const js = await this.codeExecutionService.transpileTypeScript(this.tsCode);
+      this.tsConsole = this.codeExecutionService.runInPage(js);
       this.scheduleCelebration(() => this.tsConsole);
     } catch (error: any) {
       this.tsConsole.push('ERROR: ' + (error?.message ?? 'Failed to compile TypeScript.'));
     }
   }
 
-  // Waits briefly for console/error output to arrive (logs come async via postMessage),
-  // then celebrates only if no error line showed up for that panel.
+  // Runs after a run populates the console, then celebrates only if no error line appeared.
   private scheduleCelebration(getConsole: () => string[]): void {
     // A fresh run clears the previous success line until this run proves clean.
     this.runSucceeded = false;
@@ -309,7 +306,6 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
 
   clearTypeScriptOutput(): void {
     this.tsConsole = [];
-    this.tsOutput = '';
     this.runSucceeded = false;
     this.showCelebration = false;
   }
@@ -324,67 +320,12 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
     toast.present();
   }
 
-  private handleMessage(event: MessageEvent): void {
-    const data = event.data;
-    if (!data || (data.type !== 'console' && data.type !== 'error')) {
-      return;
-    }
-
-    const line = data.type === 'error'
-      ? this.formatError(data.data, data.source, data.line, data.column)
-      : '> ' + data.data;
-
-    if (data.source === 'javascript') {
-      this.jsOnlyConsole.push(line);
-    } else if (data.source === 'typescript') {
-      this.tsConsole.push(line);
-    } else {
-      this.consoleOutput.push(line);
-    }
-  }
-
-  // Renders a Node-style code frame pointing at the failing token, e.g.
-  //
-  //   ERROR!
-  //   main.js:2
-  //   let result = str.split(');
-  //                          ^
-  //
-  //   SyntaxError: Invalid or unexpected token
-  //
-  // Errors without a position (console.error, cross-origin failures) fall back
-  // to a single labelled line.
-  private formatError(message: string, source: string, line?: number, column?: number): string {
-    if (!line || line < 1) {
-      return 'ERROR: ' + message;
-    }
-
-    const isTs = source === 'typescript';
-    const fileName = isTs ? 'main.ts' : 'main.js';
-    const sourceCode = isTs ? this.tsCode : source === 'javascript' ? this.jsOnlyCode : this.jsCode;
-    const failingLine = sourceCode.split('\n')[line - 1];
-
-    const frame = ['ERROR!', `${fileName}:${line}`];
-
-    if (failingLine !== undefined) {
-      frame.push(failingLine);
-      if (column && column > 0) {
-        // Reuse the line's own tabs so the caret stays aligned under the token.
-        const indent = failingLine.slice(0, column - 1).replace(/[^\t]/g, ' ');
-        frame.push(indent + '^');
-      }
-    }
-
-    frame.push('', message);
-    return frame.join('\n');
-  }
-
   isErrorLine(log: string): boolean {
     return log.startsWith('ERROR!') || log.startsWith('ERROR: ');
   }
 
-  // Multi-line code frames (a SyntaxError with a caret) must keep their alignment,
-  // so only these scroll sideways. Plain 'ERROR: ' messages wrap normally.
+  // Kept for the console template: multi-line code frames (ERROR!) scroll sideways;
+  // plain 'ERROR: ' messages wrap. In-page runs only produce the latter.
   isErrorFrame(log: string): boolean {
     return log.startsWith('ERROR!');
   }
