@@ -1,0 +1,8 @@
+# Keep the Docker build context small — deps and build output are produced inside the image.
+**/node_modules
+**/www
+**/dist
+**/.angular
+**/.git
+**/.env
+**/*.log

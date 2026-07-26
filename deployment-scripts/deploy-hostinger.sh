@@ -1,19 +1,14 @@
 #!/usr/bin/env bash
-# One-shot VPS deploy for the Learning Platform (PM2 + Nginx static files).
-# Run automatically by the GitHub Actions workflow (.github/workflows/deploy-dev.yml)
-# on every push to `dev`, or manually on the server:
+# Docker deploy for the Learning Platform — run by the GitHub Actions workflow on
+# every push to `dev`, or manually on the server:
 #     APP_ROOT=/var/www/learning-platform-backend BRANCH=dev bash deployment-scripts/deploy-hostinger.sh
 #
-# It pulls the latest code, reloads the backend under PM2, rebuilds the Angular app,
-# publishes it to the Nginx web root, and health-checks both.
+# Pulls the latest code and rebuilds/restarts the docker-compose stack (lp-mongo,
+# lp-api, lp-web), then health-checks the live URLs. Mirrors the ionic-ecom flow.
 set -euo pipefail
 
-APP_ROOT="${APP_ROOT:-/var/www/learning-platform-backend}"   # full monorepo git clone
+APP_ROOT="${APP_ROOT:-/var/www/learning-platform-backend}"
 BRANCH="${BRANCH:-dev}"
-BACKEND_DIR="$APP_ROOT/backend"
-FRONTEND_DIR="$APP_ROOT/learning-platform"
-WEB_ROOT="${WEB_ROOT:-/var/www/learning-platform-frontend}"   # Nginx serves this
-APP_NAME="learning-platform-backend"
 API_HEALTH_URL="${API_HEALTH_URL:-https://api.primuscodex.com/api/health}"
 FRONTEND_HEALTH_URL="${FRONTEND_HEALTH_URL:-https://primuscodex.com}"
 
@@ -29,7 +24,9 @@ health_check() {
 }
 
 main() {
-  require_cmd git; require_cmd node; require_cmd npm; require_cmd pm2; require_cmd curl
+  require_cmd git
+  require_cmd docker
+  require_cmd curl
 
   log "Updating code at $APP_ROOT ($BRANCH)"
   cd "$APP_ROOT"
@@ -37,42 +34,20 @@ main() {
   git checkout "$BRANCH"
   git pull origin "$BRANCH"
 
-  # ---------- Backend (PM2) ----------
-  [[ -f "$BACKEND_DIR/.env" ]] || { echo "Missing backend env: $BACKEND_DIR/.env" >&2; exit 1; }
-  log "Installing backend dependencies"
-  cd "$BACKEND_DIR"
-  mkdir -p logs
-  npm install --production
-  log "(Re)starting backend under PM2"
-  if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
-    pm2 reload "$APP_NAME" --update-env
-  else
-    pm2 start ecosystem.config.js --env production
-  fi
-  pm2 save
+  [[ -f backend/.env ]] || { echo "Missing backend/.env at $APP_ROOT/backend/.env" >&2; exit 1; }
 
-  # ---------- Frontend (build + publish) ----------
-  log "Building Angular production bundle"
-  cd "$FRONTEND_DIR"
-  npm ci
-  npm run build   # outputs to learning-platform/www (environment.prod.ts)
-  log "Publishing frontend to $WEB_ROOT"
-  mkdir -p "$WEB_ROOT"
-  if command -v rsync >/dev/null 2>&1; then
-    rsync -a --delete "$FRONTEND_DIR/www/" "$WEB_ROOT/"
-  else
-    rm -rf "${WEB_ROOT:?}/"* && cp -r "$FRONTEND_DIR/www/"* "$WEB_ROOT/"
-  fi
+  log "Building and starting containers (lp-mongo, lp-api, lp-web)"
+  docker compose down
+  docker compose up -d --build
+  docker compose ps
 
-  # ---------- Nginx reload (best-effort; static files don't strictly need it) ----------
+  # Host nginx is static across deploys; reload best-effort (fine to skip).
   if sudo -n true 2>/dev/null; then
-    if sudo nginx -t; then sudo systemctl reload nginx; else log "WARNING: nginx config test failed; skipping reload"; fi
-  else
-    log "Skipping nginx reload (no non-interactive sudo)"
+    sudo nginx -t && sudo systemctl reload nginx || log "WARNING: nginx reload skipped"
   fi
 
-  # ---------- Health checks ----------
-  sleep 3
+  log "Running endpoint checks"
+  sleep 5
   health_check "$API_HEALTH_URL" "API"
   health_check "$FRONTEND_HEALTH_URL" "Frontend"
 

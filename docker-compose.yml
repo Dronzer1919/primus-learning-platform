@@ -1,0 +1,50 @@
+# Learning Platform stack — mirrors the ionic-ecom setup but with its own names,
+# volume, network and HOST ports so it coexists with the ecom project on the VPS.
+#
+#   ecom:      api 127.0.0.1:3000  web 127.0.0.1:8080  (containers sindhu-*)
+#   this app:  api 127.0.0.1:3100  web 127.0.0.1:8081  (containers lp-*)
+#
+# The host Nginx reverse-proxies primuscodex.com -> :8081 and api.primuscodex.com -> :3100.
+services:
+  lp-mongo:
+    image: mongo:7
+    container_name: lp-mongo
+    restart: unless-stopped
+    command: ["--bind_ip_all"]
+    volumes:
+      - lp-mongo-data:/data/db
+    networks:
+      - lp-net
+
+  lp-api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: lp-api
+    restart: unless-stopped
+    env_file:
+      - backend/.env
+    ports:
+      - "127.0.0.1:3100:3001"      # host:container (container reads PORT=3001 from .env)
+    depends_on:
+      - lp-mongo
+    networks:
+      - lp-net
+
+  lp-web:
+    build:
+      context: .
+      dockerfile: learning-platform/Dockerfile
+    container_name: lp-web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8081:80"
+    networks:
+      - lp-net
+
+networks:
+  lp-net:
+    driver: bridge
+
+volumes:
+  lp-mongo-data:
