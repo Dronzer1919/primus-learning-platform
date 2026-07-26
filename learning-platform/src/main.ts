@@ -1,6 +1,7 @@
 import { bootstrapApplication } from '@angular/platform-browser';
+import { importProvidersFrom } from '@angular/core';
 import { RouteReuseStrategy, provideRouter, withPreloading, PreloadAllModules } from '@angular/router';
-import { IonicRouteStrategy, provideIonicAngular } from '@ionic/angular/standalone';
+import { IonicModule, IonicRouteStrategy } from '@ionic/angular';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideAnimations } from '@angular/platform-browser/animations';
 import { addIcons } from 'ionicons';
@@ -28,9 +29,10 @@ import { authInterceptor } from './app/interceptors/auth.interceptor';
 import { routes } from './app/app.routes';
 import { AppComponent } from './app/app.component';
 
-// @ionic/angular/standalone does not auto-load ionicons; each icon used in a template must be
-// registered here so <ion-icon> has SVG data to render. addIcons registers both the camelCase
-// key and its kebab-case alias (e.g. codeSlashOutline -> "code-slash-outline").
+// Each icon used in a template is registered here so <ion-icon> has SVG data to render.
+// addIcons registers both the camelCase key and its kebab-case alias (e.g. codeSlashOutline
+// -> "code-slash-outline"). NOTE: the whole app uses IonicModule (@ionic/angular) — do NOT
+// import from @ionic/angular/standalone, or icons render blank in production (two registries).
 addIcons({
   // Icons whose names end in a digit need explicit kebab aliases: addIcons'
   // auto-conversion turns `logoHtml5` into `logo-html-5` (with a stray dash),
@@ -58,7 +60,7 @@ addIcons({
 bootstrapApplication(AppComponent, {
   providers: [
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
-    provideIonicAngular(),
+    importProvidersFrom(IonicModule.forRoot()),
     provideRouter(routes, withPreloading(PreloadAllModules)),
     provideHttpClient(withInterceptors([authInterceptor])),
     provideAnimations(),
