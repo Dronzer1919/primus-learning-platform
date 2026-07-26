@@ -16,13 +16,14 @@ module.exports = {
     exec_mode: 'fork',   // Or 'cluster' for load balancing
 
     // Environment variables (real secrets live in the .env file, not here)
+    // Port 3001 to coexist with the other project on this VPS (which uses 3000).
     env: {
       NODE_ENV: 'development',
-      PORT: 3000
+      PORT: 3001
     },
     env_production: {
       NODE_ENV: 'production',
-      PORT: 3000
+      PORT: 3001
     },
 
     // Logging
