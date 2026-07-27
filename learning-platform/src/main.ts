@@ -20,8 +20,10 @@ import {
   documentsOutline, earthOutline, informationCircleOutline, keyOutline, keypadOutline, locationOutline,
   logoGoogle, mailUnreadOutline, paperPlaneOutline, pencilOutline, peopleOutline, radioButtonOnOutline,
   shieldCheckmarkOutline, todayOutline,
-  // Flowchart builder: header, empty state, and the four directional connect handles.
-  gitNetworkOutline, shapesOutline,
+  // Flowchart builder: header, empty state, the four directional connect handles,
+  // and the show/hide controls for the shapes and properties panels.
+  gitNetworkOutline, shapesOutline, optionsOutline, chevronBackOutline, downloadOutline,
+  clipboardOutline,
   caretUpOutline, caretDownOutline, caretForwardOutline, caretBackOutline,
   // Step-through visualizer controls and panels.
   playBackOutline, playForwardOutline, playSkipForwardOutline, pauseOutline, serverOutline,
@@ -61,7 +63,8 @@ addIcons({
   documentsOutline, earthOutline, informationCircleOutline, keyOutline, keypadOutline, locationOutline,
   logoGoogle, mailUnreadOutline, paperPlaneOutline, pencilOutline, peopleOutline, radioButtonOnOutline,
   shieldCheckmarkOutline, todayOutline,
-  gitNetworkOutline, shapesOutline,
+  gitNetworkOutline, shapesOutline, optionsOutline, chevronBackOutline, downloadOutline,
+  clipboardOutline,
   caretUpOutline, caretDownOutline, caretForwardOutline, caretBackOutline,
   playBackOutline, playForwardOutline, playSkipForwardOutline, pauseOutline, serverOutline,
   warningOutline,

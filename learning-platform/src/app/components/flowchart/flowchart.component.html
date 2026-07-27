@@ -36,42 +36,75 @@ previews and canvas nodes can both reference them by id. -->
   </div>
 
   <div class="flow-body">
-    <!-- Shape palette -->
-    <div class="palette">
-      @for (group of paletteGroups; track group) {
-        <div class="palette-title">{{ group.title }}</div>
-        <div class="palette-grid">
-          @for (p of group.items; track p) {
-            <!-- Drag on a pointer device, tap on a touch device (where dragstart
-                 never fires) — both routes end in addShape(). -->
-            <div
-              class="palette-item"
-              draggable="true"
-              [title]="p.shape.label + ' — ' + p.shape.meaning"
-              (dragstart)="onPaletteDragStart($event, p.shape.type)"
-              (click)="onPaletteTap(p.shape.type)"
-              >
-              <svg class="palette-preview" viewBox="-2 -2 50 32" preserveAspectRatio="xMidYMid meet">
-                <ng-container
-                  *ngTemplateOutlet="shapeTpl; context: { r: p.render, w: previewW, h: previewH }"
-                ></ng-container>
-              </svg>
-              <span class="palette-label">{{ p.shape.label }}</span>
+    <!-- Shape palette. The head row is the same height as the canvas toolbar, so
+         the panel title sits on the same line as the Delete / Clear buttons. -->
+    @if (showPalette) {
+      <div class="palette">
+        <div class="panel-head">
+          <span class="panel-head-title">Shapes</span>
+          <button
+            type="button"
+            class="panel-close"
+            title="Hide the shapes panel"
+            aria-label="Hide the shapes panel"
+            (click)="togglePalette()"
+            >
+            <ion-icon name="chevron-back-outline"></ion-icon>
+          </button>
+        </div>
+        <div class="palette-scroll">
+          @for (group of paletteGroups; track group) {
+            <div class="palette-title">{{ group.title }}</div>
+            <div class="palette-grid">
+              @for (p of group.items; track p) {
+                <!-- Drag on a pointer device, tap on a touch device (where dragstart
+                     never fires) — both routes end in addShape(). -->
+                <div
+                  class="palette-item"
+                  draggable="true"
+                  [title]="p.shape.label + ' — ' + p.shape.meaning"
+                  (dragstart)="onPaletteDragStart($event, p.shape.type)"
+                  (click)="onPaletteTap(p.shape.type)"
+                  >
+                  <svg class="palette-preview" viewBox="-2 -2 50 32" preserveAspectRatio="xMidYMid meet">
+                    <ng-container
+                      *ngTemplateOutlet="shapeTpl; context: { r: p.render, w: previewW, h: previewH }"
+                    ></ng-container>
+                  </svg>
+                  <span class="palette-label">{{ p.shape.label }}</span>
+                </div>
+              }
             </div>
           }
+          <div class="palette-hint">
+            Hover a palette shape to see what it means, then drag it onto the canvas.
+            <strong>Double-click a shape (or press F2) to type inside it</strong> — Enter
+            saves, Escape cancels. Hover a shape to reveal its side arrows, then drag from
+            an arrow onto another shape to connect them. Select a shape and drag any of the
+            eight square grips to resize it — hold Shift on a corner to keep its proportions.
+            <strong>Ctrl+C / Ctrl+V</strong> copies and pastes the selected shape (Ctrl+X cuts).
+          </div>
         </div>
-      }
-      <div class="palette-hint">
-        Hover a palette shape to see what it means, then drag it onto the canvas.
-        <strong>Double-click a shape (or press F2) to type inside it</strong> — Enter
-        saves, Escape cancels. Hover a shape to reveal its side arrows, then drag from
-        an arrow onto another shape to connect them.
       </div>
-    </div>
+    }
 
     <!-- Canvas -->
     <div class="canvas-wrap">
       <div class="toolbar">
+        <!-- Only shown while the panel is hidden: it is the way back in. An open
+             panel is closed from the chevron in its own head row. -->
+        @if (!showPalette) {
+          <button
+            type="button"
+            class="panel-btn"
+            title="Show the shapes panel"
+            (click)="togglePalette()"
+            >
+            <ion-icon name="shapes-outline"></ion-icon>
+            <span>Shapes</span>
+            <ion-icon class="panel-btn-chevron" name="chevron-forward-outline"></ion-icon>
+          </button>
+        }
         <ion-button
           size="small"
           fill="outline"
@@ -82,14 +115,84 @@ previews and canvas nodes can both reference them by id. -->
           <ion-icon slot="start" name="trash-outline"></ion-icon>
           Delete
         </ion-button>
+        <!-- Copy / paste. Touch devices have no Ctrl+C, so these are not just a
+             shortcut mirror. Cut is keyboard-only (Ctrl+X). -->
+        <ion-button
+          size="small"
+          fill="outline"
+          [disabled]="!selectedNodeId"
+          title="Copy the selected shape (Ctrl+C)"
+          (click)="copySelected()"
+          >
+          <ion-icon slot="start" name="copy-outline"></ion-icon>
+          Copy
+        </ion-button>
+        <ion-button
+          size="small"
+          fill="outline"
+          [disabled]="!canPaste"
+          title="Paste a copy of the last copied shape (Ctrl+V)"
+          (click)="pasteClipboard()"
+          >
+          <ion-icon slot="start" name="clipboard-outline"></ion-icon>
+          Paste
+        </ion-button>
         <ion-button size="small" fill="outline" (click)="clear()">
           <ion-icon slot="start" name="refresh-outline"></ion-icon>
           Clear
         </ion-button>
+
+        <!-- Save menu. Nothing to export from an empty canvas, so it is disabled
+             until the first shape lands. -->
+        <div class="export-wrap">
+          <button
+            type="button"
+            class="panel-btn"
+            [disabled]="exporting || diagram.nodes.length === 0"
+            [attr.aria-expanded]="exportOpen"
+            aria-haspopup="menu"
+            title="Save the diagram as an image or PDF"
+            (click)="toggleExport($event)"
+            >
+            <ion-icon name="download-outline"></ion-icon>
+            <span>{{ exporting ? 'Saving…' : 'Save' }}</span>
+            <ion-icon class="panel-btn-chevron" name="chevron-down-outline"></ion-icon>
+          </button>
+          @if (exportOpen) {
+            <div class="export-menu" role="menu">
+              <button type="button" role="menuitem" (click)="saveAs('png')">
+                PNG image<span class="export-note">Sharp, transparent-free</span>
+              </button>
+              <button type="button" role="menuitem" (click)="saveAs('jpg')">
+                JPG image<span class="export-note">Smaller file</span>
+              </button>
+              <button type="button" role="menuitem" (click)="saveAs('pdf')">
+                PDF document<span class="export-note">One page, print ready</span>
+              </button>
+            </div>
+          }
+        </div>
+        @if (exportError) {
+          <span class="toolbar-error" role="alert">{{ exportError }}</span>
+        }
         @if (connectFromId) {
           <span class="toolbar-note">
             Drag onto a target shape to connect — release on empty space to cancel.
           </span>
+        }
+        <span class="toolbar-spacer"></span>
+        <!-- Same rule as the shapes button. -->
+        @if (!showProps) {
+          <button
+            type="button"
+            class="panel-btn"
+            title="Show the properties panel"
+            (click)="toggleProps()"
+            >
+            <ion-icon class="panel-btn-chevron" name="chevron-back-outline"></ion-icon>
+            <span>Properties</span>
+            <ion-icon name="options-outline"></ion-icon>
+          </button>
         }
       </div>
 
@@ -216,6 +319,21 @@ previews and canvas nodes can both reference them by id. -->
               >
               <ion-icon name="caret-back-outline"></ion-icon>
             </button>
+            <!-- Resize grips, on the selected shape only. Hidden while its label is
+                 being edited or a connection is being dragged, so they never sit on
+                 top of the textarea or steal the drop target. -->
+            @if (selectedNodeId === v.node.id && editingNodeId !== v.node.id && !connectFromId) {
+              @for (dir of resizeHandles; track dir) {
+                <span
+                  class="resize-handle rh-{{ dir }}"
+                  aria-hidden="true"
+                  title="Drag to resize"
+                  (pointerdown)="startResize($event, v.node, dir)"
+                  (mousedown)="$event.stopPropagation()"
+                  (click)="$event.stopPropagation()"
+                ></span>
+              }
+            }
           </div>
         }
 
@@ -231,14 +349,30 @@ previews and canvas nodes can both reference them by id. -->
       </div>
     </div>
 
-    <!-- Properties / Text panel for the selected shape -->
-    @if (selectedNode; as sel) {
+    <!-- Properties / Text panel. Shown or hidden purely by its own toggle, like the
+         shapes palette; the controls inside wait for a selection. -->
+    @if (showProps) {
       <div
         class="props-panel"
         role="region"
         aria-labelledby="props-heading"
         >
-        <h2 class="props-header" id="props-heading">Text</h2>
+        <div class="panel-head">
+          <button
+            type="button"
+            class="panel-close"
+            title="Hide the properties panel"
+            aria-label="Hide the properties panel"
+            (click)="toggleProps()"
+            >
+            <ion-icon name="chevron-forward-outline"></ion-icon>
+          </button>
+          <h2 class="panel-head-title" id="props-heading">Text</h2>
+        </div>
+        @if (!selectedNode) {
+          <p class="props-empty">Select a shape on the canvas to edit its text, colours and size.</p>
+        }
+        @if (selectedNode; as sel) {
         <!-- Font -->
         <div class="props-section" role="group" aria-labelledby="font-title">
           <div class="props-title" id="font-title">Font</div>
@@ -419,6 +553,37 @@ previews and canvas nodes can both reference them by id. -->
                     </label>
                   </div>
                 </div>
+                <!-- Size — the keyboard equivalent of dragging the resize grips -->
+                <div class="props-section" role="group" aria-labelledby="size-title">
+                  <div class="props-title" id="size-title">Size</div>
+                  <div class="props-row">
+                    <div class="num-field">
+                      <span class="dim" aria-hidden="true">W</span>
+                      <input
+                        type="number"
+                        [min]="minNodeSize"
+                        max="2000"
+                        aria-label="Width in pixels"
+                        [value]="sel.w"
+                        (change)="setNodeSize('w', $any($event.target).valueAsNumber)"
+                        />
+                    </div>
+                    <div class="num-field">
+                      <span class="dim" aria-hidden="true">H</span>
+                      <input
+                        type="number"
+                        [min]="minNodeSize"
+                        max="2000"
+                        aria-label="Height in pixels"
+                        [value]="sel.h"
+                        (change)="setNodeSize('h', $any($event.target).valueAsNumber)"
+                        />
+                    </div>
+                  </div>
+                  <button type="button" class="props-btn" (click)="resetNodeSize()">
+                    Reset to default
+                  </button>
+                </div>
                 <!-- Line height -->
                 <div class="props-section">
                   <div class="props-row spread">
@@ -437,10 +602,11 @@ previews and canvas nodes can both reference them by id. -->
                     </div>
                   </div>
                 </div>
-              </div>
-            }
-          </div>
-        </div>
+        }
+      </div>
+    }
+  </div>
+</div>
 
         <!-- Reusable shape renderer, shared by palette previews and canvas nodes.
         svg: namespace prefixes are required because these elements live in an

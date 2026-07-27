@@ -4,6 +4,7 @@ import { Router, RouterModule } from '@angular/router';
 import { IonicModule } from '@ionic/angular';
 import { ThemeSelectorComponent } from '../theme-selector/theme-selector.component';
 import { FlowchartStoreService } from '../../services/flowchart-store.service';
+import { ExportFormat, FlowchartExportService } from '../../services/flowchart-export.service';
 import {
   DEFAULT_NODE_HEIGHT,
   DEFAULT_NODE_WIDTH,
@@ -37,6 +38,9 @@ interface PaletteGroupView {
   title: string;
   items: PaletteView[];
 }
+
+/** Which corner/edge of a shape a resize handle drags. */
+type ResizeDir = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
 
 @Component({
   selector: 'app-flowchart',
@@ -75,6 +79,19 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   selectedEdgeId: string | null = null;
   editingNodeId: string | null = null;
 
+  // Side panels start open. The toolbar toggles are always visible, so they are
+  // also the way back once a panel has been collapsed.
+  showPalette = true;
+  showProps = true;
+
+  togglePalette(): void {
+    this.showPalette = !this.showPalette;
+  }
+
+  toggleProps(): void {
+    this.showProps = !this.showProps;
+  }
+
   // Drag-to-connect state. `connectFromId` is the source node while dragging a new
   // arrow; `connectX/Y` track the loose end (canvas coords); `connectTargetId` is
   // the node currently under the pointer (highlighted green as a drop target).
@@ -93,8 +110,21 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   private readonly onConnectMoveRef = (e: MouseEvent) => this.onConnectMove(e);
   private readonly onConnectEndRef = () => this.onConnectEnd();
 
+  // --- Resize bookkeeping ------------------------------------------------
+  /** The eight handles drawn around a selected shape, in clockwise order. */
+  readonly resizeHandles: ResizeDir[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+  /** Nothing useful can be drawn or clicked below this, in px. */
+  readonly minNodeSize = 20;
+  private resizingNodeId: string | null = null;
+  private resizeDir: ResizeDir = 'se';
+  private resizeStart = { x: 0, y: 0, nodeX: 0, nodeY: 0, w: 0, h: 0 };
+  private resized = false;
+  private readonly onResizeMoveRef = (e: PointerEvent) => this.onResizeMove(e);
+  private readonly onResizeEndRef = () => this.onResizeEnd();
+
   constructor(
     private store: FlowchartStoreService,
+    private exporter: FlowchartExportService,
     private location: Location,
     private router: Router
   ) {}
@@ -125,6 +155,7 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     document.removeEventListener('mouseup', this.onMoveEndRef);
     document.removeEventListener('mousemove', this.onConnectMoveRef);
     document.removeEventListener('mouseup', this.onConnectEndRef);
+    this.detachResizeListeners();
   }
 
   /** Pointer position relative to the (possibly scrolled) canvas. */
@@ -225,6 +256,127 @@ export class FlowchartComponent implements OnInit, OnDestroy {
       this.persist();
     }
     this.movingNodeId = null;
+  }
+
+  // --- Resizing a node ---------------------------------------------------
+
+  /**
+   * Starts a resize drag from one of the eight handles on the selected shape.
+   * Pointer events (rather than the mouse events used elsewhere) so a finger
+   * drag resizes too — `touch-action: none` on the handle stops the canvas from
+   * scrolling underneath it.
+   */
+  startResize(event: PointerEvent, node: FlowNode, dir: ResizeDir): void {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+      return;
+    }
+    event.stopPropagation();
+    event.preventDefault();
+    this.select(node.id, null);
+    this.resizingNodeId = node.id;
+    this.resizeDir = dir;
+    this.resized = false;
+    const point = this.canvasPoint(event);
+    this.resizeStart = { x: point.x, y: point.y, nodeX: node.x, nodeY: node.y, w: node.w, h: node.h };
+    document.addEventListener('pointermove', this.onResizeMoveRef);
+    document.addEventListener('pointerup', this.onResizeEndRef);
+    document.addEventListener('pointercancel', this.onResizeEndRef);
+  }
+
+  private onResizeMove(event: PointerEvent): void {
+    const node = this.diagram.nodes.find((n) => n.id === this.resizingNodeId);
+    if (!node) {
+      return;
+    }
+    this.resized = true;
+    const start = this.resizeStart;
+    const point = this.canvasPoint(event);
+    const dir = this.resizeDir;
+    const min = this.minNodeSize;
+    let { w, h } = start;
+    let x = start.nodeX;
+    let y = start.nodeY;
+
+    if (dir.includes('e')) {
+      w = Math.max(min, start.w + (point.x - start.x));
+    } else if (dir.includes('w')) {
+      // Dragging the left edge moves the origin as well, so the right edge stays put.
+      w = Math.max(min, start.w - (point.x - start.x));
+      x = start.nodeX + start.w - w;
+    }
+    if (dir.includes('s')) {
+      h = Math.max(min, start.h + (point.y - start.y));
+    } else if (dir.includes('n')) {
+      h = Math.max(min, start.h - (point.y - start.y));
+      y = start.nodeY + start.h - h;
+    }
+
+    // Shift on a corner keeps the original proportions, as in most editors.
+    if (event.shiftKey && dir.length === 2 && start.w > 0 && start.h > 0) {
+      const ratio = start.w / start.h;
+      if (w / h > ratio) {
+        w = Math.max(min, h * ratio);
+      } else {
+        h = Math.max(min, w / ratio);
+      }
+      if (dir.includes('w')) {
+        x = start.nodeX + start.w - w;
+      }
+      if (dir.includes('n')) {
+        y = start.nodeY + start.h - h;
+      }
+    }
+
+    // Never let a shape be dragged off the top/left of the canvas.
+    if (x < 0) {
+      w = Math.max(min, w + x);
+      x = 0;
+    }
+    if (y < 0) {
+      h = Math.max(min, h + y);
+      y = 0;
+    }
+
+    node.x = x;
+    node.y = y;
+    node.w = Math.round(w);
+    node.h = Math.round(h);
+  }
+
+  private onResizeEnd(): void {
+    this.detachResizeListeners();
+    if (this.resized) {
+      this.persist();
+    }
+    this.resizingNodeId = null;
+  }
+
+  private detachResizeListeners(): void {
+    document.removeEventListener('pointermove', this.onResizeMoveRef);
+    document.removeEventListener('pointerup', this.onResizeEndRef);
+    document.removeEventListener('pointercancel', this.onResizeEndRef);
+  }
+
+  /** Width/height fields in the properties panel — the keyboard route to resizing. */
+  setNodeSize(dimension: 'w' | 'h', value: number): void {
+    const node = this.selectedNode;
+    if (!node || !Number.isFinite(value)) {
+      return;
+    }
+    node[dimension] = Math.min(2000, Math.max(this.minNodeSize, Math.round(value)));
+    this.persist();
+  }
+
+  /** Restores the shape's palette default footprint. */
+  resetNodeSize(): void {
+    const node = this.selectedNode;
+    if (!node) {
+      return;
+    }
+    const preset = this.palette.find((p) => p.type === node.type);
+    node.w = preset?.w ?? DEFAULT_NODE_WIDTH;
+    node.h = preset?.h ?? DEFAULT_NODE_HEIGHT;
+    this.persist();
   }
 
   // --- Selection ---------------------------------------------------------
@@ -516,11 +668,77 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     }
   }
 
+  // --- Copy / paste ------------------------------------------------------
+
+  // A private clipboard rather than the system one: the copied value is a node
+  // object, and reading the real clipboard needs a permission prompt.
+  private clipboard: FlowNode | null = null;
+  // Grows with each paste so repeated pastes cascade instead of stacking.
+  private pasteOffset = 0;
+
+  get canPaste(): boolean {
+    return this.clipboard !== null;
+  }
+
+  copySelected(): void {
+    const node = this.selectedNode;
+    if (!node) {
+      return;
+    }
+    this.clipboard = { ...node };
+    this.pasteOffset = 0;
+  }
+
+  cutSelected(): void {
+    if (!this.selectedNode) {
+      return;
+    }
+    this.copySelected();
+    this.deleteSelected();
+  }
+
+  /** Drops a copy of the clipboard shape, offset from the last one. */
+  pasteClipboard(): void {
+    if (!this.clipboard) {
+      return;
+    }
+    this.pasteOffset += 20;
+    const copy: FlowNode = {
+      ...this.clipboard,
+      id: this.newId(),
+      x: Math.max(0, this.clipboard.x + this.pasteOffset),
+      y: Math.max(0, this.clipboard.y + this.pasteOffset)
+    };
+    this.diagram.nodes.push(copy);
+    this.select(copy.id, null);
+    this.persist();
+  }
+
   // --- Deletion ----------------------------------------------------------
 
   @HostListener('window:keydown', ['$event'])
   onKeyDown(event: KeyboardEvent): void {
     if (this.editingNodeId) {
+      return;
+    }
+    if (event.key === 'Escape' && this.exportOpen) {
+      this.exportOpen = false;
+      return;
+    }
+    // Ctrl on Windows/Linux, Cmd on a Mac. The editing guard above means these
+    // never shadow the browser's own copy/paste inside a label.
+    if (event.ctrlKey || event.metaKey) {
+      const key = event.key.toLowerCase();
+      if (key === 'c' && this.selectedNodeId) {
+        event.preventDefault();
+        this.copySelected();
+      } else if (key === 'x' && this.selectedNodeId) {
+        event.preventDefault();
+        this.cutSelected();
+      } else if (key === 'v' && this.clipboard) {
+        event.preventDefault();
+        this.pasteClipboard();
+      }
       return;
     }
     if (event.key === 'Delete' || event.key === 'Backspace') {
@@ -548,6 +766,78 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     }
     this.select(null, null);
     this.persist();
+  }
+
+  // --- Exporting ---------------------------------------------------------
+
+  exportOpen = false;
+  exporting = false;
+  exportError: string | null = null;
+
+  toggleExport(event: MouseEvent): void {
+    // Without this the document listener below would close the menu again.
+    event.stopPropagation();
+    this.exportError = null;
+    this.exportOpen = !this.exportOpen;
+  }
+
+  @HostListener('document:click')
+  closeExport(): void {
+    this.exportOpen = false;
+  }
+
+  async saveAs(format: ExportFormat): Promise<void> {
+    this.exportOpen = false;
+    if (this.exporting || this.diagram.nodes.length === 0) {
+      return;
+    }
+    this.exporting = true;
+    this.exportError = null;
+    try {
+      await this.exporter.export(
+        {
+          nodes: this.diagram.nodes,
+          edges: this.edgeGeometries.map((g) => g.points),
+          shapeFor: (type, w, h) => this.shapeFor(type, w, h),
+          colors: this.exportColors(),
+          fontSize: this.defaultFontSize,
+          lineHeight: this.defaultLineHeight
+        },
+        format
+      );
+    } catch {
+      this.exportError = 'Could not create the file — please try again.';
+    } finally {
+      this.exporting = false;
+    }
+  }
+
+  /**
+   * The theme's diagram colours as concrete `rgb()` strings. Reading the custom
+   * properties directly can hand back `color-mix(…)` or another `var(…)`, which
+   * an exported SVG may not resolve — so each one is measured off a probe
+   * element, whose computed background is always a plain colour.
+   */
+  private exportColors(): { background: string; fill: string; stroke: string; text: string } {
+    const probe = document.createElement('div');
+    probe.style.position = 'absolute';
+    probe.style.visibility = 'hidden';
+    probe.style.pointerEvents = 'none';
+    this.canvasRef.nativeElement.appendChild(probe);
+    const read = (variable: string, fallback: string): string => {
+      probe.style.backgroundColor = '';
+      probe.style.backgroundColor = `var(${variable})`;
+      const value = getComputedStyle(probe).backgroundColor;
+      return !value || value === 'rgba(0, 0, 0, 0)' ? fallback : value;
+    };
+    const colors = {
+      background: read('--playground-page-bg', '#ffffff'),
+      fill: read('--editor-header-bg', '#ffffff'),
+      stroke: read('--editor-fg', '#111827'),
+      text: read('--editor-fg', '#111827')
+    };
+    probe.remove();
+    return colors;
   }
 
   clear(): void {

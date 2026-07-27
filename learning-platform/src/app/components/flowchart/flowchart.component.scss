@@ -100,12 +100,88 @@
   }
 }
 
+// --- Side panels --------------------------------------------------------
+// Both panels open with a head row of exactly this height, so their titles land
+// on the same line as the canvas toolbar's Delete / Clear buttons.
+$bar-height: 49px;
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  min-height: $bar-height;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--editor-border);
+  background: var(--editor-header-bg);
+  flex-shrink: 0;
+
+  .panel-head-title {
+    flex: 1;
+    margin: 0;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--editor-fg);
+  }
+}
+
+.panel-close {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--editor-border);
+  border-radius: 6px;
+  background: var(--playground-page-bg);
+  color: var(--editor-fg);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+
+  ion-icon {
+    font-size: 15px;
+  }
+
+  &:hover {
+    border-color: var(--ion-color-primary);
+    color: var(--ion-color-primary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ion-color-primary);
+    outline-offset: 1px;
+  }
+}
+
 // --- Palette ------------------------------------------------------------
 .palette {
   width: 188px;
   flex-shrink: 0;
+  min-height: 0;
   background: var(--editor-header-bg);
   border-right: 1px solid var(--editor-border);
+  display: flex;
+  flex-direction: column;
+
+  // Stacked: a horizontal strip above the canvas, so the head row would only
+  // steal height — the toolbar toggle still hides/shows the whole strip.
+  @include below('lg') {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--editor-border);
+
+    .panel-head {
+      display: none;
+    }
+  }
+}
+
+.palette-scroll {
+  flex: 1;
+  min-height: 0;
   padding: 12px 10px;
   overflow-y: auto;
   display: flex;
@@ -198,12 +274,11 @@
   // labels so the "Flow / Data / …" grouping survives the reflow.
   @include below('lg') {
     width: 100%;
+    flex: none;
     flex-direction: row;
     align-items: center;
     gap: 8px;
     padding: 8px 10px;
-    border-right: none;
-    border-bottom: 1px solid var(--editor-border);
     overflow-x: auto;
     overflow-y: hidden;
     flex-shrink: 0;
@@ -261,7 +336,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  box-sizing: border-box;
+  min-height: $bar-height;
+  padding: 5px 12px;
   border-bottom: 1px solid var(--editor-border);
   background: var(--editor-header-bg);
   flex-shrink: 0;
@@ -272,6 +349,17 @@
     color: var(--ion-color-primary);
   }
 
+  .toolbar-error {
+    font-size: 12px;
+    color: var(--ion-color-danger, #e5484d);
+  }
+
+  // Pushes the properties toggle to the far right, over the panel it controls.
+  .toolbar-spacer {
+    flex: 1;
+    min-width: 0;
+  }
+
   @include below('sm') {
     padding: 6px 8px;
 
@@ -280,6 +368,108 @@
       flex-basis: 100%;
       font-size: 11px;
     }
+
+    // Icon-only once space is tight; the title attribute still names them.
+    .panel-btn span {
+      display: none;
+    }
+  }
+}
+
+// Toolbar button that reopens a hidden side panel. Matches the small outline
+// ion-buttons beside it.
+.panel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--editor-border);
+  border-radius: 6px;
+  background: var(--playground-page-bg);
+  color: var(--editor-fg);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+
+  ion-icon {
+    font-size: 15px;
+  }
+
+  // The direction the panel will slide back in from.
+  .panel-btn-chevron {
+    font-size: 12px;
+    color: color-mix(in srgb, var(--editor-fg), transparent 45%);
+  }
+
+  &:hover:not(:disabled) {
+    border-color: var(--ion-color-primary);
+    color: var(--ion-color-primary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ion-color-primary);
+    outline-offset: 1px;
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+// --- Save menu ----------------------------------------------------------
+.export-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.export-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  min-width: 190px;
+  padding: 4px;
+  border: 1px solid var(--editor-border);
+  border-radius: 8px;
+  background: var(--editor-header-bg);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  display: flex;
+  flex-direction: column;
+
+  button {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+    width: 100%;
+    padding: 7px 10px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--editor-fg);
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      background: color-mix(in srgb, var(--ion-color-primary), transparent 88%);
+      color: var(--ion-color-primary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ion-color-primary);
+      outline-offset: -2px;
+    }
+  }
+
+  .export-note {
+    font-size: 11px;
+    font-weight: 400;
+    color: color-mix(in srgb, var(--editor-fg), transparent 45%);
   }
 }
 
@@ -638,13 +828,49 @@
   pointer-events: none;
 }
 
+// --- Resize grips -------------------------------------------------------
+// Eight squares centred on the corners/edges of the selected shape's box.
+// `touch-action: none` keeps a finger drag from scrolling the canvas instead.
+.resize-handle {
+  position: absolute;
+  z-index: 4;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--ion-color-primary);
+  border-radius: 2px;
+  background: var(--editor-header-bg);
+  transform: translate(-50%, -50%);
+  touch-action: none;
+
+  &:hover {
+    background: var(--ion-color-primary);
+  }
+
+  &.rh-nw { top: 0;    left: 0;    cursor: nwse-resize; }
+  &.rh-n  { top: 0;    left: 50%;  cursor: ns-resize; }
+  &.rh-ne { top: 0;    left: 100%; cursor: nesw-resize; }
+  &.rh-e  { top: 50%;  left: 100%; cursor: ew-resize; }
+  &.rh-se { top: 100%; left: 100%; cursor: nwse-resize; }
+  &.rh-s  { top: 100%; left: 50%;  cursor: ns-resize; }
+  &.rh-sw { top: 100%; left: 0;    cursor: nesw-resize; }
+  &.rh-w  { top: 50%;  left: 0;    cursor: ew-resize; }
+
+  // Fingers need a bigger target than a 10px square.
+  @include touch {
+    width: 16px;
+    height: 16px;
+  }
+}
+
 // --- Properties / Text panel -------------------------------------------
 .props-panel {
   width: 240px;
   flex-shrink: 0;
   background: var(--editor-header-bg);
   border-left: 1px solid var(--editor-border);
-  padding: 14px 14px 20px;
+  // No top padding: the head row spans the full width and provides its own.
+  padding: 0 14px 20px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -658,17 +884,28 @@
     flex-shrink: 0;
     border-left: none;
     border-top: 1px solid var(--editor-border);
-    padding: 12px 14px 16px;
+    padding: 0 14px 16px;
     // Sits above the canvas, which scrolls under it.
     box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.25);
   }
 
-  .props-header {
+  // Cancel the panel's side padding so the head reads as a bar, and keep it in
+  // view while the sections below scroll.
+  .panel-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    margin: 0 -14px 4px;
+  }
+
+  // Stands in for the controls until a shape is picked, so the panel can stay
+  // open with nothing selected.
+  .props-empty {
+    margin: 14px 0 0;
+    font-size: 12px;
+    line-height: 1.5;
     text-align: center;
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--editor-fg);
-    padding-bottom: 10px;
+    color: color-mix(in srgb, var(--editor-fg), transparent 45%);
   }
 
   .props-section {
@@ -804,6 +1041,36 @@
   .unit {
     font-size: 12px;
     color: color-mix(in srgb, var(--editor-fg), transparent 35%);
+  }
+
+  // Leading W / H marker on the size fields.
+  .dim {
+    font-size: 11px;
+    font-weight: 700;
+    color: color-mix(in srgb, var(--editor-fg), transparent 35%);
+  }
+}
+
+// Full-width secondary action inside a props section (e.g. "Reset to default").
+.props-btn {
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--editor-border);
+  border-radius: 6px;
+  background: var(--playground-page-bg);
+  color: var(--editor-fg);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+
+  &:hover {
+    border-color: var(--ion-color-primary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ion-color-primary);
+    outline-offset: 1px;
   }
 }
 
