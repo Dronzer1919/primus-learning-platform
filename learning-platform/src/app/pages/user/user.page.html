@@ -14,16 +14,19 @@
     <ion-title>Learning Platform</ion-title>
     <ion-buttons slot="end">
       <app-theme-selector></app-theme-selector>
-      <ion-button routerLink="/flowchart" title="Flowchart Builder">
+      <!-- .nav-btn: below `sm` these four do not fit alongside the title, theme picker
+           and avatar, so they are hidden here and re-offered inside the profile
+           popover (.popover-nav below). -->
+      <ion-button class="nav-btn" routerLink="/flowchart" title="Flowchart Builder">
         <ion-icon slot="icon-only" name="git-network-outline"></ion-icon>
       </ion-button>
-      <ion-button (click)="navigateToPlaygroundSessions()" title="Playground Sessions">
+      <ion-button class="nav-btn" (click)="navigateToPlaygroundSessions()" title="Playground Sessions">
         <ion-icon slot="icon-only" name="code-slash-outline"></ion-icon>
       </ion-button>
-      <ion-button (click)="navigateToNotes()" title="My Notes">
+      <ion-button class="nav-btn" (click)="navigateToNotes()" title="My Notes">
         <ion-icon slot="icon-only" name="document-text-outline"></ion-icon>
       </ion-button>
-      <ion-button (click)="navigateToSessions()" title="My Sessions">
+      <ion-button class="nav-btn" (click)="navigateToSessions()" title="My Sessions">
         <ion-icon slot="icon-only" name="albums-outline"></ion-icon>
       </ion-button>
       <ion-button class="profile-btn" (click)="openProfile($event)">
@@ -80,6 +83,31 @@
         </div>
       </div>
 
+      <!-- Mobile-only navigation: mirrors the .nav-btn toolbar icons, which are hidden
+           below `sm`. Shown here so every destination stays reachable on a phone. -->
+      <div class="popover-nav">
+        <button type="button" (click)="isProfileOpen = false; navigateHome()">
+          <ion-icon name="library-outline"></ion-icon>
+          <span>Topics</span>
+        </button>
+        <button type="button" routerLink="/flowchart" (click)="isProfileOpen = false">
+          <ion-icon name="git-network-outline"></ion-icon>
+          <span>Flowchart Builder</span>
+        </button>
+        <button type="button" (click)="isProfileOpen = false; navigateToPlaygroundSessions()">
+          <ion-icon name="code-slash-outline"></ion-icon>
+          <span>Playground Sessions</span>
+        </button>
+        <button type="button" (click)="isProfileOpen = false; navigateToNotes()">
+          <ion-icon name="document-text-outline"></ion-icon>
+          <span>My Notes</span>
+        </button>
+        <button type="button" (click)="isProfileOpen = false; navigateToSessions()">
+          <ion-icon name="albums-outline"></ion-icon>
+          <span>My Sessions</span>
+        </button>
+      </div>
+
       <!-- Pick an inbuilt cartoon avatar -->
       <!-- <div class="avatar-grid">
         <button
@@ -113,6 +141,15 @@
 
 <ion-content>
   <div class="user-container">
+    <!-- Scrim: only painted while the sidebar is an overlay (below `md`). Gives the
+         open drawer a tap-anywhere-to-close target, which a phone otherwise lacks. -->
+    <div
+      class="sidebar-scrim"
+      *ngIf="!hideSidebar && isSidebarOpen"
+      (click)="isSidebarOpen = false"
+      aria-hidden="true"
+    ></div>
+
     <aside class="sidebar" *ngIf="!hideSidebar" [class.sidebar-open]="isSidebarOpen">
       <nav class="sidebar-menu">
         <div *ngFor="let level of difficultyLevels" class="difficulty-section">

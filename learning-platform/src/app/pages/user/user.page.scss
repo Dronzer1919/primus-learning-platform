@@ -1,7 +1,39 @@
+@use 'breakpoints' as *;
+
 .user-header {
   ion-toolbar {
     --padding-start: 10px;
     --padding-end: 10px;
+
+    @include below('sm') {
+      --padding-start: 2px;
+      --padding-end: 2px;
+    }
+  }
+
+  // Six end-slot buttons plus a title do not fit on a phone. The four route icons
+  // move into the profile popover (.popover-nav) and only the theme picker and
+  // avatar stay in the bar.
+  .nav-btn {
+    @include below('sm') {
+      display: none;
+    }
+  }
+
+  // Between `sm` and `md` they still fit, but only once the icon padding is trimmed.
+  @media (min-width: 601px) and (max-width: 900px) {
+    ion-buttons[slot='end'] ion-button {
+      --padding-start: 4px;
+      --padding-end: 4px;
+    }
+  }
+
+  // The title is the first thing worth sacrificing: it is decorative here, and
+  // dropping it gives the buttons their full width back.
+  ion-title {
+    @include below('xs') {
+      display: none;
+    }
   }
 }
 
@@ -86,7 +118,9 @@
 .profile-card {
   padding: 20px 18px;
   text-align: center;
-  min-width: 250px;
+  // min-width alone would overflow a 320px screen once the popover's own margins
+  // are counted; cap it against the viewport too.
+  min-width: min(250px, calc(100vw - 48px));
 
   .avatar-lg {
     width: 66px;
@@ -145,6 +179,49 @@
   }
 }
 
+/* Mobile-only nav inside the profile popover — the counterpart to the .nav-btn
+   toolbar icons hidden below `sm`. */
+.popover-nav {
+  display: none;
+
+  @include below('sm') {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 4px 0 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--theme-border-color);
+    text-align: left;
+
+    button {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      // 44px keeps every row at the minimum comfortable touch target.
+      min-height: 44px;
+      padding: 8px 10px;
+      border: none;
+      border-radius: 10px;
+      background: transparent;
+      color: var(--ion-text-color);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+
+      ion-icon {
+        font-size: 20px;
+        flex-shrink: 0;
+        color: var(--ion-color-primary);
+      }
+
+      &:active {
+        background: color-mix(in srgb, var(--ion-color-primary), transparent 88%);
+      }
+    }
+  }
+}
+
 .user-container {
   display: flex;
   height: 100%;
@@ -189,11 +266,16 @@
     }
   }
 
-  @media (max-width: 768px) {
-    position: fixed;
+  // Overlay drawer. Anchored to .user-container (position: relative) rather than the
+  // viewport: the previous `position: fixed; top: 112px` hard-coded the height of a
+  // two-row header, so it was wrong on the single-toolbar playground route and on any
+  // device whose toolbar is not exactly 56px.
+  @include below('md') {
+    position: absolute;
     left: 0;
-    top: 112px;
-    height: calc(100% - 112px);
+    top: 0;
+    bottom: 0;
+    height: auto;
     z-index: 999;
     transform: translateX(-100%);
     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
@@ -218,6 +300,30 @@
 
       app-user-topic-list { display: block; }
     }
+  }
+
+  // On a 320px phone a 300px drawer leaves no visible page behind it, which removes
+  // the "tap outside to close" affordance. Leave a strip of content showing.
+  @include below('xs') {
+    width: min(300px, 82vw);
+
+    &:not(.sidebar-open) {
+      width: min(300px, 82vw);
+    }
+  }
+}
+
+/* Dim + close-on-tap layer behind the open drawer. Desktop keeps the sidebar in
+   flow, so the scrim is only painted in overlay mode. */
+.sidebar-scrim {
+  display: none;
+
+  @include below('md') {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 998;
+    background: rgba(0, 0, 0, 0.4);
   }
 }
 

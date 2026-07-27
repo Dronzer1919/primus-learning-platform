@@ -1,4 +1,4 @@
-<div class="viz">
+<div class="viz" [class.accordion]="accordion">
   <!-- Header: title, complexity badges and controls — all on one row -->
   <div class="viz-header">
     <div class="viz-title">
@@ -54,29 +54,66 @@
   }
 
   @if (totalSteps > 0) {
-    <div class="viz-body">
+    <!-- Below `lg` this becomes an accordion: `accordion` swaps the panel titles for
+         buttons and `.acc-closed` collapses everything but the open section. Above it
+         the same markup renders as the two-column layout, because isOpen() is
+         unconditionally true when the accordion is off. -->
+    <div class="viz-body" [class.accordion]="accordion">
       <!-- Left: code with the executing line highlighted -->
-      <div class="viz-code">
-        @for (ln of codeLines; track ln.number) {
-          <div
-            class="code-row"
-            [class.active]="ln.number === activeLine"
+      <div class="panel flow" [class.acc-closed]="!isOpen('flow')">
+        @if (accordion) {
+          <button
+            type="button"
+            class="panel-title acc-toggle"
+            [attr.aria-expanded]="isOpen('flow')"
+            (click)="toggleSection('flow')"
             >
-            <span class="gutter">{{ ln.number }}</span>
-            <span class="code-text">{{ ln.text || ' ' }}</span>
-          </div>
+            <ion-icon class="acc-chevron" [name]="isOpen('flow') ? 'chevron-down-outline' : 'chevron-forward-outline'"></ion-icon>
+            <ion-icon name="code-slash-outline"></ion-icon>
+            Visual Flow
+            @if (totalSteps > 0) {
+              <span class="loop-tag">Step {{ current + 1 }} / {{ totalSteps }}</span>
+            }
+          </button>
         }
+        <div class="viz-code">
+          @for (ln of codeLines; track ln.number) {
+            <div
+              class="code-row"
+              [class.active]="ln.number === activeLine"
+              >
+              <span class="gutter">{{ ln.number }}</span>
+              <span class="code-text">{{ ln.text || ' ' }}</span>
+            </div>
+          }
+        </div>
       </div>
       <!-- Right: live variable/memory + console -->
       <div class="viz-side">
-        <div class="panel memory">
-          <div class="panel-title">
-            <ion-icon name="server-outline"></ion-icon>
-            Memory
-            @if (inLoop) {
-              <span class="loop-tag">in loop</span>
-            }
-          </div>
+        <div class="panel memory" [class.acc-closed]="!isOpen('memory')">
+          <!-- Static heading on desktop, accordion button on mobile: a <button> is only
+               correct when it actually toggles something. -->
+          @if (accordion) {
+            <button
+              type="button"
+              class="panel-title acc-toggle"
+              [attr.aria-expanded]="isOpen('memory')"
+              (click)="toggleSection('memory')"
+              >
+              <ion-icon class="acc-chevron" [name]="isOpen('memory') ? 'chevron-down-outline' : 'chevron-forward-outline'"></ion-icon>
+              <ion-icon name="server-outline"></ion-icon>
+              Memory
+              <span class="loop-tag">{{ inLoop ? 'in loop' : vars.length }}</span>
+            </button>
+          } @else {
+            <div class="panel-title">
+              <ion-icon name="server-outline"></ion-icon>
+              Memory
+              @if (inLoop) {
+                <span class="loop-tag">in loop</span>
+              }
+            </div>
+          }
           <div class="var-list">
             @for (v of vars; track v.name) {
               <div class="var-row">
@@ -90,33 +127,56 @@
             }
           </div>
         </div>
-        <div class="panel console">
-          <div class="panel-title">
-            <ion-icon name="terminal-outline"></ion-icon>
-            Console
-          </div>
-          <div class="console-body">
-            @for (line of consoleLines; track $index) {
-              <div class="console-line">&gt; {{ line }}</div>
+
+        <!-- In accordion mode the console is withheld until the trace has been stepped
+             all the way through, so the tight mobile stack only carries sections that
+             have something to show. -->
+        @if (!accordion || hasRunToEnd) {
+          <div class="panel console" [class.acc-closed]="!isOpen('console')">
+            @if (accordion) {
+              <button
+                type="button"
+                class="panel-title acc-toggle"
+                [attr.aria-expanded]="isOpen('console')"
+                (click)="toggleSection('console')"
+                >
+                <ion-icon class="acc-chevron" [name]="isOpen('console') ? 'chevron-down-outline' : 'chevron-forward-outline'"></ion-icon>
+                <ion-icon name="terminal-outline"></ion-icon>
+                Console
+                <span class="loop-tag">{{ consoleLines.length }}</span>
+              </button>
+            } @else {
+              <div class="panel-title">
+                <ion-icon name="terminal-outline"></ion-icon>
+                Console
+              </div>
             }
-            @if (consoleLines.length === 0) {
-              <div class="var-empty">No output yet.</div>
-            }
+            <div class="console-body">
+              @for (line of consoleLines; track $index) {
+                <div class="console-line">&gt; {{ line }}</div>
+              }
+              @if (consoleLines.length === 0) {
+                <div class="var-empty">No output yet.</div>
+              }
+            </div>
           </div>
-        </div>
+        }
       </div>
     </div>
   }
 
   <!-- Controls -->
   @if (totalSteps > 0) {
+    <!-- .ctrl-compact buttons shed their labels below `sm` so the whole control strip
+         stays on one row. Play/Pause and Skip Loop keep theirs: Play is the primary
+         action, and a bare skip-forward glyph does not say "past this loop". -->
     <div class="viz-controls">
-      <ion-button size="small" fill="outline" (click)="prev()" [disabled]="atStart">
+      <ion-button size="small" fill="outline" class="ctrl-compact" title="Previous step" (click)="prev()" [disabled]="atStart">
         <ion-icon slot="start" name="play-back-outline"></ion-icon>
-        Prev
+        <span class="btn-label">Prev</span>
       </ion-button>
-      <ion-button size="small" fill="outline" (click)="next()" [disabled]="atEnd">
-        Next
+      <ion-button size="small" fill="outline" class="ctrl-compact" title="Next step" (click)="next()" [disabled]="atEnd">
+        <span class="btn-label">Next</span>
         <ion-icon slot="end" name="play-forward-outline"></ion-icon>
       </ion-button>
       <ion-button size="small" color="primary" (click)="togglePlay()">
@@ -134,9 +194,9 @@
         <ion-icon slot="start" name="play-skip-forward-outline"></ion-icon>
         Skip Loop
       </ion-button>
-      <ion-button size="small" fill="outline" (click)="reset()">
+      <ion-button size="small" fill="outline" class="ctrl-compact" title="Reset to first step" (click)="reset()">
         <ion-icon slot="start" name="refresh-outline"></ion-icon>
-        Reset
+        <span class="btn-label">Reset</span>
       </ion-button>
     </div>
   }

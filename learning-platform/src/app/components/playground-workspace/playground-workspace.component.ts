@@ -7,7 +7,7 @@ import { CodeExecutionService } from '../../services/code-execution.service';
 import { PLAYGROUND_LANGUAGES, PlaygroundLanguage, PlaygroundModeId } from '../../models/playground.model';
 import { CodeEditorComponent } from '../code-editor/code-editor.component';
 import { ThemeSelectorComponent } from '../theme-selector/theme-selector.component';
-import { JsVisualizerComponent } from '../js-visualizer/js-visualizer.component';
+import { JsVisualizerComponent, VizSection } from '../js-visualizer/js-visualizer.component';
 import { AuthService } from '../../services/auth.service';
 
 const DEFAULT_HTML = `<!DOCTYPE html>
@@ -94,6 +94,24 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
   showVisualizer = false;
   visualizerCode = '';
 
+  /**
+   * Mobile accordion for the visualizer. Active exactly where the workspace stacks its
+   * panes (see the `lg` / short-viewport rules in the stylesheet) — the accordion exists
+   * to solve the vertical squeeze that stacking creates, so the two must agree.
+   */
+  private static readonly ACCORDION_QUERY = '(max-width: 992px) and (min-height: 521px)';
+  mobileAccordion = false;
+  /**
+   * Expanded accordion sections; 'code' is this component's own editor pane. Open
+   * sections split the height evenly, so the default shows the trace and its variables
+   * half and half.
+   */
+  openSections: VizSection[] = ['flow', 'memory'];
+  private accordionMql: MediaQueryList | null = null;
+  private readonly onAccordionChangeRef = (e: MediaQueryListEvent) => {
+    this.mobileAccordion = e.matches;
+  };
+
   // 🎉 Success feedback. `runSucceeded` persists the "code executed successfully"
   // line until the next run/clear; `showCelebration` is the transient confetti burst.
   runSucceeded = false;
@@ -120,11 +138,18 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.selectedMode = this.mode;
+
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      this.accordionMql = window.matchMedia(PlaygroundWorkspaceComponent.ACCORDION_QUERY);
+      this.mobileAccordion = this.accordionMql.matches;
+      this.accordionMql.addEventListener('change', this.onAccordionChangeRef);
+    }
   }
 
   ngOnDestroy(): void {
     document.removeEventListener('mousemove', this.onResizeMoveRef);
     document.removeEventListener('mouseup', this.onResizeEndRef);
+    this.accordionMql?.removeEventListener('change', this.onAccordionChangeRef);
     clearTimeout(this.celebrationCheckTimer);
     clearTimeout(this.celebrationHideTimer);
   }
@@ -258,10 +283,25 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
   visualizeJavaScript(): void {
     this.visualizerCode = this.jsOnlyCode;
     this.showVisualizer = true;
+    // The editor starts collapsed: the visualizer shows the same code with the active
+    // line highlighted, so the editable copy is the one section worth folding away.
+    this.openSections = ['flow', 'memory'];
   }
 
   closeVisualizer(): void {
     this.showVisualizer = false;
+  }
+
+  /** True while `section` is expanded (or whenever the accordion is not in play). */
+  isSectionOpen(section: VizSection): boolean {
+    return !this.mobileAccordion || this.openSections.includes(section);
+  }
+
+  /** Expands `section`, or collapses it if it was already open. */
+  toggleSection(section: VizSection): void {
+    this.openSections = this.openSections.includes(section)
+      ? this.openSections.filter((s) => s !== section)
+      : [...this.openSections, section];
   }
 
   async runTypeScript(): Promise<void> {

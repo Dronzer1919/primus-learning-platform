@@ -74,17 +74,17 @@
           </ion-button>
         </div>
         <div class="toolbar-actions">
-          <ion-button size="small" fill="outline" (click)="resetCode()">
+          <ion-button size="small" fill="outline" title="Reset" (click)="resetCode()">
             <ion-icon slot="start" name="refresh-outline"></ion-icon>
-            Reset
+            <span class="btn-label">Reset</span>
           </ion-button>
-          <ion-button size="small" fill="outline" (click)="clearCode()">
+          <ion-button size="small" fill="outline" title="Clear" (click)="clearCode()">
             <ion-icon slot="start" name="trash-outline"></ion-icon>
-            Clear
+            <span class="btn-label">Clear</span>
           </ion-button>
-          <ion-button size="small" fill="outline" (click)="showConsole = !showConsole">
+          <ion-button size="small" fill="outline" title="Console" (click)="showConsole = !showConsole">
             <ion-icon slot="start" [name]="showConsole ? 'terminal' : 'terminal-outline'"></ion-icon>
-            Console
+            <span class="btn-label">Console</span>
           </ion-button>
         </div>
       </div>
@@ -161,19 +161,40 @@
           </ion-button>
         </div>
         <div class="toolbar-actions">
-          <ion-button size="small" fill="outline" (click)="shareCode()">
+          <!-- .btn-label is dropped below `sm`, leaving these as icon-only buttons so
+               the whole toolbar fits one phone row alongside Run and Visualize. -->
+          <ion-button size="small" fill="outline" title="Share" (click)="shareCode()">
             <ion-icon slot="start" name="share-social-outline"></ion-icon>
-            Share
+            <span class="btn-label">Share</span>
           </ion-button>
-          <ion-button size="small" fill="outline" (click)="clearJavaScriptOutput(); jsOnlyCode = ''">
+          <ion-button size="small" fill="outline" title="Clear" (click)="clearJavaScriptOutput(); jsOnlyCode = ''">
             <ion-icon slot="start" name="trash-outline"></ion-icon>
-            Clear
+            <span class="btn-label">Clear</span>
           </ion-button>
         </div>
       </div>
 
-      <div class="playground-body single-editor" [style.--editor-w]="editorWidthPercent + '%'">
-        <div class="editor-section">
+      <div
+        class="playground-body single-editor"
+        [class.accordion]="mobileAccordion && showVisualizer"
+        [style.--editor-w]="editorWidthPercent + '%'"
+        >
+        <div class="editor-section" [class.acc-closed]="!isSectionOpen('code')">
+          <!-- Accordion header for the editable source. Only rendered while the
+               visualizer is open on a stacked viewport; elsewhere the editor is just
+               a pane and has no business carrying a toggle. -->
+          <button
+            *ngIf="mobileAccordion && showVisualizer"
+            type="button"
+            class="acc-toggle"
+            [attr.aria-expanded]="isSectionOpen('code')"
+            (click)="toggleSection('code')"
+            >
+            <ion-icon class="acc-chevron" [name]="isSectionOpen('code') ? 'chevron-down-outline' : 'chevron-forward-outline'"></ion-icon>
+            <ion-icon name="create-outline"></ion-icon>
+            {{ fileLabel }}
+            <span class="acc-tag">edit</span>
+          </button>
           <app-code-editor [value]="jsOnlyCode" (valueChange)="jsOnlyCode = $event" language="javascript"></app-code-editor>
         </div>
         <div class="resize-divider" (mousedown)="startResize($event)" title="Drag to resize"></div>
@@ -189,6 +210,9 @@
         <div class="output-panel visualizer-panel" *ngIf="showVisualizer">
           <app-js-visualizer
             [code]="visualizerCode"
+            [accordion]="mobileAccordion"
+            [openSections]="openSections"
+            (openSectionsChange)="openSections = $event"
             (refresh)="visualizeJavaScript()"
             (close)="closeVisualizer()"
           ></app-js-visualizer>
@@ -213,13 +237,13 @@
           </ion-button>
         </div>
         <div class="toolbar-actions">
-          <ion-button size="small" fill="outline" (click)="shareCode()">
+          <ion-button size="small" fill="outline" title="Share" (click)="shareCode()">
             <ion-icon slot="start" name="share-social-outline"></ion-icon>
-            Share
+            <span class="btn-label">Share</span>
           </ion-button>
-          <ion-button size="small" fill="outline" (click)="clearTypeScriptOutput(); tsCode = ''">
+          <ion-button size="small" fill="outline" title="Clear" (click)="clearTypeScriptOutput(); tsCode = ''">
             <ion-icon slot="start" name="trash-outline"></ion-icon>
-            Clear
+            <span class="btn-label">Clear</span>
           </ion-button>
         </div>
       </div>

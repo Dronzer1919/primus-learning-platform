@@ -36,6 +36,9 @@
               }
             ],
             "styles": ["src/global.scss", "src/theme/variables.scss"],
+            "stylePreprocessorOptions": {
+              "includePaths": ["src/theme"]
+            },
             "scripts": [],
             "allowedCommonJsDependencies": ["typescript"],
             "externalDependencies": ["source-map-support"],
@@ -112,6 +115,9 @@
               }
             ],
             "styles": ["src/global.scss", "src/theme/variables.scss"],
+            "stylePreprocessorOptions": {
+              "includePaths": ["src/theme"]
+            },
             "scripts": []
           },
           "configurations": {

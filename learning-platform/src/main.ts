@@ -22,7 +22,15 @@ import {
   shieldCheckmarkOutline, todayOutline,
   // Flowchart builder: header, empty state, and the four directional connect handles.
   gitNetworkOutline, shapesOutline,
-  caretUpOutline, caretDownOutline, caretForwardOutline, caretBackOutline
+  caretUpOutline, caretDownOutline, caretForwardOutline, caretBackOutline,
+  // Step-through visualizer controls and panels.
+  playBackOutline, playForwardOutline, playSkipForwardOutline, pauseOutline, serverOutline,
+  warningOutline,
+  // Accordion chevrons (mobile), password visibility toggles, notes pinning, YouTube cards
+  // and the mobile "Topics" shortcut. All of these were rendering blank: an unregistered
+  // name makes <ion-icon> fall back to fetching /svg/<name>.svg, which this build does not
+  // serve, so the request 404s and nothing paints.
+  chevronDownOutline, eyeOutline, eyeOffOutline, pinOutline, logoYoutube, libraryOutline
 } from 'ionicons/icons';
 import { authInterceptor } from './app/interceptors/auth.interceptor';
 
@@ -54,7 +62,10 @@ addIcons({
   logoGoogle, mailUnreadOutline, paperPlaneOutline, pencilOutline, peopleOutline, radioButtonOnOutline,
   shieldCheckmarkOutline, todayOutline,
   gitNetworkOutline, shapesOutline,
-  caretUpOutline, caretDownOutline, caretForwardOutline, caretBackOutline
+  caretUpOutline, caretDownOutline, caretForwardOutline, caretBackOutline,
+  playBackOutline, playForwardOutline, playSkipForwardOutline, pauseOutline, serverOutline,
+  warningOutline,
+  chevronDownOutline, eyeOutline, eyeOffOutline, pinOutline, logoYoutube, libraryOutline
 });
 
 bootstrapApplication(AppComponent, {

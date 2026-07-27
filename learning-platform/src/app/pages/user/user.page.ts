@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule, RouterOutlet, NavigationEnd } from '@angular/router';
@@ -47,9 +47,23 @@ export class UserPage implements OnInit, OnDestroy {
   currentUser: User | null = null;
   orderedTabs: OrderedTab[] = [];
   selectedLanguage: LanguagePlatform = 'html';
-  isSidebarOpen = true;
+  // Below `md` the sidebar is an overlay drawer, so starting it open would cover the
+  // content on first paint. Above it, the sidebar is part of the layout and starts open.
+  isSidebarOpen = !UserPage.isOverlayViewport();
   isPlaygroundRoute = false;
   hideSidebar = false;
+
+  // Last known side of the overlay boundary, so a resize only resets the drawer when
+  // the layout mode actually changes (see onViewportResize).
+  private wasOverlayViewport = UserPage.isOverlayViewport();
+
+  // Matches the `md` breakpoint in src/theme/breakpoints.scss, where user.page.scss
+  // switches the sidebar from an in-flow column to a fixed overlay drawer.
+  private static readonly OVERLAY_MAX_WIDTH = 768;
+
+  private static isOverlayViewport(): boolean {
+    return typeof window !== 'undefined' && window.innerWidth <= UserPage.OVERLAY_MAX_WIDTH;
+  }
 
   // Routes that own the full width and have nothing to navigate with the topic sidebar.
   // Note 'sessions' also matches 'playground-sessions' — intended, both hide the sidebar.
@@ -134,9 +148,20 @@ export class UserPage implements OnInit, OnDestroy {
 
   // Auto-close the sidebar after picking a topic only on small screens (overlay mode).
   onTopicSelected() {
-    if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+    if (UserPage.isOverlayViewport()) {
       this.isSidebarOpen = false;
     }
+  }
+
+  // Only *crossing* the overlay boundary resets the drawer — rotating a phone to
+  // landscape should not leave a drawer covering the page, but a desktop user who
+  // collapsed the rail keeps that choice through ordinary window resizes.
+  @HostListener('window:resize')
+  onViewportResize() {
+    const isOverlay = UserPage.isOverlayViewport();
+    if (isOverlay === this.wasOverlayViewport) return;
+    this.wasOverlayViewport = isOverlay;
+    this.isSidebarOpen = !isOverlay;
   }
 
   get greeting(): string {

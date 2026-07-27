@@ -1,22 +1,36 @@
+@use 'breakpoints' as *;
+
 .dashboard-container {
   h1 {
-    font-size: 28px;
+    font-size: fluid(21px, 28px);
     margin-bottom: 30px;
     color: var(--ion-color-dark);
   }
 
   .section-title {
-    font-size: 22px;
+    font-size: fluid(18px, 22px);
     margin: 30px 0 20px;
     color: var(--ion-color-dark);
+  }
+
+  @include below('sm') {
+    h1 { margin-bottom: 20px; }
+    .section-title { margin: 22px 0 14px; }
   }
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  // `min(100%, 250px)` so the track floor can never exceed the available column width
+  // on a narrow screen (which would push the grid past the viewport).
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
   gap: 20px;
   margin-bottom: 30px;
+
+  @include below('sm') {
+    gap: 12px;
+    margin-bottom: 20px;
+  }
 }
 
 .stat-card {
@@ -26,12 +40,12 @@
 
     .stat-icon {
       ion-icon {
-        font-size: 48px;
+        font-size: fluid(36px, 48px);
       }
     }
 
     h2 {
-      font-size: 36px;
+      font-size: fluid(28px, 36px);
       font-weight: bold;
       margin: 15px 0 5px;
     }
@@ -41,30 +55,55 @@
       font-size: 14px;
       margin: 0;
     }
+
+    // Four stat cards stacked at 30px vertical padding each is a lot of scrolling
+    // for four numbers.
+    @include below('sm') {
+      padding: 18px 14px;
+
+      h2 { margin: 8px 0 4px; }
+    }
   }
 }
 
 .difficulty-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
   gap: 20px;
   margin-bottom: 30px;
+
+  // Two-up rather than one-up on a phone: these cards are a number and a word, so they
+  // read fine at half width and the four levels stay comparable at a glance.
+  @include below('sm') {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
 }
 
 .difficulty-card {
+  // ion-card's default side margins waste ~32px per card in a two-up phone grid.
+  @include below('sm') {
+    margin-inline: 0;
+  }
+
   ion-card-content {
     text-align: center;
     padding: 25px 15px;
 
     ion-icon {
-      font-size: 40px;
+      font-size: fluid(32px, 40px);
       margin-bottom: 10px;
     }
 
     h3 {
-      font-size: 18px;
+      font-size: fluid(15px, 18px);
       margin: 10px 0 5px;
       font-weight: 600;
+    }
+
+    @include below('sm') {
+      padding: 16px 10px;
     }
 
     .count {
@@ -105,6 +144,7 @@
 
 .recent-logins {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 
   .login-row {
     display: grid;
@@ -114,6 +154,10 @@
     padding: 10px 6px;
     border-bottom: 1px solid var(--ion-color-light-shade);
     font-size: 13px;
+    // Five fr-columns would otherwise just squash to fit — `overflow-x: auto` on the
+    // parent does nothing until the content is actually wider than the box. This is
+    // the width below which the timestamp and duration columns become unreadable.
+    min-width: 620px;
 
     &.header-row {
       font-weight: 600;

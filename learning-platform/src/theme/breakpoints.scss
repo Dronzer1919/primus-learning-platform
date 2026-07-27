@@ -1,0 +1,71 @@
+// Responsive breakpoints
+// ---------------------------------------------------------------------------
+// One source of truth for every media query in the app. Component styles reach
+// these via `@use 'breakpoints' as *;` — resolved through the `src/theme`
+// includePath registered in angular.json.
+//
+// The scale is mobile-last (max-width): the desktop layout is the base and each
+// breakpoint peels it back, which matches how these pages were already written.
+
+@use 'sass:map';
+@use 'sass:math';
+
+$breakpoints: (
+  'xs': 480px,   // small phones
+  'sm': 600px,   // phones
+  'md': 768px,   // tablets (portrait) — the sidebar/overlay switch
+  'lg': 992px,   // tablets (landscape) / small laptops — editor split switch
+  'xl': 1200px,  // desktop
+);
+
+@function bp($name) {
+  @if not map.has-key($breakpoints, $name) {
+    @error 'Unknown breakpoint `#{$name}`. Valid keys: #{map.keys($breakpoints)}.';
+  }
+  @return map.get($breakpoints, $name);
+}
+
+// Styles that apply at or below a breakpoint (the mobile side).
+@mixin below($name) {
+  @media (max-width: bp($name)) {
+    @content;
+  }
+}
+
+// Styles that apply above a breakpoint (the desktop side). Offset by 0.02px so
+// `above('md')` and `below('md')` never both match at exactly 768px.
+@mixin above($name) {
+  @media (min-width: bp($name) + 0.02px) {
+    @content;
+  }
+}
+
+// Short viewports (landscape phones), where vertical chrome has to shrink even
+// though the width suggests a tablet.
+@mixin short-viewport {
+  @media (max-height: 520px) {
+    @content;
+  }
+}
+
+// Coarse pointers: larger hit targets, and affordances that must not be
+// hover-only because there is no hover.
+@mixin touch {
+  @media (hover: none) and (pointer: coarse) {
+    @content;
+  }
+}
+
+// Fluid type: scales linearly between two sizes instead of stepping at a
+// breakpoint. $min applies at or below $from, $max at or above $to.
+//
+// All four arguments must be in px — the slope is a ratio of two lengths, so mixing
+// units (e.g. rem sizes against px viewport widths) produces an invalid calc().
+@function fluid($min, $max, $from: 360px, $to: 1200px) {
+  @if math.unit($min) != 'px' or math.unit($max) != 'px' {
+    @error 'fluid() takes px values; got #{$min} and #{$max}.';
+  }
+  $slope: math.div($max - $min, $to - $from);       // unitless
+  $intercept: $min - $slope * $from;                // px
+  @return clamp(#{$min}, #{$intercept} + #{$slope * 100}vw, #{$max});
+}

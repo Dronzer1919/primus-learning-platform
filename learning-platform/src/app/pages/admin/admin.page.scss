@@ -1,11 +1,50 @@
+@use 'breakpoints' as *;
+
 .admin-header {
   ion-toolbar {
     --padding-start: 10px;
     --padding-end: 10px;
+
+    @include below('sm') {
+      --padding-start: 2px;
+      --padding-end: 2px;
+    }
   }
 
   ion-button {
     font-size: 14px;
+  }
+
+  // Long title first, short title from `md` down.
+  .title-short { display: none; }
+
+  @include below('md') {
+    .title-full { display: none; }
+    .title-short { display: inline; }
+  }
+
+  // Below `sm` the username and "Logout" labels are dropped: the icons carry the
+  // meaning, and the row fits without truncating the title.
+  @include below('sm') {
+    .btn-label { display: none; }
+
+    // The bell is decorative and has no handler yet — first thing to go.
+    .notify-btn { display: none; }
+
+    ion-button {
+      --padding-start: 6px;
+      --padding-end: 6px;
+    }
+
+    ion-icon[slot='start'] {
+      margin-inline-end: 0;
+    }
+  }
+
+  // The username is the least useful label at this size — the avatar button is
+  // already an identity cue — so drop it before the Logout label.
+  @include below('xs') {
+    .user-btn { display: none; }
   }
 }
 
@@ -13,6 +52,8 @@
   display: flex;
   height: 100%;
   overflow: hidden;
+  // Anchors the overlay drawer + scrim below.
+  position: relative;
 }
 
 .sidebar {
@@ -112,23 +153,58 @@
   padding: 20px;
   max-width: 1400px;
   margin: 0 auto;
+
+  @include below('md') {
+    padding: 16px;
+  }
+
+  @include below('xs') {
+    padding: 12px;
+  }
 }
 
-@media (max-width: 768px) {
+// Overlay drawer. Anchored to .admin-container rather than the viewport: the previous
+// `position: fixed; top: 56px` assumed a fixed 56px toolbar, which is wrong on iOS
+// (safe-area inset) and in Ionic's md mode.
+@include below('md') {
   .sidebar {
-    position: fixed;
+    position: absolute;
     left: 0;
-    top: 56px;
-    height: calc(100% - 56px);
+    top: 0;
+    bottom: 0;
     z-index: 999;
     transform: translateX(0);
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15);
 
+    // Collapsed on mobile means fully off-screen, not a 70px icon rail — a rail would
+    // eat a fifth of a phone's width for no navigational gain.
     &.sidebar-collapsed {
+      width: 260px;
       transform: translateX(-100%);
     }
   }
 
   .main-content {
     margin-left: 0 !important;
+  }
+}
+
+@include below('xs') {
+  .sidebar,
+  .sidebar.sidebar-collapsed {
+    width: min(260px, 80vw);
+  }
+}
+
+/* Dim + close-on-tap layer behind the open drawer. */
+.sidebar-scrim {
+  display: none;
+
+  @include below('md') {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 998;
+    background: rgba(0, 0, 0, 0.4);
   }
 }

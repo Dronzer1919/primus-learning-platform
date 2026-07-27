@@ -1,13 +1,21 @@
+@use 'breakpoints' as *;
+
 .language-tabs-container {
   .header-section {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
     margin-bottom: 20px;
 
     h1 {
-      font-size: 28px;
+      font-size: fluid(21px, 28px);
       margin: 0;
+    }
+
+    @include below('xs') {
+      > ion-button { width: 100%; }
     }
   }
 }
@@ -17,6 +25,9 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 10px;
+    // Order badge + name + status badge + three icon buttons is more than one phone row.
+    flex-wrap: wrap;
     padding: 15px;
     border-bottom: 1px solid var(--ion-color-light-shade);
 
@@ -28,6 +39,8 @@
       display: flex;
       align-items: center;
       gap: 15px;
+      min-width: 0;
+      flex: 1 1 auto;
 
       .tab-order {
         width: 40px;
@@ -40,12 +53,15 @@
         justify-content: center;
         font-weight: bold;
         font-size: 16px;
+        flex-shrink: 0;
       }
 
       .tab-details {
+        min-width: 0;
+
         h3 {
           margin: 0 0 5px;
-          font-size: 18px;
+          font-size: fluid(16px, 18px);
           font-weight: 600;
         }
 
@@ -61,10 +77,20 @@
       display: flex;
       align-items: center;
       gap: 5px;
+      flex-shrink: 0;
 
       ion-badge {
         margin-right: 10px;
       }
+
+      @include below('sm') {
+        width: 100%;
+        justify-content: flex-end;
+      }
+    }
+
+    @include below('sm') {
+      padding: 12px;
     }
   }
 }
@@ -74,9 +100,13 @@
   padding: 50px 20px;
 
   ion-icon {
-    font-size: 80px;
+    font-size: fluid(56px, 80px);
     color: var(--ion-color-medium);
     margin-bottom: 20px;
+  }
+
+  @include below('sm') {
+    padding: 36px 16px;
   }
 
   p {

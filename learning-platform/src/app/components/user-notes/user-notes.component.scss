@@ -1,33 +1,75 @@
+@use 'breakpoints' as *;
+
 .notes-container {
   padding: 20px;
   max-width: 1400px;
   margin: 0 auto;
+
+  @include below('sm') {
+    padding: 14px;
+  }
 }
 
 .notes-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
   margin-bottom: 30px;
 
   h1 {
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 28px;
+    font-size: fluid(21px, 28px);
     margin: 0;
+    min-width: 0;
 
     ion-icon {
-      font-size: 32px;
+      font-size: fluid(24px, 32px);
       color: var(--ion-color-primary);
+      flex-shrink: 0;
     }
   }
+
+  @include below('sm') {
+    margin-bottom: 18px;
+  }
+}
+
+.notes-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--ion-color-danger, #eb445a);
+  background: color-mix(in srgb, var(--ion-color-danger, #eb445a), transparent 90%);
+  color: var(--ion-text-color);
+  font-size: 14px;
+
+  ion-icon {
+    font-size: 18px;
+    flex-shrink: 0;
+    color: var(--ion-color-danger, #eb445a);
+  }
+
+  span { flex: 1; min-width: 0; }
 }
 
 .notes-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  // `min(100%, 300px)` guards the 320px case: a bare 300px floor plus the container
+  // padding overflows, and auto-fill will not shrink below the floor on its own.
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
   gap: 20px;
+
+  @include below('sm') {
+    gap: 14px;
+  }
 }
 
 .note-card {
@@ -79,14 +121,18 @@
   padding: 60px 20px;
 
   ion-icon {
-    font-size: 100px;
+    font-size: fluid(64px, 100px);
     color: var(--ion-color-medium);
     margin-bottom: 20px;
   }
 
   h2 {
-    font-size: 24px;
+    font-size: fluid(20px, 24px);
     margin: 0 0 10px;
+  }
+
+  @include below('sm') {
+    padding: 40px 16px;
   }
 
   p {

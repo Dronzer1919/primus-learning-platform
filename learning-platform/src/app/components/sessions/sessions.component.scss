@@ -1,8 +1,20 @@
+@use 'breakpoints' as *;
+
 .sessions-layout {
   display: flex;
   height: 100%;
-  min-height: calc(100vh - 120px);
+  // 120px was the height of the two-row user header. Using dvh keeps the page correct
+  // when a mobile browser's own chrome shows and hides during scroll.
+  min-height: calc(100dvh - 120px);
   gap: 0;
+
+  // A 280px rail beside a content pane leaves nothing usable on a phone, so the
+  // session list becomes a horizontal band above the active session.
+  @include below('md') {
+    flex-direction: column;
+    min-height: 0;
+    height: auto;
+  }
 }
 
 /* ---- Sidebar ---- */
@@ -27,6 +39,20 @@
     overflow-y: auto;
     padding: 0 8px 16px;
     flex: 1;
+  }
+
+  @include below('md') {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--ion-color-light-shade, #e0e0e0);
+
+    .sidebar-header { padding: 12px 14px; }
+
+    // Capped so a long session history cannot push the active session off-screen.
+    .session-list {
+      max-height: 34vh;
+      padding: 0 10px 12px;
+    }
   }
 
   .session-item {
@@ -57,9 +83,20 @@
       gap: 8px;
       opacity: 0;
       transition: opacity 0.15s ease;
+      flex-shrink: 0;
       ion-icon { font-size: 1.1rem; cursor: pointer; }
     }
     &:hover .session-actions, &.active .session-actions { opacity: 1; }
+
+    // Reveal-on-hover hides rename and delete completely on a touch screen, where the
+    // only way to reach them would be to select the session first.
+    @include touch {
+      .session-actions {
+        opacity: 1;
+        gap: 14px;
+        ion-icon { font-size: 1.35rem; padding: 4px; }
+      }
+    }
   }
 }
 
@@ -68,11 +105,16 @@
   flex: 1;
   padding: 24px;
   overflow-y: auto;
+  min-width: 0;
 
   .session-main-header {
     margin-bottom: 20px;
-    h1 { margin: 0; font-size: 1.6rem; }
+    h1 { margin: 0; font-size: fluid(20px, 26px); }
     .updated { font-size: 0.8rem; color: var(--ion-color-medium, #92949c); }
+  }
+
+  @include below('md') {
+    padding: 16px 14px;
   }
 
   &.empty-state {
@@ -91,8 +133,12 @@
   grid-template-columns: 1fr 1fr;
   gap: 20px;
 
-  @media (max-width: 900px) {
+  @include below('lg') {
     grid-template-columns: 1fr;
+  }
+
+  @include below('sm') {
+    gap: 14px;
   }
 }
 
@@ -101,11 +147,14 @@
   border: 1px solid var(--theme-border-color);
   border-radius: 14px;
   padding: 16px;
+  min-width: 0;
 
   .panel-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
     margin-bottom: 12px;
     h3 { margin: 0; font-size: 1.05rem; }
     .badge {
@@ -123,7 +172,16 @@
   gap: 8px;
   align-items: center;
   margin-bottom: 12px;
-  ion-input { flex: 1; }
+  ion-input { flex: 1; min-width: 0; }
+
+  // "Add a task and press Enter" needs most of a phone row; the button drops below it
+  // rather than squeezing the field down to a few characters.
+  @include below('xs') {
+    flex-wrap: wrap;
+
+    ion-input { flex: 1 1 100%; }
+    ion-button { width: 100%; }
+  }
 }
 
 .todo-items {
@@ -138,9 +196,14 @@
     padding: 8px 4px;
     border-bottom: 1px solid var(--ion-color-light, #f0f1f4);
 
-    .todo-text { flex: 1; }
+    .todo-text { flex: 1; min-width: 0; }
     &.done .todo-text { text-decoration: line-through; color: var(--ion-color-medium, #92949c); }
-    ion-icon { cursor: pointer; font-size: 1.1rem; }
+    ion-icon { cursor: pointer; font-size: 1.1rem; flex-shrink: 0; }
+
+    @include touch {
+      padding: 10px 4px;
+      ion-icon { font-size: 1.35rem; padding: 4px; }
+    }
   }
 }
 
@@ -155,13 +218,25 @@
     border-radius: 10px;
     padding: 12px;
 
-    .note-content { margin: 0 0 8px; white-space: pre-wrap; }
+    // Notes are free text, so a pasted URL or stack trace must not widen the card.
+    .note-content { margin: 0 0 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
     .note-footer {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 8px;
       .note-date { font-size: 0.75rem; color: var(--ion-color-medium, #92949c); }
-      .note-actions { display: flex; gap: 10px; ion-icon { cursor: pointer; } }
+      .note-actions {
+        display: flex;
+        gap: 10px;
+        flex-shrink: 0;
+        ion-icon { cursor: pointer; }
+
+        @include touch {
+          gap: 16px;
+          ion-icon { font-size: 1.3rem; padding: 4px; }
+        }
+      }
     }
   }
 }

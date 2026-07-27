@@ -10,6 +10,13 @@
     </ion-button>
   </div>
 
+  <!-- Without this, a failed request is indistinguishable from "nothing happened". -->
+  <div class="notes-error" *ngIf="error">
+    <ion-icon name="alert-circle-outline"></ion-icon>
+    <span>{{ error }}</span>
+    <ion-button fill="clear" size="small" (click)="reload()">Retry</ion-button>
+  </div>
+
   <div class="notes-grid">
     <ion-card *ngFor="let note of notes" class="note-card" [class.pinned]="note.isPinned">
       <ion-card-header>
@@ -73,8 +80,9 @@
             ></ion-textarea>
           </ion-item>
 
-          <ion-button expand="block" type="submit" class="ion-margin-top">
-            {{ editingNote ? 'Update' : 'Create' }} Note
+          <ion-button expand="block" type="submit" class="ion-margin-top" [disabled]="saving || !noteContent.trim()">
+            <ion-spinner *ngIf="saving" name="crescent"></ion-spinner>
+            <span *ngIf="!saving">{{ editingNote ? 'Update' : 'Create' }} Note</span>
           </ion-button>
         </form>
       </ion-content>

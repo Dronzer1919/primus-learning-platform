@@ -13,6 +13,9 @@ interface VarView {
   value: string;
 }
 
+/** Collapsible sections of the mobile accordion. 'code' is the host's editor pane. */
+export type VizSection = 'code' | 'flow' | 'memory' | 'console';
+
 @Component({
   selector: 'app-js-visualizer',
   templateUrl: './js-visualizer.component.html',
@@ -23,6 +26,21 @@ interface VarView {
 export class JsVisualizerComponent implements OnChanges, OnDestroy {
   /** JavaScript source to trace and step through. */
   @Input() code = '';
+  /**
+   * Mobile accordion mode. The host turns this on when the workspace is stacked, where
+   * showing the code listing, memory and console at once leaves none of them readable.
+   */
+  @Input() accordion = false;
+  /**
+   * Which sections are expanded. Owned by the host because the accordion also contains
+   * the host's own editor pane — one shared value is what lets a toggle here collapse
+   * a section over there.
+   *
+   * Several may be open at once; they split the available height evenly rather than the
+   * first one claiming all of it.
+   */
+  @Input() openSections: VizSection[] = ['flow', 'memory'];
+  @Output() openSectionsChange = new EventEmitter<VizSection[]>();
   /** Ask the host to re-trace with the latest editor code. */
   @Output() refresh = new EventEmitter<void>();
   /** Ask the host to close the visualizer. */
@@ -30,13 +48,32 @@ export class JsVisualizerComponent implements OnChanges, OnDestroy {
 
   result: TraceResult | null = null;
   codeLines: CodeLine[] = [];
-  current = 0;
   playing = false;
   speed = 600; // ms between steps in play mode
 
+  /**
+   * Set once stepping has reached the final step of a trace. Gates the console section
+   * in accordion mode: output is only offered after the whole run has been seen.
+   * Deliberately sticky across prev()/reset() — it would flicker away mid-review
+   * otherwise — and cleared only when a new trace is built.
+   */
+  hasRunToEnd = false;
+
+  private _current = 0;
   private timer: any = null;
 
   constructor(private traceService: JsTraceService) {}
+
+  get current(): number {
+    return this._current;
+  }
+
+  set current(value: number) {
+    this._current = value;
+    if (this.totalSteps > 0 && value >= this.totalSteps - 1) {
+      this.hasRunToEnd = true;
+    }
+  }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['code']) {
@@ -55,6 +92,23 @@ export class JsVisualizerComponent implements OnChanges, OnDestroy {
     this.current = 0;
     this.codeLines = this.code.split('\n').map((text, i) => ({ number: i + 1, text }));
     this.result = this.traceService.trace(this.code);
+    // Cleared last: the `current` setter above still sees the previous trace's step
+    // count, so an earlier reset could otherwise be undone by a stale `atEnd`.
+    this.hasRunToEnd = false;
+  }
+
+  /** True while `section` is expanded (or whenever the accordion is off). */
+  isOpen(section: VizSection): boolean {
+    return !this.accordion || this.openSections.includes(section);
+  }
+
+  /** Expands `section`, or collapses it if it was already open. */
+  toggleSection(section: VizSection): void {
+    this.openSectionsChange.emit(
+      this.openSections.includes(section)
+        ? this.openSections.filter((s) => s !== section)
+        : [...this.openSections, section]
+    );
   }
 
   get steps(): TraceStep[] {

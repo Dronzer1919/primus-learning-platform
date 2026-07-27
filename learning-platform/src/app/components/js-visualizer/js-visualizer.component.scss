@@ -1,3 +1,5 @@
+@use 'breakpoints' as *;
+
 :host {
   display: block;
   height: 100%;
@@ -151,13 +153,14 @@
   overflow: hidden;
 }
 
+// The code listing is now wrapped in a .panel so it can carry an accordion header,
+// matching Memory and Console. The panel owns the frame; this owns the scroll.
 .viz-code {
-  flex: 1 1 55%;
+  flex: 1;
+  min-height: 0;
   min-width: 0;
   overflow: auto;
   background: var(--editor-bg, #0d1117);
-  border: 1px solid var(--editor-border, #30363d);
-  border-radius: 8px;
   font-family: 'Fira Code', 'Consolas', monospace;
   padding: 6px 0;
 }
@@ -206,6 +209,11 @@
   overflow: hidden;
   min-height: 0;
 
+  // The code listing sits beside the side column, so it takes the wider share.
+  &.flow {
+    flex: 1 1 55%;
+    min-width: 0;
+  }
   &.memory {
     flex: 1 1 55%;
   }
@@ -236,6 +244,38 @@
     border-radius: 10px;
     color: #f0b429;
     background: color-mix(in srgb, #f0b429, transparent 82%);
+  }
+}
+
+// The same heading rendered as a real <button> in accordion mode.
+.acc-toggle {
+  width: 100%;
+  margin: 0;
+  border: none;
+  border-bottom: 1px solid var(--editor-border, #30363d);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  // Comfortable tap target — this is the primary control in the mobile layout.
+  min-height: 44px;
+  flex-shrink: 0;
+
+  .acc-chevron {
+    color: color-mix(in srgb, var(--editor-fg, #e6edf3), transparent 35%);
+    font-size: 14px;
+  }
+
+  &:hover {
+    background: color-mix(in srgb, var(--editor-fg, #e6edf3), transparent 92%);
+  }
+
+  &:focus-visible {
+    outline: 2px solid #2dd4a7;
+    outline-offset: -2px;
   }
 }
 
@@ -294,10 +334,110 @@
     --border-radius: 8px;
     margin: 0;
   }
+
+  // Prev / Next / Reset become icon-only on phones, which brings all five controls back
+  // onto one row instead of wrapping Reset onto a second. The label stays in the DOM
+  // (clipped, not removed) so the accessible name survives, backed by `title`.
+  @include below('sm') {
+    gap: 4px;
+    padding: 8px;
+
+    .ctrl-compact {
+      --padding-start: 8px;
+      --padding-end: 8px;
+
+      .btn-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
+      ion-icon[slot='start'] { margin-inline-end: 0; }
+      ion-icon[slot='end'] { margin-inline-start: 0; }
+    }
+  }
 }
 
-@media (max-width: 720px) {
-  .viz-body {
+// Code beside memory/console needs roughly two columns' worth of width; below that the
+// two halves stack, with the code listing keeping the larger share.
+@include below('lg') {
+  .viz-body:not(.accordion) {
     flex-direction: column;
+
+    .panel.flow {
+      flex: 1 1 55%;
+      // Without a floor the code pane collapses to a couple of lines once variables
+      // accumulate in the memory panel, which defeats the point of stepping through.
+      min-height: 30vh;
+    }
+
+    .viz-side {
+      flex: 1 1 45%;
+      min-height: 26vh;
+    }
+  }
+}
+
+// ---- Mobile accordion -----------------------------------------------------
+// The component's own header would repeat what the section headers already say, so in
+// accordion mode it sheds the title and step counter and keeps only what is unique to
+// it: the complexity badges and the refresh/close tools.
+.viz.accordion {
+  .viz-title,
+  .badge.step {
+    display: none;
+  }
+
+  .viz-badges {
+    margin-left: 0;
+  }
+}
+
+// One section open at a time, so whichever is open gets the full remaining height
+// instead of three panels each showing three lines.
+.viz-body.accordion {
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+
+  // Dissolves the two-column wrapper so Memory and Console become siblings of the
+  // code panel — one flex column, one sizing rule for all three.
+  .viz-side {
+    display: contents;
+  }
+
+  .panel {
+    // `0` basis, not `auto`: with `auto` each open panel is sized from its content, so
+    // whichever had the most (or simply came first) took the whole column. A zero basis
+    // makes every open panel an equal share — half and half for two, thirds for three.
+    // Each panel body scrolls inside its share.
+    flex: 1 1 0;
+    min-height: 0;
+
+    &.acc-closed {
+      flex: 0 0 auto;
+
+      > .viz-code,
+      > .var-list,
+      > .console-body {
+        display: none;
+      }
+
+      .acc-toggle {
+        border-bottom: none;
+      }
+    }
+  }
+}
+
+// Stepping controls are the primary interaction here, so they get real touch targets.
+@include touch {
+  .viz-tool {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
   }
 }

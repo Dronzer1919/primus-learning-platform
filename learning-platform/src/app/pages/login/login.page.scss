@@ -1,6 +1,8 @@
 // ============================================================
 //  Login shares the modern auth styling used by the signup page
 // ============================================================
+@use 'breakpoints' as *;
+
 .auth-toolbar {
   --background: transparent;
   --border-width: 0;
@@ -63,6 +65,11 @@
   border-radius: 22px;
   padding: 26px 22px;
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+
+  @include below('xs') {
+    padding: 20px 16px;
+    border-radius: 18px;
+  }
 }
 
 .field {
@@ -222,11 +229,19 @@ h2 {
   letter-spacing: 10px;
   font-size: 22px !important;
   font-weight: 700;
+
+  // Six digits at 22px plus 10px tracking runs past a 320px field.
+  @include below('xs') {
+    letter-spacing: 6px;
+    font-size: 19px !important;
+  }
 }
 
 .otp-actions {
   display: flex;
   justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-top: 16px;
 }
 

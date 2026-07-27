@@ -1,24 +1,38 @@
+@use 'breakpoints' as *;
+
 .topics-container {
   .header-section {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
+    // "Intermediate Topics" plus an "Add Topic" button does not fit one phone row.
+    flex-wrap: wrap;
     margin-bottom: 20px;
 
     .title-group {
       display: flex;
       align-items: center;
       gap: 15px;
+      min-width: 0;
 
       .level-icon {
-        font-size: 36px;
+        font-size: fluid(28px, 36px);
         color: var(--ion-color-primary);
+        flex-shrink: 0;
       }
 
       h1 {
-        font-size: 28px;
+        font-size: fluid(21px, 28px);
         margin: 0;
       }
+    }
+
+    @include below('xs') {
+      .title-group { gap: 10px; }
+
+      // Full-width so the primary action is unmissable once it wraps to its own row.
+      > ion-button { width: 100%; }
     }
   }
 }
@@ -31,11 +45,22 @@
       display: flex;
       justify-content: space-between;
       align-items: start;
+      gap: 8px;
+
+      // Long topic titles must not push the edit/delete buttons out of the card.
+      > div:first-child {
+        min-width: 0;
+      }
+
+      .topic-actions {
+        flex-shrink: 0;
+      }
 
       ion-card-subtitle {
         display: flex;
         gap: 10px;
         align-items: center;
+        flex-wrap: wrap;
         margin-top: 8px;
 
         .order-badge {
@@ -58,6 +83,8 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
         margin-bottom: 15px;
 
         h3 {
@@ -72,6 +99,10 @@
           display: flex;
           justify-content: space-between;
           align-items: center;
+          gap: 10px;
+          // Each row carries four icon buttons; below `sm` they move to their own line
+          // rather than shrinking the subtopic title to a couple of words.
+          flex-wrap: wrap;
           padding: 12px;
           background: var(--ion-color-light);
           border-radius: 8px;
@@ -81,6 +112,8 @@
             display: flex;
             align-items: center;
             gap: 12px;
+            min-width: 0;
+            flex: 1 1 auto;
 
             .subtopic-order {
               width: 30px;
@@ -93,6 +126,7 @@
               justify-content: center;
               font-weight: 600;
               font-size: 14px;
+              flex-shrink: 0;
             }
 
             .content-count {
@@ -105,6 +139,12 @@
           .subtopic-actions {
             display: flex;
             gap: 5px;
+            flex-shrink: 0;
+
+            @include below('sm') {
+              width: 100%;
+              justify-content: flex-end;
+            }
           }
         }
       }
@@ -124,14 +164,18 @@
   padding: 60px 20px;
 
   ion-icon {
-    font-size: 100px;
+    font-size: fluid(64px, 100px);
     color: var(--ion-color-medium);
     margin-bottom: 20px;
   }
 
   h2 {
-    font-size: 24px;
+    font-size: fluid(20px, 24px);
     margin-bottom: 10px;
+  }
+
+  @include below('sm') {
+    padding: 40px 16px;
   }
 
   p {

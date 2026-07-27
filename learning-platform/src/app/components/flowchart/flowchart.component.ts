@@ -159,15 +159,28 @@ export class FlowchartComponent implements OnInit, OnDestroy {
       return;
     }
     event.preventDefault();
+    const point = this.canvasPoint(event);
+    this.addShape(type, point.x, point.y);
+  }
+
+  // Tap-to-add fallback. HTML5 drag & drop does not fire on touch screens at all, so
+  // on a phone the palette would be inert without this — the shape lands in the middle
+  // of whatever part of the canvas is currently scrolled into view.
+  onPaletteTap(type: ShapeType): void {
+    const el = this.canvasRef.nativeElement;
+    this.addShape(type, el.scrollLeft + el.clientWidth / 2, el.scrollTop + el.clientHeight / 2);
+  }
+
+  // Adds a shape of `type` centred on a point in canvas coordinates.
+  private addShape(type: ShapeType, centerX: number, centerY: number): void {
     const preset = this.palette.find((p) => p.type === type);
     const w = preset?.w ?? DEFAULT_NODE_WIDTH;
     const h = preset?.h ?? DEFAULT_NODE_HEIGHT;
-    const point = this.canvasPoint(event);
     const node: FlowNode = {
       id: this.newId(),
       type,
-      x: Math.max(0, point.x - w / 2),
-      y: Math.max(0, point.y - h / 2),
+      x: Math.max(0, centerX - w / 2),
+      y: Math.max(0, centerY - h / 2),
       w,
       h,
       text: ''

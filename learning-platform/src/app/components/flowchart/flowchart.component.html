@@ -42,11 +42,14 @@ previews and canvas nodes can both reference them by id. -->
         <div class="palette-title">{{ group.title }}</div>
         <div class="palette-grid">
           @for (p of group.items; track p) {
+            <!-- Drag on a pointer device, tap on a touch device (where dragstart
+                 never fires) — both routes end in addShape(). -->
             <div
               class="palette-item"
               draggable="true"
               [title]="p.shape.label + ' — ' + p.shape.meaning"
               (dragstart)="onPaletteDragStart($event, p.shape.type)"
+              (click)="onPaletteTap(p.shape.type)"
               >
               <svg class="palette-preview" viewBox="-2 -2 50 32" preserveAspectRatio="xMidYMid meet">
                 <ng-container
@@ -220,7 +223,9 @@ previews and canvas nodes can both reference them by id. -->
         @if (diagram.nodes.length === 0) {
           <div class="canvas-empty">
             <ion-icon name="shapes-outline"></ion-icon>
-            <p>Drag a shape from the left to get started</p>
+            <!-- "from the left" is wrong below `lg`, where the palette is a strip above
+                 the canvas — and dragging does not work on touch at all. -->
+            <p>Drag or tap a shape from the palette to get started</p>
           </div>
         }
       </div>

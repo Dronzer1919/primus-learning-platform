@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node toggle.mjs 1280 800)",
+      "Bash(node viz2.mjs 1280 800 shot viz-desktop.png)",
+      "Bash(node -e ' *)",
+      "Bash(node viz5.mjs 390 844 shot half-default2.png)"
+    ]
+  }
+}

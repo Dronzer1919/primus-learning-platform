@@ -5,22 +5,26 @@
         <ion-icon slot="icon-only" name="menu-outline"></ion-icon>
       </ion-button>
     </ion-buttons>
-    <ion-title>Admin Panel - Learning Platform</ion-title>
+    <!-- The full title only fits from `md` up; narrower screens get the short form. -->
+    <ion-title>
+      <span class="title-full">Admin Panel - Learning Platform</span>
+      <span class="title-short">Admin</span>
+    </ion-title>
     <ion-buttons slot="end">
       <app-theme-selector></app-theme-selector>
-      <ion-button>
+      <ion-button class="notify-btn">
         <ion-icon slot="icon-only" name="notifications-outline"></ion-icon>
       </ion-button>
-      <ion-button>
+      <ion-button class="user-btn">
         <ion-icon slot="start" name="person-circle-outline"></ion-icon>
-        {{ currentUser?.username }}
+        <span class="btn-label">{{ currentUser?.username }}</span>
       </ion-button>
       <!-- No color="light": the dark palette redefines --ion-color-light to #222428, which
            renders dark-on-dark in the dark themes. Inheriting the toolbar's contrast colour
            keeps this consistent with the buttons above it in every theme. -->
       <ion-button (click)="logout()">
         <ion-icon slot="start" name="log-out-outline"></ion-icon>
-        Logout
+        <span class="btn-label">Logout</span>
       </ion-button>
     </ion-buttons>
   </ion-toolbar>
@@ -28,6 +32,14 @@
 
 <ion-content>
   <div class="admin-container">
+    <!-- Scrim: only painted while the sidebar is an overlay (below `md`). -->
+    <div
+      class="sidebar-scrim"
+      *ngIf="isSidebarOpen"
+      (click)="isSidebarOpen = false"
+      aria-hidden="true"
+    ></div>
+
     <aside class="sidebar" [class.sidebar-collapsed]="!isSidebarOpen">
       <div class="sidebar-header">
         <h3 *ngIf="isSidebarOpen">Content Management</h3>

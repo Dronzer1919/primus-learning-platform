@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
@@ -16,8 +16,22 @@ import { ThemeSelectorComponent } from '../../components/theme-selector/theme-se
 })
 export class AdminPage implements OnInit {
   currentUser: User | null = null;
-  isSidebarOpen = true;
+  // Below `md` the sidebar is an overlay drawer; starting it open would cover the
+  // dashboard on first paint. Above it, the sidebar is part of the layout.
+  isSidebarOpen = !AdminPage.isOverlayViewport();
   selectedMenu = 'dashboard';
+
+  // Matches the `md` breakpoint in src/theme/breakpoints.scss, where admin.page.scss
+  // switches the sidebar from an in-flow column to an overlay drawer.
+  private static readonly OVERLAY_MAX_WIDTH = 768;
+
+  // Last known side of the overlay boundary, so a resize only resets the drawer when
+  // the layout mode actually changes (see onViewportResize).
+  private wasOverlayViewport = AdminPage.isOverlayViewport();
+
+  private static isOverlayViewport(): boolean {
+    return typeof window !== 'undefined' && window.innerWidth <= AdminPage.OVERLAY_MAX_WIDTH;
+  }
 
   menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: 'grid-outline', route: '/admin' },
@@ -45,8 +59,22 @@ export class AdminPage implements OnInit {
     this.isSidebarOpen = !this.isSidebarOpen;
   }
 
+  // Only *crossing* the overlay boundary resets the drawer, so an admin who collapsed
+  // the rail on desktop keeps that choice through ordinary window resizes.
+  @HostListener('window:resize')
+  onViewportResize() {
+    const isOverlay = AdminPage.isOverlayViewport();
+    if (isOverlay === this.wasOverlayViewport) return;
+    this.wasOverlayViewport = isOverlay;
+    this.isSidebarOpen = !isOverlay;
+  }
+
   selectMenu(menuId: string, route: string) {
     this.selectedMenu = menuId;
+    // In overlay mode the drawer sits on top of the page it just navigated to.
+    if (AdminPage.isOverlayViewport()) {
+      this.isSidebarOpen = false;
+    }
     this.router.navigate([route]);
   }
 

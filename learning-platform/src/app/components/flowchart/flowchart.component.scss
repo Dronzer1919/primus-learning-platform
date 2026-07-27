@@ -1,3 +1,5 @@
+@use 'breakpoints' as *;
+
 :host {
   display: block;
   height: 100%;
@@ -31,6 +33,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 10px 16px;
   background: var(--editor-header-bg);
   border-bottom: 1px solid var(--editor-border);
@@ -40,10 +43,12 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    min-width: 0;
 
     > ion-icon {
       font-size: 28px;
       color: var(--ion-color-primary);
+      flex-shrink: 0;
     }
 
     h1 {
@@ -63,14 +68,36 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    flex-shrink: 0;
+  }
+
+  @include below('sm') {
+    padding: 8px 10px;
+
+    .brand {
+      gap: 8px;
+
+      > ion-icon { font-size: 22px; }
+      h1 { font-size: 15px; }
+      // The tagline duplicates the palette hint; drop it before anything functional.
+      p { display: none; }
+    }
   }
 }
 
 // --- Body layout --------------------------------------------------------
+// Desktop is a three-column workbench: palette | canvas | properties. That is 428px of
+// fixed chrome, which leaves nothing for the canvas on a phone — so below `lg` the two
+// side panels become horizontal bands above and below it.
 .flow-body {
   flex: 1;
   display: flex;
   min-height: 0;
+
+  @include below('lg') {
+    flex-direction: column;
+    min-width: 0;
+  }
 }
 
 // --- Palette ------------------------------------------------------------
@@ -166,6 +193,53 @@
       font-size: 13px;
     }
   }
+
+  // Horizontal shape strip above the canvas. Group headings stay inline as narrow
+  // labels so the "Flow / Data / …" grouping survives the reflow.
+  @include below('lg') {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-right: none;
+    border-bottom: 1px solid var(--editor-border);
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-shrink: 0;
+    -webkit-overflow-scrolling: touch;
+
+    .palette-title {
+      margin: 0;
+      white-space: nowrap;
+      flex-shrink: 0;
+      font-size: 10px;
+
+      &:not(:first-child) {
+        margin-top: 0;
+        margin-left: 8px;
+        padding-left: 10px;
+        border-left: 1px solid var(--editor-border);
+      }
+    }
+
+    .palette-grid {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .palette-item {
+      width: 56px;
+      flex-shrink: 0;
+    }
+
+    // Multi-sentence instructions do not belong in a scrolling strip; the same
+    // guidance is in each item's title/tooltip.
+    .palette-hint {
+      display: none;
+    }
+  }
 }
 
 // --- Canvas area --------------------------------------------------------
@@ -174,6 +248,13 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+
+  // Once stacked, the canvas must still be the tallest band — without a floor it
+  // collapses to nothing when the properties panel opens.
+  @include below('lg') {
+    min-height: 45vh;
+  }
 }
 
 .toolbar {
@@ -184,10 +265,21 @@
   border-bottom: 1px solid var(--editor-border);
   background: var(--editor-header-bg);
   flex-shrink: 0;
+  flex-wrap: wrap;
 
   .toolbar-note {
     font-size: 12px;
     color: var(--ion-color-primary);
+  }
+
+  @include below('sm') {
+    padding: 6px 8px;
+
+    .toolbar-note {
+      // Full-width so the hint reads as its own line rather than squeezing the buttons.
+      flex-basis: 100%;
+      font-size: 11px;
+    }
   }
 }
 
@@ -200,6 +292,16 @@
   padding-left: 6px;
   margin-left: 2px;
   border-left: 1px solid var(--editor-border);
+
+  // The left rule reads as a separator beside the buttons but as a stray mark once
+  // the group wraps onto its own row.
+  @include below('sm') {
+    gap: 10px;
+    padding-left: 0;
+    margin-left: 0;
+    border-left: none;
+    flex-basis: 100%;
+  }
 }
 
 .color-group {
@@ -226,6 +328,13 @@
   cursor: pointer;
   box-sizing: border-box;
   transition: transform 0.1s ease, box-shadow 0.1s ease;
+
+  // 18px is well under a fingertip. Coarse pointers get a bigger tile rather than a
+  // padded hit area, so the colour itself stays easy to aim at.
+  @include touch {
+    width: 30px;
+    height: 30px;
+  }
 
   &:hover {
     transform: scale(1.15);
@@ -502,6 +611,19 @@
     margin-top: -10px;
   }
 
+  // A 20px circle is hard to hit and even harder to drag from with a finger.
+  @include touch {
+    width: 28px;
+    height: 28px;
+
+    ion-icon { font-size: 15px; }
+
+    &.handle-top { top: -34px; margin-left: -14px; }
+    &.handle-right { right: -34px; margin-top: -14px; }
+    &.handle-bottom { bottom: -34px; margin-left: -14px; }
+    &.handle-left { left: -34px; margin-top: -14px; }
+  }
+
   // Reveal on hover/selection; keep visible on the source while dragging.
   .node:hover &,
   .node.selected &,
@@ -527,6 +649,19 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+
+  // Bottom sheet once stacked: it only appears while a shape is selected, so capping
+  // it at 40vh keeps the shape being edited visible above it.
+  @include below('lg') {
+    width: 100%;
+    max-height: 40vh;
+    flex-shrink: 0;
+    border-left: none;
+    border-top: 1px solid var(--editor-border);
+    padding: 12px 14px 16px;
+    // Sits above the canvas, which scrolls under it.
+    box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.25);
+  }
 
   .props-header {
     text-align: center;

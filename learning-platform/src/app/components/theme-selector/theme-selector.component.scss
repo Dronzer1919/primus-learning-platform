@@ -1,5 +1,9 @@
+// A flat 300px overflows a 320px screen once the popover's own margins are counted.
 ion-popover {
-  --width: 300px;
+  --width: min(300px, calc(100vw - 24px));
+  // Six themes at ~64px each need room; on a short screen the list scrolls instead of
+  // being clipped by the popover frame.
+  --max-height: min(80vh, 520px);
 }
 
 .theme-list {

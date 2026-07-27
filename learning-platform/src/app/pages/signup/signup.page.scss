@@ -1,6 +1,8 @@
 // ============================================================
 //  Shared modern auth styling (login + signup use the same look)
 // ============================================================
+@use 'breakpoints' as *;
+
 .auth-toolbar {
   --background: transparent;
   --border-width: 0;
@@ -108,6 +110,14 @@
     background: var(--ion-color-step-150, #e5e7eb);
     &.filled { background: linear-gradient(90deg, #6366f1, #22c55e); }
   }
+
+  // Three dots, three labels and two 46px connectors overrun a 320px screen; the
+  // connectors shrink first because the dots carry the step numbers.
+  @include below('xs') {
+    gap: 6px;
+
+    .bar { width: 26px; }
+  }
 }
 
 // ---- Glass card ----
@@ -117,6 +127,11 @@
   border-radius: 22px;
   padding: 26px 22px;
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+
+  @include below('xs') {
+    padding: 20px 16px;
+    border-radius: 18px;
+  }
 }
 
 // ---- Fields ----
@@ -189,6 +204,9 @@
 .row {
   display: flex;
   gap: 12px;
+
+  // Two side-by-side fields need room for their labels and placeholders.
+  > * { min-width: 0; flex: 1 1 0; }
 }
 
 // ---- Buttons ----
@@ -288,11 +306,18 @@
   letter-spacing: 10px;
   font-size: 22px !important;
   font-weight: 700;
+
+  @include below('xs') {
+    letter-spacing: 6px;
+    font-size: 19px !important;
+  }
 }
 
 .otp-actions {
   display: flex;
   justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-top: 16px;
 }
 
@@ -312,6 +337,7 @@
   &:disabled { color: var(--ion-color-medium); cursor: default; }
 }
 
-@media (max-width: 400px) {
+// Paired fields stack rather than each getting ~140px of usable width.
+@include below('xs') {
   .row { flex-direction: column; gap: 0; }
 }

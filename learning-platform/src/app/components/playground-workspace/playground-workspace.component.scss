@@ -1,3 +1,5 @@
+@use 'breakpoints' as *;
+
 :host {
   display: block;
   height: 100%;
@@ -12,6 +14,12 @@
     position: fixed;
     inset: 0;
     z-index: 1000;
+  }
+
+  // A 56px vertical rail costs a phone a sixth of its width for the whole session.
+  // Below `md` it becomes a horizontal strip above the workspace instead.
+  @include below('md') {
+    flex-direction: column;
   }
 }
 
@@ -28,6 +36,25 @@
   overflow-y: auto;
   // The hover preview escapes the rail via position:fixed, so no clipping needed.
   overflow-x: visible;
+
+  @include below('md') {
+    width: 100%;
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-right: none;
+    border-bottom: 1px solid var(--editor-border);
+    overflow-x: auto;
+    overflow-y: visible;
+    // Language choice should stay reachable while scrolling a long file.
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
 }
 
 // Ganpati thumbnail pinned at the top of the rail; hovering reveals a large preview.
@@ -76,6 +103,28 @@
     .rail-deity-big {
       opacity: 1;
       transform: scale(1) translateX(0);
+    }
+  }
+
+  @include below('md') {
+    margin-bottom: 0;
+    margin-right: 6px;
+
+    // The rail is horizontal now, so the preview drops below the thumbnail instead
+    // of beside it.
+    .rail-deity-big {
+      left: 12px;
+      top: 64px;
+      width: min(440px, calc(100vw - 24px));
+      max-width: none;
+    }
+  }
+
+  // Hover previews do not exist on touch, where they can only fire as a sticky
+  // tap-state that covers the toolbar. Suppress the enlargement there.
+  @include touch {
+    .rail-deity-big {
+      display: none;
     }
   }
 }
@@ -151,20 +200,28 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
   padding: 12px 20px;
   background: var(--editor-header-bg);
   color: var(--editor-fg);
   border-bottom: 1px solid var(--editor-border);
+  flex-wrap: wrap;
+
+  @include below('sm') {
+    padding: 8px 12px;
+  }
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 
   ion-icon {
     font-size: 28px;
     color: var(--editor-fg);
+    flex-shrink: 0;
   }
 
   h1 {
@@ -179,12 +236,24 @@
     margin: 0;
     color: color-mix(in srgb, var(--editor-fg), transparent 35%);
   }
+
+  // The tagline is the first thing to go: it is atmosphere, and the action buttons
+  // beside it are not.
+  @include below('sm') {
+    gap: 8px;
+
+    ion-icon { font-size: 22px; }
+    h1 { font-size: 14px; }
+    p { display: none; }
+  }
 }
 
 .header-actions {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .toolbar {
@@ -205,11 +274,29 @@
     --background-activated: color-mix(in srgb, var(--editor-fg), transparent 76%);
     --background-focused: color-mix(in srgb, var(--editor-fg), transparent 84%);
   }
+
+  @include below('sm') {
+    gap: 6px;
+    padding: 6px 8px;
+  }
 }
 
 .file-tabs {
   display: flex;
   gap: 4px;
+  min-width: 0;
+
+  // Three file tabs plus Run/Save do not fit on one phone row. The tabs get their own
+  // scroll rather than shrinking the action buttons, which must stay tappable.
+  @include below('sm') {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar { display: none; }
+
+    .file-tab { flex-shrink: 0; }
+  }
 }
 
 .file-tab {
@@ -255,6 +342,35 @@
   align-items: center;
   gap: 8px;
   margin-left: auto; // push the utility buttons to the far right of the toolbar
+
+  // Once the toolbar wraps, `margin-left: auto` would strand these on a right-aligned
+  // second row with a ragged gap. Let them fill the row instead.
+  @include below('sm') {
+    margin-left: 0;
+    gap: 6px;
+
+    // Icon-only on phones. These are secondary actions (Share/Clear/Reset/Console), so
+    // dropping their labels is what lets the whole toolbar sit on one row next to Run
+    // and Visualize instead of wrapping onto a second. `title` carries the name, and
+    // the label stays in the DOM for screen readers.
+    .btn-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    ion-button {
+      --padding-start: 8px;
+      --padding-end: 8px;
+    }
+
+    ion-icon[slot='start'] {
+      margin-inline-end: 0;
+    }
+  }
 }
 
 .panel-label {
@@ -272,8 +388,9 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   overflow: hidden;
+  min-height: 0;
 
-  @media (max-width: 968px) {
+  @include below('lg') {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr 1fr;
   }
@@ -294,6 +411,130 @@
       flex: 1;
       min-width: 200px;
     }
+
+    // Side-by-side panes stop working once the viewport is narrower than roughly two
+    // readable code columns, so below `lg` the editor stacks above its output.
+    //
+    // These overrides are load-bearing: the flex rules above set a *width* basis, so
+    // without resetting them the panes stayed side by side no matter what the grid
+    // media query said — each ending up around 150px wide on a phone.
+    @include below('lg') {
+      flex-direction: column;
+
+      .editor-section {
+        // The editor is the primary surface, so it keeps the larger share.
+        flex: 1 1 55%;
+        max-width: none;
+        min-width: 0;
+        // Guarantees a usable number of visible lines even when the output grows.
+        min-height: 45vh;
+      }
+
+      .preview-section,
+      .output-panel {
+        flex: 1 1 45%;
+        min-width: 0;
+        min-height: 30vh;
+      }
+    }
+
+    // Landscape phones have the width for a split but not the height for a stack.
+    @include short-viewport {
+      flex-direction: row;
+
+      .editor-section {
+        flex: 1 1 50%;
+        min-height: 0;
+      }
+
+      .preview-section,
+      .output-panel {
+        flex: 1 1 50%;
+        min-height: 0;
+      }
+    }
+  }
+
+  // ---- Mobile accordion (visualizer open) --------------------------------
+  // The editor becomes one collapsible section among the visualizer's own, so the
+  // vh-based floors above have to go: with four sections sharing the column, whichever
+  // is open takes the remaining height and the rest are just their headers.
+  &.accordion {
+    flex-direction: column;
+
+    // Equal shares (see the matching note in js-visualizer.component.scss): a `0` basis
+    // splits the column evenly between the editor and the visualizer when both are open,
+    // rather than letting content size decide.
+    .editor-section {
+      flex: 1 1 0;
+      min-height: 0;
+      max-width: none;
+      border-bottom: 1px solid var(--editor-border);
+
+      &.acc-closed {
+        flex: 0 0 auto;
+
+        app-code-editor {
+          display: none;
+        }
+      }
+    }
+
+    .output-panel {
+      flex: 1 1 0;
+      min-height: 0;
+    }
+
+    // Dragging a horizontal split is meaningless in an accordion.
+    .resize-divider {
+      display: none;
+    }
+  }
+}
+
+// Accordion header for the editor pane. Deliberately matches .acc-toggle in the
+// visualizer so all four sections read as one control stack.
+.acc-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 8px 12px;
+  border: none;
+  background: var(--editor-tab-bg);
+  color: var(--editor-fg);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  ion-icon {
+    font-size: 15px;
+    color: #2dd4a7;
+  }
+
+  .acc-chevron {
+    color: color-mix(in srgb, var(--editor-fg), transparent 35%);
+    font-size: 14px;
+  }
+
+  .acc-tag {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 10px;
+    color: #f0b429;
+    background: color-mix(in srgb, #f0b429, transparent 82%);
+  }
+
+  &:focus-visible {
+    outline: 2px solid #2dd4a7;
+    outline-offset: -2px;
   }
 }
 
@@ -315,6 +556,32 @@
     position: absolute;
     inset: 0 -4px; // wider hit area
   }
+
+  // Stacked panes make a horizontal drag meaningless, and the handler is mousedown-only
+  // so there is nothing to offer a touch device anyway. It becomes a plain seam.
+  @include below('lg') {
+    width: 100%;
+    height: 4px;
+    cursor: default;
+
+    &:hover, &:active {
+      background: var(--editor-border);
+    }
+
+    &::after {
+      inset: 0;
+    }
+  }
+
+  @include short-viewport {
+    width: 5px;
+    height: auto;
+    cursor: col-resize;
+
+    &:hover, &:active {
+      background: var(--ion-color-primary, #3880ff);
+    }
+  }
 }
 
 .editor-section {
@@ -325,7 +592,7 @@
   min-height: 0;
   overflow: hidden;
 
-  @media (max-width: 968px) {
+  @include below('lg') {
     border-right: none;
     border-bottom: 1px solid var(--editor-border);
   }
@@ -373,6 +640,12 @@
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+
+  // A fixed 150px is a third of the stacked editor's height on a phone. Scale it with
+  // the pane, with a floor of about four visible lines.
+  @include below('lg') {
+    height: clamp(96px, 22vh, 150px);
+  }
 }
 
 .console-output,
