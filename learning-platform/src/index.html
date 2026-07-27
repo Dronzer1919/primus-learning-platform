@@ -3,9 +3,17 @@
 
 <head>
   <meta charset="utf-8" />
-  <title>Ionic App</title>
+  <title>Online Compiler — Primus Codex</title>
+  <meta name="description" content="Free online compiler and learning platform — run HTML/CSS/JS &amp; TypeScript in the browser, visualize code execution, and study interview topics." />
 
   <base href="/" />
+
+  <!-- Perf: warm up connections to the third-party origins used lazily (Google Sign-In
+       and the Pyodide CDN) so their first request is faster when it happens. -->
+  <link rel="preconnect" href="https://accounts.google.com" />
+  <link rel="dns-prefetch" href="https://accounts.google.com" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
 
   <!-- Resolve the bare "source-map-support" specifier that TypeScript's browser
        bundle imports to a local no-op stub, so the lazily-loaded compiler chunk
@@ -40,7 +48,9 @@
   <meta name="format-detection" content="telephone=no" />
   <meta name="msapplication-tap-highlight" content="no" />
 
-  <link rel="icon" type="image/png" href="assets/icon/favicon.png" />
+  <link rel="icon" type="image/svg+xml" href="assets/icon/logo.svg" />
+  <link rel="alternate icon" type="image/png" href="assets/icon/favicon.png" />
+  <link rel="apple-touch-icon" href="assets/icon/logo.svg" />
 
   <!-- add to homescreen for ios -->
   <meta name="mobile-web-app-capable" content="yes" />
