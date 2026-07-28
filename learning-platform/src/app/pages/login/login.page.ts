@@ -80,7 +80,9 @@ export class LoginPage implements AfterViewInit {
           theme: 'outline',
           size: 'large',
           text: 'continue_with',
-          shape: 'rectangular',
+          // Pill shape + centered logo to match the rounded "Login as Guest" button.
+          shape: 'pill',
+          logo_alignment: 'center',
           width: Math.min(el.offsetWidth, 400)
         });
       } else {
