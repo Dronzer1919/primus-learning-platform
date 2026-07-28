@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://primuscodex.com/sitemap.xml
