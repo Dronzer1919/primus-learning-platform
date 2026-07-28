@@ -285,7 +285,10 @@ h2 {
 }
 
 .google-rendered-btn {
-  width: 100%;
+  // Fixed 335px (tested to sit nicely inside the card with the G branding clear
+  // of the edge); shrinks to fit on narrow screens. Centered by .google-btn-wrapper.
+  width: 335px;
+  max-width: 100%;
   min-height: 44px;
   display: flex;
   justify-content: center;

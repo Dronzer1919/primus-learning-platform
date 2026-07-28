@@ -75,10 +75,10 @@ export class LoginPage implements AfterViewInit {
           client_id: environment.googleClientId,
           callback: (response: any) => this.handleGoogleCallback(response)
         });
-        // Render a bit narrower than the card and centre it (justify-content on
-        // .google-rendered-btn) so the personalized button's right-hand "G" branding
-        // has margin and isn't jammed against / clipped by the card's edge.
-        const width = Math.max(240, Math.min(el.offsetWidth - 32, 400));
+        // Fill the fixed-width (335px, shrinks on mobile) .google-rendered-btn
+        // container; the container is centered in the card so the G branding stays
+        // clear of the edge.
+        const width = Math.max(200, Math.min(el.offsetWidth, 400));
         google.accounts.id.renderButton(el, {
           type: 'standard',
           theme: 'outline',
