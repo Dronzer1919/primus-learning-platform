@@ -75,15 +75,17 @@ export class LoginPage implements AfterViewInit {
           client_id: environment.googleClientId,
           callback: (response: any) => this.handleGoogleCallback(response)
         });
+        // Google caps the button at 400px; keep it a few px narrower than the
+        // container so the personalized "Continue as …" button can't overflow/clip
+        // on the right. Default (left) logo alignment renders cleanest.
+        const width = Math.max(200, Math.min(el.offsetWidth - 6, 400));
         google.accounts.id.renderButton(el, {
           type: 'standard',
           theme: 'outline',
           size: 'large',
           text: 'continue_with',
-          // Pill shape + centered logo to match the rounded "Login as Guest" button.
           shape: 'pill',
-          logo_alignment: 'center',
-          width: Math.min(el.offsetWidth, 400)
+          width
         });
       } else {
         setTimeout(tryRender, 300);
