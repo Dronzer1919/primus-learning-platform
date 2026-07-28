@@ -289,6 +289,10 @@ h2 {
   min-height: 44px;
   display: flex;
   justify-content: center;
+  // Round the (rectangular) Google button via CSS so it matches the pill guest
+  // button without using Google's `pill` shape, which overflows/clips on the right.
+  border-radius: 14px;
+  overflow: hidden;
 }
 
 .google-login-btn {
