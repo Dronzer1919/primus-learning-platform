@@ -164,8 +164,6 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     document.removeEventListener('mousemove', this.onMoveRef);
     document.removeEventListener('mouseup', this.onMoveEndRef);
     document.removeEventListener('mousemove', this.onConnectMoveRef);
-    document.removeEventListener('mouseup', this.onConnectEndRef);
-    document.removeEventListener('mousemove', this.onEdgeMoveRef);
     document.removeEventListener('mouseup', this.onEdgeMoveEndRef);
     this.detachResizeListeners();
   }
@@ -395,6 +393,21 @@ export class FlowchartComponent implements OnInit, OnDestroy {
 
   onNodeClick(event: MouseEvent, node: FlowNode): void {
     event.stopPropagation();
+    // If in connect mode, this click on a node completes the connection.
+    if (this.connectFromId && this.connectFromId !== node.id) {
+      const from = this.connectFromId;
+      this.cancelConnect();
+      const exists = this.diagram.edges.some((e) => e.from === from && e.to === node.id);
+      if (!exists) {
+        this.diagram.edges.push({ id: this.newId(), from, to: node.id });
+        this.persist();
+      }
+      return;
+    }
+    if (this.connectFromId) {
+      this.cancelConnect();
+      return;
+    }
     if (this.moved) {
       // This click concludes a drag — don't treat it as a select toggle.
       return;
@@ -408,6 +421,10 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   }
 
   onCanvasClick(): void {
+    if (this.connectFromId) {
+      this.cancelConnect();
+      return;
+    }
     this.select(null, null);
   }
 
@@ -566,19 +583,33 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     this.persist();
   }
 
-  // --- Drag-to-connect ---------------------------------------------------
+  // --- Click-to-connect -----------------------------------------------
+  // Step 1: click an arrow handle on any shape → enters "awaiting target" mode.
+  // Step 2: click any other shape → edge is created.
+  // Click on empty canvas → cancels.
 
-  /** Begins dragging a new arrow out of `node` from one of its side handles. */
+  /** Enters connect mode: source is fixed, waiting for a target click. */
   startConnect(event: MouseEvent, node: FlowNode): void {
     event.stopPropagation();
     event.preventDefault();
+    // If already in connect mode and clicking the same source, cancel.
+    if (this.connectFromId === node.id) {
+      this.cancelConnect();
+      return;
+    }
     this.connectFromId = node.id;
     this.connectTargetId = null;
     const point = this.canvasPoint(event);
     this.connectX = point.x;
     this.connectY = point.y;
+    // Track mouse for the live preview line (no mouseup needed — target is set by click).
     document.addEventListener('mousemove', this.onConnectMoveRef);
-    document.addEventListener('mouseup', this.onConnectEndRef);
+  }
+
+  private cancelConnect(): void {
+    document.removeEventListener('mousemove', this.onConnectMoveRef);
+    this.connectFromId = null;
+    this.connectTargetId = null;
   }
 
   private onConnectMove(event: MouseEvent): void {
