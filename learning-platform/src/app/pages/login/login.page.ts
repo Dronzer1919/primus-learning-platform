@@ -1,4 +1,4 @@
-import { Component, AfterViewInit, NgZone, ElementRef, ViewChild } from '@angular/core';
+import { Component, AfterViewInit, NgZone } from '@angular/core';
 import { CommonModule, Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -19,8 +19,6 @@ declare const google: any;
   imports: [IonicModule, CommonModule, FormsModule, ThemeSelectorComponent]
 })
 export class LoginPage implements AfterViewInit {
-  @ViewChild('googleBtnContainer', { static: false }) googleBtnContainer!: ElementRef;
-
   // 'login' -> normal sign in, 'forgot' -> password recovery flow
   mode: 'login' | 'forgot' = 'login';
 
@@ -61,37 +59,27 @@ export class LoginPage implements AfterViewInit {
 
   ngAfterViewInit(): void {
     if (!this.googleConfigured) return;
-    this.renderGoogleButton();
+    this.initializeGoogle();
   }
 
-  private renderGoogleButton(): void {
-    const tryRender = () => {
-      const el = this.googleBtnContainer?.nativeElement;
-      // Wait until the container has a real laid-out width, so the Google button
-      // renders at the SAME width as the full-width "Login as Guest" button.
-      // Google caps the button at 400px, so clamp to avoid a mismatch on wide cards.
-      if (typeof google !== 'undefined' && google?.accounts?.id && el && el.offsetWidth > 0) {
+  private initializeGoogle(): void {
+    const tryInit = () => {
+      if (typeof google !== 'undefined' && google?.accounts?.id) {
         google.accounts.id.initialize({
           client_id: environment.googleClientId,
           callback: (response: any) => this.handleGoogleCallback(response)
         });
-        // Fill the fixed-width (335px, shrinks on mobile) .google-rendered-btn
-        // container; the container is centered in the card so the G branding stays
-        // clear of the edge.
-        const width = Math.max(200, Math.min(el.offsetWidth, 400));
-        google.accounts.id.renderButton(el, {
-          type: 'standard',
-          theme: 'outline',
-          size: 'large',
-          text: 'continue_with',
-          shape: 'rectangular',
-          width
-        });
       } else {
-        setTimeout(tryRender, 300);
+        setTimeout(tryInit, 300);
       }
     };
-    tryRender();
+    tryInit();
+  }
+
+  triggerGoogleLogin(): void {
+    if (typeof google !== 'undefined' && google?.accounts?.id) {
+      google.accounts.id.prompt();
+    }
   }
 
   private handleGoogleCallback(response: any): void {
