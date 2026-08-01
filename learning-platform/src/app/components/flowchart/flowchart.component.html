@@ -613,6 +613,14 @@ previews and canvas nodes can both reference them by id. -->
                 aria-label="Underline"
                 (click)="toggleText('underline')"
               ><u aria-hidden="true">U</u></button>
+              <button
+                type="button"
+                class="icon-btn"
+                [class.active]="sel.strikethrough"
+                [attr.aria-pressed]="!!sel.strikethrough"
+                aria-label="Strikethrough"
+                (click)="toggleText('strikethrough')"
+              ><s aria-hidden="true">S</s></button>
             </div>
 
             <div class="num-field">

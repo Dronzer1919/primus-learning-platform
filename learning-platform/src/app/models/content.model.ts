@@ -67,6 +67,26 @@ export interface YoutubeContent {
   title?: string;
 }
 
+/**
+ * Per-note presentation. Mirrors the flowchart's label styling (see FlowNode in
+ * flowchart.model.ts) so both editors offer the same set of text controls.
+ * Every field is optional; unset means the theme default.
+ */
+export interface NoteStyle {
+  /** Card background. When set, the note text switches to a dark ink so the
+   *  pale swatches stay readable on the dark themes. */
+  bgColor?: string;
+  textColor?: string;
+  fontFamily?: string;
+  /** Font size in px. */
+  fontSize?: number;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strikethrough?: boolean;
+  align?: 'left' | 'center' | 'right';
+}
+
 export interface UserNote {
   id: string;
   userId: string;
@@ -74,4 +94,8 @@ export interface UserNote {
   createdAt: Date;
   updatedAt: Date;
   isPinned: boolean;
+  /** `null` clears the styling. It has to be an explicit null rather than undefined:
+   *  JSON.stringify drops undefined keys, so the server would never see the change
+   *  and the old style would survive the save. */
+  style?: NoteStyle | null;
 }

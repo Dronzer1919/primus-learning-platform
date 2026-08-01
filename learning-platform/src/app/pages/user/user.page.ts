@@ -50,7 +50,6 @@ export class UserPage implements OnInit, OnDestroy {
   // Below `md` the sidebar is an overlay drawer, so starting it open would cover the
   // content on first paint. Above it, the sidebar is part of the layout and starts open.
   isSidebarOpen = !UserPage.isOverlayViewport();
-  isPlaygroundRoute = false;
   hideSidebar = false;
 
   // Last known side of the overlay boundary, so a resize only resets the drawer when
@@ -66,8 +65,7 @@ export class UserPage implements OnInit, OnDestroy {
   }
 
   // Routes that own the full width and have nothing to navigate with the topic sidebar.
-  // Note 'sessions' also matches 'playground-sessions' — intended, both hide the sidebar.
-  private static readonly SIDEBAR_HIDDEN_ROUTES = ['playground-sessions', 'notes', 'sessions'];
+  private static readonly SIDEBAR_HIDDEN_ROUTES = ['playground-sessions', 'notes'];
   isProfileOpen = false;
   private routeSub!: Subscription;
   profileEvent?: Event;              // anchors the popover under the avatar (dropdown)
@@ -130,7 +128,6 @@ export class UserPage implements OnInit, OnDestroy {
   // sidebar is removed from the DOM while hidden, so forcing it closed here would only
   // discard the user's expanded/collapsed choice when they navigate back to a topic.
   private applyRouteFlags(url: string): void {
-    this.isPlaygroundRoute = url.includes('playground-sessions');
     this.hideSidebar = UserPage.SIDEBAR_HIDDEN_ROUTES.some((route) => url.includes(route));
   }
 
@@ -267,9 +264,5 @@ export class UserPage implements OnInit, OnDestroy {
 
   navigateToNotes() {
     this.router.navigate(['/user/notes']);
-  }
-
-  navigateToSessions() {
-    this.router.navigate(['/user/sessions']);
   }
 }

@@ -52,13 +52,14 @@ exports.getNoteById = async (req, res) => {
 // Create note
 exports.createNote = async (req, res) => {
   try {
-    const { content, isPinned } = req.body;
+    const { content, isPinned, style } = req.body;
     const userId = req.user.id;
 
     const note = new UserNote({
       userId,
       content,
-      isPinned: isPinned || false
+      isPinned: isPinned || false,
+      style
     });
 
     await note.save();

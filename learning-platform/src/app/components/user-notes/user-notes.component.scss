@@ -6,9 +6,11 @@
   margin: 0 auto;
 
   @include below('sm') {
-    padding: 14px;
+    padding: 12px;
   }
 }
+
+/* --- Header ------------------------------------------------------------- */
 
 .notes-header {
   display: flex;
@@ -16,34 +18,42 @@
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 30px;
+  margin-bottom: 16px;
 
   h1 {
     display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: fluid(21px, 28px);
+    align-items: baseline;
+    gap: 7px;
+    font-size: fluid(18px, 22px);
+    font-weight: 650;
+    line-height: 1.2;
     margin: 0;
+    letter-spacing: -0.01em;
     min-width: 0;
-
-    ion-icon {
-      font-size: fluid(24px, 32px);
-      color: var(--ion-color-primary);
-      flex-shrink: 0;
-    }
-  }
-
-  @include below('sm') {
-    margin-bottom: 18px;
   }
 }
+
+.notes-count {
+  font-size: fluid(15px, 18px);
+  font-weight: 500;
+  color: var(--ion-color-medium);
+}
+
+.new-note-btn {
+  flex-shrink: 0;
+  --border-radius: 9px;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* --- Load error banner --------------------------------------------------- */
 
 .notes-error {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   padding: 10px 14px;
   border-radius: 10px;
   border: 1px solid var(--ion-color-danger, #eb445a);
@@ -60,83 +70,645 @@
   span { flex: 1; min-width: 0; }
 }
 
-.notes-grid {
+/* --- Note rows ----------------------------------------------------------- */
+
+/* Four cards per row on a desktop, stepping down to one on a phone. `minmax(0, 1fr)`
+   rather than a bare `1fr`: a grid track's default min is `auto`, so a long unbroken
+   word in one note would widen its column and knock the row out of alignment. */
+.notes-list {
   display: grid;
-  // `min(100%, 300px)` guards the 320px case: a bare 300px floor plus the container
-  // padding overflows, and auto-fill will not shrink below the floor on its own.
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+
+  @include below('xl') { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  @include below('lg') { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   @include below('sm') {
-    gap: 14px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
   }
 }
 
-.note-card {
+.note-row {
+  display: flex;
+  flex-direction: column;
+  padding: 11px 13px 10px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--theme-border-color), transparent 30%);
+  background: var(--theme-card-background);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    border-color: color-mix(in srgb, var(--ion-color-primary), transparent 60%);
+    box-shadow: 0 4px 14px var(--theme-shadow);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+
+  /* Pinned rows are tinted edge to edge rather than capped with a bar — the whole row
+     reads as promoted, which is what pinning means. */
   &.pinned {
-    border-top: 4px solid var(--ion-color-warning);
-  }
+    border-color: color-mix(in srgb, var(--ion-color-warning), transparent 55%);
+    background:
+      linear-gradient(
+        color-mix(in srgb, var(--ion-color-warning), transparent 93%),
+        color-mix(in srgb, var(--ion-color-warning), transparent 93%)
+      ),
+      var(--theme-card-background);
 
-  .note-header-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-
-    ion-badge {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-
-      ion-icon {
-        font-size: 14px;
-      }
-    }
-
-    .actions {
-      display: flex;
-      gap: 5px;
+    &:hover {
+      border-color: color-mix(in srgb, var(--ion-color-warning), transparent 35%);
     }
   }
 
-  .note-content {
-    white-space: pre-wrap;
-    word-break: break-word;
-    min-height: 100px;
-    max-height: 200px;
-    overflow-y: auto;
-    margin: 0 0 15px;
-    line-height: 1.6;
+  @include below('sm') {
+    padding: 10px 11px 11px;
   }
 
-  .note-footer {
-    border-top: 1px solid var(--ion-color-light-shade);
-    padding-top: 10px;
+  /* A custom background is always one of the pale swatches, so the row's meta text
+     switches to dark ink — the theme's own muted grey vanishes on them, and on the
+     dark themes it would be near-white on near-white. */
+  &.has-bg {
+    border-color: rgba(0, 0, 0, 0.12);
+
+    .note-date { color: rgba(31, 41, 55, 0.62); }
+    .note-glyph {
+      background: rgba(31, 41, 55, 0.08);
+      ion-icon { color: rgba(31, 41, 55, 0.72); }
+    }
+    .note-action {
+      color: rgba(31, 41, 55, 0.55);
+
+      &:hover { color: #1f2937; background: rgba(31, 41, 55, 0.08); }
+      &.is-danger:hover { color: var(--ion-color-danger); }
+      &.is-pinned { color: #b45309; }
+    }
+    .note-flag {
+      color: #92400e;
+      background: rgba(180, 83, 9, 0.14);
+    }
+    .note-actions { border-top-color: rgba(31, 41, 55, 0.14); }
   }
 }
 
-.empty-state {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 60px 20px;
+.note-row-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.note-date {
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--ion-color-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.note-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ion-color-warning-shade, #b88217);
+  background: color-mix(in srgb, var(--ion-color-warning), transparent 82%);
 
   ion-icon {
-    font-size: fluid(64px, 100px);
-    color: var(--ion-color-medium);
-    margin-bottom: 20px;
+    font-size: 11px;
+  }
+}
+
+.note-row-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  /* Takes the slack so the action row stays pinned to the bottom of the card and
+     every card in a grid row lines its icons up. */
+  flex: 1;
+}
+
+/* Small round glyph, matching the reference: it marks the row as a note without
+   repeating the word anywhere. */
+.note-glyph {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ion-color-primary), transparent 88%);
+
+  ion-icon {
+    font-size: 15px;
+    color: var(--ion-color-primary);
+  }
+}
+
+/* A button so the clamped text is reachable by keyboard, reset back to plain text. */
+.note-body {
+  flex: 1;
+  min-width: 0;
+  align-self: stretch;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--ion-color-primary);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+}
+
+/* Three lines then an ellipsis, at every width. `-webkit-` prefixes are still
+   required: no browser ships the unprefixed box model.
+   The size is fixed here and textStyle() withholds the note's own font-size — the
+   box is exactly three lines tall, so all cards match no matter what a note is set
+   to, and a 48px note cannot stretch its whole grid row. */
+.note-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  /* pre-line, not pre-wrap: authored newlines are kept, but a run of blank lines
+     cannot eat the whole three-line budget. */
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  font-size: 14.5px;
+  line-height: 1.5;
+  /* 3 lines at the line-height above, so a one-line note reserves the same space. */
+  min-height: 4.5em;
+  color: var(--ion-text-color);
+
+  @include below('sm') {
+    font-size: 14px;
+  }
+}
+
+/* A footer row rather than a column beside the text: at four cards across, icons on
+   the right would take a third of the width away from the note itself. */
+.note-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid color-mix(in srgb, var(--theme-border-color), transparent 55%);
+}
+
+.note-action {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  /* Recessed until hovered: the actions repeat on every row, and at full strength
+     they out-shout the note text they belong to. */
+  color: var(--ion-color-medium);
+  transition: color 0.12s ease, background-color 0.12s ease;
+
+  ion-icon {
+    font-size: 17px;
+  }
+
+  &:hover {
+    color: var(--ion-color-primary);
+    background: color-mix(in srgb, var(--ion-color-primary), transparent 90%);
+  }
+
+  &.is-danger:hover {
+    color: var(--ion-color-danger);
+    background: color-mix(in srgb, var(--ion-color-danger), transparent 90%);
+  }
+
+  /* The pin is the one action with a persistent on/off meaning, so it stays lit. */
+  &.is-pinned {
+    color: var(--ion-color-warning);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ion-color-primary);
+    outline-offset: 1px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+/* No hover to reveal them, and thumbs need a bigger target than a mouse does. */
+@include touch {
+  .note-action {
+    width: 36px;
+    height: 36px;
+    color: var(--ion-text-color);
+
+    &.is-danger { color: var(--ion-color-danger); }
+    &.is-pinned { color: var(--ion-color-warning); }
+  }
+}
+
+/* --- Empty state --------------------------------------------------------- */
+
+.empty-state {
+  /* Spans the whole grid instead of sitting in the first column. */
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 44px 20px;
+  border: 1px dashed color-mix(in srgb, var(--theme-border-color), transparent 20%);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--theme-card-background), transparent 45%);
+
+  ion-icon {
+    font-size: fluid(44px, 60px);
+    color: color-mix(in srgb, var(--ion-color-primary), transparent 65%);
+    margin-bottom: 10px;
   }
 
   h2 {
-    font-size: fluid(20px, 24px);
-    margin: 0 0 10px;
-  }
-
-  @include below('sm') {
-    padding: 40px 16px;
+    font-size: fluid(16px, 19px);
+    font-weight: 650;
+    margin: 0 0 6px;
   }
 
   p {
     color: var(--ion-color-medium);
-    margin-bottom: 20px;
+    margin: 0 auto 16px;
+    max-width: 34ch;
+    font-size: 13.5px;
+  }
+
+  ion-button {
+    --border-radius: 9px;
+    font-weight: 600;
+  }
+
+  @include below('sm') {
+    padding: 34px 16px;
+  }
+}
+
+/* --- Editor modal -------------------------------------------------------- */
+
+/* Modal styles live here rather than in global.scss: ion-modal projects its
+   ng-template content, so these elements still carry this component's encapsulation
+   attribute even after Ionic moves the overlay to the app root. */
+/* Ionic's default desktop modal is only tall enough for a short form — with the
+   style bar, swatch row and a 14-row textarea the action buttons fell off the
+   bottom edge. Size it explicitly, and go edge-to-edge on phones. */
+.note-modal {
+  --border-radius: 16px;
+  --width: min(680px, 94vw);
+  --height: min(760px, 88vh);
+
+  @include below('sm') {
+    --width: 100%;
+    --height: 100%;
+    --border-radius: 0;
+  }
+}
+
+/* Fills the modal so the actions sit at the bottom of the sheet rather than
+   floating directly under the textarea with dead space beneath them. */
+.note-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 100%;
+}
+
+/* --- Style bar ----------------------------------------------------------- */
+
+.style-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 7px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--theme-border-color), transparent 25%);
+  background: color-mix(in srgb, var(--theme-surface), transparent 45%);
+}
+
+.style-select {
+  height: 30px;
+  max-width: 140px;
+  padding: 0 6px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--theme-border-color), transparent 20%);
+  background: var(--theme-card-background);
+  color: var(--ion-text-color);
+  font-size: 12.5px;
+}
+
+/* Segmented cluster: the buttons read as one control, so only the outer corners round. */
+.style-group {
+  display: flex;
+  border-radius: 7px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--theme-border-color), transparent 20%);
+}
+
+.style-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-right: 1px solid color-mix(in srgb, var(--theme-border-color), transparent 40%);
+  background: var(--theme-card-background);
+  color: var(--ion-text-color);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+
+  &:last-child { border-right: 0; }
+
+  &:hover {
+    background: color-mix(in srgb, var(--ion-color-primary), transparent 88%);
+  }
+
+  &.active {
+    background: color-mix(in srgb, var(--ion-color-primary), transparent 78%);
+    color: var(--ion-color-primary);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ion-color-primary);
+    outline-offset: -2px;
+  }
+
+  .align-icon {
+    width: 15px;
+    height: 15px;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+  }
+}
+
+.style-num {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 30px;
+  padding: 0 7px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--theme-border-color), transparent 20%);
+  background: var(--theme-card-background);
+
+  input {
+    width: 34px;
+    border: 0;
+    background: none;
+    color: var(--ion-text-color);
+    font-size: 12.5px;
+    text-align: right;
+    /* The spinners cost more width than they earn in a bar this tight. */
+    -moz-appearance: textfield;
+    appearance: textfield;
+
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+  }
+
+  .unit {
+    font-size: 11px;
+    color: var(--ion-color-medium);
+  }
+}
+
+/* The native colour input is unstylable, so it is sized to the swatch and hidden
+   behind it — clicking the chip still opens the OS picker. */
+.style-color {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--theme-border-color), transparent 20%);
+  background: var(--theme-card-background);
+  cursor: pointer;
+
+  .style-color-chip {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.18);
+  }
+
+  input[type='color'] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    cursor: pointer;
+  }
+}
+
+.style-reset {
+  height: 30px;
+  padding: 0 10px;
+  margin-left: auto;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--theme-border-color), transparent 20%);
+  background: var(--theme-card-background);
+  color: var(--ion-color-medium);
+  font-size: 12px;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--ion-color-danger);
+    border-color: color-mix(in srgb, var(--ion-color-danger), transparent 60%);
+  }
+}
+
+/* --- Background swatches ------------------------------------------------- */
+
+.bg-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.bg-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ion-text-color);
+}
+
+.bg-swatches {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.bg-swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--theme-border-color), transparent 10%);
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+
+  &:hover { transform: scale(1.1); }
+
+  &.active {
+    box-shadow: 0 0 0 2px var(--ion-color-primary);
+  }
+
+  /* "No background" reads as a crossed-out swatch rather than an empty box. */
+  &.none {
+    position: relative;
+    background: var(--theme-card-background);
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: 4px;
+      background: linear-gradient(
+        to top right,
+        transparent 44%,
+        var(--ion-color-danger) 44%,
+        var(--ion-color-danger) 56%,
+        transparent 56%
+      );
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+    &:hover { transform: none; }
+  }
+}
+
+/* Takes all the room the style bar and actions leave, so the textarea grows with
+   the modal instead of sitting at a fixed 14 rows. */
+.note-field {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 7px;
+
+  ion-textarea {
+    --background: color-mix(in srgb, var(--theme-surface), transparent 40%);
+    --padding-start: 12px;
+    --padding-end: 12px;
+    --padding-top: 10px;
+    --padding-bottom: 10px;
+    flex: 1;
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--theme-border-color), transparent 25%);
+    line-height: 1.6;
+    transition: border-color 0.15s ease;
+
+    &:focus-within {
+      border-color: var(--ion-color-primary);
+    }
+
+    /* ion-textarea is a shadow component, and two things have to cross the boundary:
+       - height, because Ionic sizes the inner <textarea> from `rows`, so the field's
+         extra space would stay empty and unclickable;
+       - font-weight, font-style and text-decoration, which (unlike font-family, size,
+         colour and alignment) do not inherit into it — without them the preview
+         ignores Bold, Italic and Strikethrough. */
+    &::part(native) {
+      height: 100%;
+      min-height: 150px;
+      font-weight: inherit;
+      font-style: inherit;
+      text-decoration: inherit;
+      text-align: inherit;
+      color: inherit;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
+  }
+}
+
+.note-field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+
+  .note-field-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ion-text-color);
+  }
+}
+
+.note-count {
+  font-size: 12px;
+  color: var(--ion-color-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+/* `margin-top: auto` is what actually pushes the pair to the bottom of the sheet;
+   sticky keeps them reachable once a long note starts scrolling the form. */
+.note-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: auto;
+  position: sticky;
+  bottom: 0;
+  padding-top: 12px;
+  /* The form scrolls under this row, so it needs its own opaque backing. */
+  background: var(--theme-background);
+
+  ion-button {
+    --border-radius: 10px;
+    min-width: 120px;
+    margin: 0;
+    font-weight: 600;
+  }
+
+  /* Stacked and full-width on phones: side-by-side buttons get too narrow to label.
+     column-reverse keeps the primary action nearest the thumb. */
+  @include below('xs') {
+    flex-direction: column-reverse;
+    gap: 8px;
+
+    ion-button {
+      width: 100%;
+      min-width: 0;
+    }
   }
 }

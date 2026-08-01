@@ -26,9 +26,6 @@
       <ion-button class="nav-btn" (click)="navigateToNotes()" title="My Notes">
         <ion-icon slot="icon-only" name="document-text-outline"></ion-icon>
       </ion-button>
-      <ion-button class="nav-btn" (click)="navigateToSessions()" title="My Sessions">
-        <ion-icon slot="icon-only" name="albums-outline"></ion-icon>
-      </ion-button>
       <ion-button class="profile-btn" (click)="openProfile($event)">
         <div class="avatar">
           <img *ngIf="avatarUrl" [src]="avatarUrl" alt="avatar" />
@@ -38,9 +35,13 @@
     </ion-buttons>
   </ion-toolbar>
 
-  <!-- No color="light": a coloured toolbar paints from --ion-color-base and ignores the
+  <!-- The tabs pick which language the topic sidebar and content viewer show, so they
+       only belong on the routes that have a sidebar. On My Notes and Playground Sessions
+       they were decoration that did nothing — hence !hideSidebar, which covers both.
+
+       No color="light": a coloured toolbar paints from --ion-color-base and ignores the
        --background set in .language-tabs-toolbar, so the theme surface would never apply. -->
-  <ion-toolbar class="language-tabs-toolbar" *ngIf="!isPlaygroundRoute">
+  <ion-toolbar class="language-tabs-toolbar" *ngIf="!hideSidebar">
     <div class="language-tabs">
       <ion-chip
         *ngFor="let tab of orderedTabs"
@@ -101,10 +102,6 @@
         <button type="button" (click)="isProfileOpen = false; navigateToNotes()">
           <ion-icon name="document-text-outline"></ion-icon>
           <span>My Notes</span>
-        </button>
-        <button type="button" (click)="isProfileOpen = false; navigateToSessions()">
-          <ion-icon name="albums-outline"></ion-icon>
-          <span>My Sessions</span>
         </button>
       </div>
 

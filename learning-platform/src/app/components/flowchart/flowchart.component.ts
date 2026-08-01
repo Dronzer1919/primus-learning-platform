@@ -1,7 +1,7 @@
 import { Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CommonModule, Location } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
-import { IonicModule } from '@ionic/angular';
+import { AlertController, IonicModule, ToastController } from '@ionic/angular';
 import { ThemeSelectorComponent } from '../theme-selector/theme-selector.component';
 import { FlowchartStoreService } from '../../services/flowchart-store.service';
 import { ExportFormat, FlowchartExportService } from '../../services/flowchart-export.service';
@@ -147,7 +147,9 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     private store: FlowchartStoreService,
     private exporter: FlowchartExportService,
     private location: Location,
-    private router: Router
+    private router: Router,
+    private alertController: AlertController,
+    private toastController: ToastController
   ) {}
 
   // Return to the page the user came from (e.g. /user/home), not a hardcoded route.
@@ -916,17 +918,34 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     return colors;
   }
 
-  clear(): void {
+  async clear(): Promise<void> {
     if (this.diagram.nodes.length === 0 && this.diagram.edges.length === 0) {
       return;
     }
-    if (!confirm('Clear the entire flowchart?')) {
-      return;
-    }
-    this.diagram = { nodes: [], edges: [] };
-    this.connectFromId = null;
-    this.select(null, null);
-    this.persist();
+    // Naming the shape count makes the consequence concrete — the canvas may be
+    // scrolled away from whatever is about to be deleted.
+    const count = this.diagram.nodes.length;
+    const alert = await this.alertController.create({
+      header: 'Clear flowchart',
+      cssClass: 'app-confirm-alert app-confirm-danger',
+      message: `Delete all ${count} shape${count === 1 ? '' : 's'} and their connections? This cannot be undone.`,
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Clear',
+          role: 'destructive',
+          cssClass: 'alert-button-danger',
+          handler: () => {
+            this.diagram = { nodes: [], edges: [] };
+            this.connectFromId = null;
+            this.select(null, null);
+            this.persist();
+            this.showToast('Flowchart cleared', 'success');
+          }
+        }
+      ]
+    });
+    await alert.present();
   }
 
   // --- Rendering ---------------------------------------------------------
@@ -1359,5 +1378,17 @@ export class FlowchartComponent implements OnInit, OnDestroy {
 
   private persist(): void {
     this.store.save(this.diagram);
+  }
+
+  /** Brief confirmation of an action that leaves no visible trace of itself. */
+  private async showToast(message: string, color: string): Promise<void> {
+    const toast = await this.toastController.create({
+      message,
+      duration: 1800,
+      color,
+      position: 'bottom',
+      cssClass: 'app-toast'
+    });
+    toast.present();
   }
 }

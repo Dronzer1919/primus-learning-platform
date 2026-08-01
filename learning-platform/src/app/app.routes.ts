@@ -62,10 +62,6 @@ export const routes: Routes = [
         loadComponent: () => import('./components/user-notes/user-notes.component').then((m) => m.UserNotesComponent),
       },
       {
-        path: 'sessions',
-        loadComponent: () => import('./components/sessions/sessions.component').then((m) => m.SessionsComponent),
-      },
-      {
         path: 'playground-sessions',
         loadComponent: () => import('./components/playground-sessions/playground-sessions.component').then((m) => m.PlaygroundSessionsComponent),
       },

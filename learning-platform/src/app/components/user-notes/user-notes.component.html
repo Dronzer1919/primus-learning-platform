@@ -1,89 +1,275 @@
 <div class="notes-container">
   <div class="notes-header">
     <h1>
-      <ion-icon name="document-text-outline"></ion-icon>
       My Notes
+      <span class="notes-count">({{ notes.length }})</span>
     </h1>
-    <ion-button (click)="openModal()" color="primary">
+    <ion-button class="new-note-btn" size="small" (click)="openModal()" color="primary">
       <ion-icon slot="start" name="add-outline"></ion-icon>
       New Note
     </ion-button>
   </div>
 
-  <!-- Without this, a failed request is indistinguishable from "nothing happened". -->
-  <div class="notes-error" *ngIf="error">
+  <!-- Without this, a failed request is indistinguishable from "nothing happened".
+       Load failures stay on screen (they own the Retry action); per-action failures
+       are transient and go to a toast instead. -->
+  <div class="notes-error" *ngIf="error" role="alert">
     <ion-icon name="alert-circle-outline"></ion-icon>
     <span>{{ error }}</span>
-    <ion-button fill="clear" size="small" (click)="reload()">Retry</ion-button>
+    <ion-button fill="clear" size="small" (click)="reload()">
+      <ion-icon slot="start" name="refresh-outline"></ion-icon>
+      Retry
+    </ion-button>
   </div>
 
-  <div class="notes-grid">
-    <ion-card *ngFor="let note of notes" class="note-card" [class.pinned]="note.isPinned">
-      <ion-card-header>
-        <div class="note-header-actions">
-          <ion-badge *ngIf="note.isPinned" color="warning">
-            <ion-icon name="pin"></ion-icon>
-            Pinned
-          </ion-badge>
-          <div class="actions">
-            <ion-button fill="clear" size="small" (click)="togglePin(note)">
-              <ion-icon [name]="note.isPinned ? 'pin' : 'pin-outline'"></ion-icon>
-            </ion-button>
-            <ion-button fill="clear" size="small" (click)="openModal(note)">
-              <ion-icon name="create-outline"></ion-icon>
-            </ion-button>
-            <ion-button fill="clear" size="small" color="danger" (click)="deleteNote(note)">
-              <ion-icon name="trash-outline"></ion-icon>
-            </ion-button>
-          </div>
-        </div>
-      </ion-card-header>
-      
-      <ion-card-content>
-        <p class="note-content">{{ note.content }}</p>
-        <div class="note-footer">
-          <ion-text color="medium">
-            <small>Updated: {{ formatDate(note.updatedAt) }}</small>
-          </ion-text>
-        </div>
-      </ion-card-content>
-    </ion-card>
+  <div class="notes-list">
+    <article
+      *ngFor="let note of notes"
+      class="note-row"
+      [class.pinned]="note.isPinned"
+      [class.has-bg]="note.style?.bgColor"
+      [ngStyle]="cardStyle(note.style)"
+    >
+      <div class="note-row-top">
+        <span class="note-date">{{ formatDate(note.updatedAt) }}</span>
+        <span class="note-flag" *ngIf="note.isPinned">
+          <ion-icon name="pin" aria-hidden="true"></ion-icon>
+          Pinned
+        </span>
+      </div>
+
+      <div class="note-row-main">
+        <span class="note-glyph" aria-hidden="true">
+          <ion-icon name="document-text-outline"></ion-icon>
+        </span>
+
+        <!-- The text is clamped to three lines, so the card itself has to open the
+             editor — otherwise the rest of a long note is unreachable. -->
+        <button type="button" class="note-body" title="Open note" (click)="openModal(note)">
+          <span class="note-text" [ngStyle]="textStyle(note.style)">{{ note.content }}</span>
+        </button>
+      </div>
+
+      <div class="note-actions">
+        <button
+          type="button"
+          class="note-action"
+          [class.is-pinned]="note.isPinned"
+          [title]="note.isPinned ? 'Unpin note' : 'Pin to top'"
+          [attr.aria-label]="note.isPinned ? 'Unpin note' : 'Pin note to top'"
+          (click)="togglePin(note)"
+        >
+          <ion-icon [name]="note.isPinned ? 'pin' : 'pin-outline'"></ion-icon>
+        </button>
+        <button
+          type="button"
+          class="note-action"
+          title="Edit note"
+          aria-label="Edit note"
+          (click)="openModal(note)"
+        >
+          <ion-icon name="create-outline"></ion-icon>
+        </button>
+        <button
+          type="button"
+          class="note-action is-danger"
+          title="Delete note"
+          aria-label="Delete note"
+          (click)="deleteNote(note)"
+        >
+          <ion-icon name="trash-outline"></ion-icon>
+        </button>
+      </div>
+    </article>
 
     <div *ngIf="notes.length === 0" class="empty-state">
       <ion-icon name="document-text-outline"></ion-icon>
       <h2>No Notes Yet</h2>
       <p>Create your first note to start organizing your learning</p>
-      <ion-button (click)="openModal()">Create First Note</ion-button>
+      <ion-button size="small" (click)="openModal()">
+        <ion-icon slot="start" name="add-outline"></ion-icon>
+        Create First Note
+      </ion-button>
     </div>
   </div>
 
-  <ion-modal [isOpen]="isModalOpen" (didDismiss)="closeModal()">
+  <ion-modal class="note-modal" [isOpen]="isModalOpen" (didDismiss)="closeModal()">
     <ng-template>
       <ion-header>
         <ion-toolbar>
           <ion-title>{{ editingNote ? 'Edit' : 'New' }} Note</ion-title>
           <ion-buttons slot="end">
-            <ion-button (click)="closeModal()">Close</ion-button>
+            <ion-button aria-label="Close" (click)="closeModal()">
+              <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+            </ion-button>
           </ion-buttons>
         </ion-toolbar>
       </ion-header>
       <ion-content class="ion-padding">
-        <form (ngSubmit)="saveNote()">
-          <ion-item lines="none">
-            <ion-label position="stacked">Note Content</ion-label>
+        <form class="note-form" (ngSubmit)="saveNote()">
+          <!-- Text properties, matching the flowchart's Text panel. -->
+          <div class="style-bar" role="group" aria-label="Note text style">
+            <select
+              class="style-select"
+              aria-label="Font family"
+              [value]="noteStyle.fontFamily || fontFamilies[0]"
+              (change)="setFontFamily($any($event.target).value)"
+            >
+              <option *ngFor="let f of fontFamilies" [value]="f">{{ f }}</option>
+            </select>
+
+            <div class="style-group" role="group" aria-label="Font style">
+              <button
+                type="button"
+                class="style-btn"
+                [class.active]="noteStyle.bold"
+                [attr.aria-pressed]="!!noteStyle.bold"
+                aria-label="Bold"
+                title="Bold"
+                (click)="toggleStyle('bold')"
+              ><b aria-hidden="true">B</b></button>
+              <button
+                type="button"
+                class="style-btn"
+                [class.active]="noteStyle.italic"
+                [attr.aria-pressed]="!!noteStyle.italic"
+                aria-label="Italic"
+                title="Italic"
+                (click)="toggleStyle('italic')"
+              ><i aria-hidden="true">I</i></button>
+              <button
+                type="button"
+                class="style-btn"
+                [class.active]="noteStyle.underline"
+                [attr.aria-pressed]="!!noteStyle.underline"
+                aria-label="Underline"
+                title="Underline"
+                (click)="toggleStyle('underline')"
+              ><u aria-hidden="true">U</u></button>
+              <button
+                type="button"
+                class="style-btn"
+                [class.active]="noteStyle.strikethrough"
+                [attr.aria-pressed]="!!noteStyle.strikethrough"
+                aria-label="Strikethrough"
+                title="Strikethrough"
+                (click)="toggleStyle('strikethrough')"
+              ><s aria-hidden="true">S</s></button>
+            </div>
+
+            <div class="style-num">
+              <input
+                type="number"
+                min="10"
+                max="48"
+                aria-label="Font size in pixels"
+                [value]="noteStyle.fontSize ?? defaultFontSize"
+                (change)="setFontSize($any($event.target).valueAsNumber)"
+              />
+              <span class="unit" aria-hidden="true">px</span>
+            </div>
+
+            <div class="style-group" role="group" aria-label="Text alignment">
+              <button
+                *ngFor="let a of alignments"
+                type="button"
+                class="style-btn"
+                [class.active]="(noteStyle.align ?? 'left') === a"
+                [attr.aria-pressed]="(noteStyle.align ?? 'left') === a"
+                [attr.aria-label]="'Align ' + a"
+                [title]="'Align ' + a"
+                (click)="setAlign(a)"
+              >
+                <svg class="align-icon" viewBox="0 0 16 16" aria-hidden="true">
+                  <line x1="2" y1="3" x2="14" y2="3" />
+                  <line
+                    [attr.x1]="a === 'right' ? 7 : (a === 'center' ? 4.5 : 2)"
+                    y1="6.5"
+                    [attr.x2]="a === 'left' ? 9 : (a === 'center' ? 11.5 : 14)"
+                    y2="6.5"
+                  />
+                  <line x1="2" y1="10" x2="14" y2="10" />
+                  <line
+                    [attr.x1]="a === 'right' ? 7 : (a === 'center' ? 4.5 : 2)"
+                    y1="13.5"
+                    [attr.x2]="a === 'left' ? 9 : (a === 'center' ? 11.5 : 14)"
+                    y2="13.5"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <label class="style-color" [title]="'Text colour'">
+              <span class="style-color-chip" [style.background]="noteStyle.textColor || 'var(--ion-text-color)'"></span>
+              <input
+                type="color"
+                aria-label="Text colour"
+                [value]="noteStyle.textColor || '#1f2937'"
+                (input)="setTextColor($any($event.target).value)"
+              />
+            </label>
+
+            <button
+              *ngIf="hasCustomStyle"
+              type="button"
+              class="style-reset"
+              title="Clear all formatting"
+              (click)="resetStyle()"
+            >Reset</button>
+          </div>
+
+          <!-- Background swatches -->
+          <div class="bg-row" role="group" aria-label="Note background">
+            <span class="bg-label">Background</span>
+            <div class="bg-swatches">
+              <button
+                *ngFor="let c of bgSwatches"
+                type="button"
+                class="bg-swatch"
+                [class.none]="c === null"
+                [class.active]="(noteStyle.bgColor ?? null) === c"
+                [style.background]="c || 'transparent'"
+                [attr.aria-pressed]="(noteStyle.bgColor ?? null) === c"
+                [attr.aria-label]="c ? 'Background ' + c : 'Default background'"
+                [title]="c ? c : 'Theme default'"
+                (click)="setBgColor(c)"
+              ></button>
+            </div>
+          </div>
+
+          <!-- The chosen background belongs to the saved card, not to this editor —
+               the editor keeps the app's own surface. -->
+          <div class="note-field">
+            <div class="note-field-head">
+              <!-- A plain span, not <label for>: ion-textarea wraps its real <textarea>
+                   in a shadow root, so `for` on the host id would not focus anything.
+                   The control carries its own aria-label instead. -->
+              <span class="note-field-label">Note content</span>
+              <span class="note-count">{{ noteContent.length }} characters</span>
+            </div>
+            <!-- The editor previews the note's typography, so what you type matches
+                 what the card will show. -->
             <ion-textarea
+              [ngStyle]="editorTextStyle()"
               [(ngModel)]="noteContent"
               name="content"
-              rows="15"
+              rows="14"
+              aria-label="Note content"
               placeholder="Write your note here..."
               required
             ></ion-textarea>
-          </ion-item>
+          </div>
 
-          <ion-button expand="block" type="submit" class="ion-margin-top" [disabled]="saving || !noteContent.trim()">
-            <ion-spinner *ngIf="saving" name="crescent"></ion-spinner>
-            <span *ngIf="!saving">{{ editingNote ? 'Update' : 'Create' }} Note</span>
-          </ion-button>
+          <div class="note-form-actions">
+            <ion-button fill="outline" type="button" (click)="closeModal()">Cancel</ion-button>
+            <ion-button type="submit" [disabled]="saving || !noteContent.trim()">
+              <ion-spinner *ngIf="saving" name="crescent"></ion-spinner>
+              <ng-container *ngIf="!saving">
+                <ion-icon slot="start" name="save-outline"></ion-icon>
+                {{ editingNote ? 'Update' : 'Create' }} Note
+              </ng-container>
+            </ion-button>
+          </div>
         </form>
       </ion-content>
     </ng-template>

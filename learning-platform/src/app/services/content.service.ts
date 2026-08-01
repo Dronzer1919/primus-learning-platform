@@ -235,7 +235,8 @@ export class ContentService {
             content: note.content,
             createdAt: new Date(note.createdAt),
             updatedAt: new Date(note.updatedAt),
-            isPinned: note.isPinned
+            isPinned: note.isPinned,
+            style: note.style
           }));
           this.userNotesSubject.next(notes);
         }
@@ -261,7 +262,8 @@ export class ContentService {
         content: response.data.content,
         createdAt: new Date(response.data.createdAt),
         updatedAt: new Date(response.data.updatedAt),
-        isPinned: response.data.isPinned
+        isPinned: response.data.isPinned,
+        style: response.data.style
       }))
     );
   }
@@ -279,7 +281,8 @@ export class ContentService {
         content: response.data.content,
         createdAt: new Date(response.data.createdAt),
         updatedAt: new Date(response.data.updatedAt),
-        isPinned: response.data.isPinned
+        isPinned: response.data.isPinned,
+        style: response.data.style
       }))
     );
   }
