@@ -67,7 +67,10 @@ export class LoginPage implements AfterViewInit {
       if (typeof google !== 'undefined' && google?.accounts?.id) {
         google.accounts.id.initialize({
           client_id: environment.googleClientId,
-          callback: (response: any) => this.handleGoogleCallback(response)
+          callback: (response: any) => this.handleGoogleCallback(response),
+          use_fedcm_for_prompt: false,
+          auto_select: false,
+          cancel_on_tap_outside: true
         });
       } else {
         setTimeout(tryInit, 300);
