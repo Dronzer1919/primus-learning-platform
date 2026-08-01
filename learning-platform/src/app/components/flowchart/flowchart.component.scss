@@ -578,12 +578,25 @@ $bar-height: 49px;
   flex: 1;
   overflow: auto;
   background-color: var(--playground-page-bg);
-  // Dotted grid for a diagram-editor feel.
+  // Default: dotted grid
   background-image: radial-gradient(
     color-mix(in srgb, var(--editor-fg), transparent 82%) 1px,
     transparent 1px
   );
   background-size: 20px 20px;
+
+  // Grid lines
+  &.canvas-bg-grid {
+    background-image:
+      linear-gradient(color-mix(in srgb, var(--editor-fg), transparent 88%) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--editor-fg), transparent 88%) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  // Plain — no background pattern
+  &.canvas-bg-plain {
+    background-image: none;
+  }
 
   &.connecting {
     cursor: crosshair;

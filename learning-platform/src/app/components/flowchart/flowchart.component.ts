@@ -85,6 +85,17 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   // also the way back once a panel has been collapsed.
   showPalette = true;
   showProps = true;
+  canvasBg: 'plain' | 'dots' | 'grid' = 'dots';
+
+  cycleCanvasBg(): void {
+    const order: Array<'plain' | 'dots' | 'grid'> = ['dots', 'grid', 'plain'];
+    const next = order[(order.indexOf(this.canvasBg) + 1) % order.length];
+    this.canvasBg = next;
+  }
+
+  canvasBgLabel(): string {
+    return { plain: 'Plain', dots: 'Dots', grid: 'Grid' }[this.canvasBg];
+  }
 
   togglePalette(): void {
     this.showPalette = !this.showPalette;

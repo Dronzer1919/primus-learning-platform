@@ -181,6 +181,16 @@ previews and canvas nodes can both reference them by id. -->
           </span>
         }
         <span class="toolbar-spacer"></span>
+        <!-- Canvas background toggle -->
+        <button
+          type="button"
+          class="panel-btn"
+          title="Toggle canvas background (Dots / Grid / Plain)"
+          (click)="cycleCanvasBg()"
+          >
+          <ion-icon name="grid-outline"></ion-icon>
+          <span>{{ canvasBgLabel() }}</span>
+        </button>
         <!-- Same rule as the shapes button. -->
         @if (!showProps) {
           <button
@@ -199,6 +209,8 @@ previews and canvas nodes can both reference them by id. -->
       <div
         #canvas
         class="canvas"
+        [class.canvas-bg-plain]="canvasBg === 'plain'"
+        [class.canvas-bg-grid]="canvasBg === 'grid'"
         [class.connecting]="connectFromId"
         (dragover)="onCanvasDragOver($event)"
         (drop)="onCanvasDrop($event)"
