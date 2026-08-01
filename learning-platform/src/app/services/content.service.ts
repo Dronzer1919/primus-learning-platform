@@ -1,9 +1,10 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { BehaviorSubject, Observable } from 'rxjs';
-import { map, tap } from 'rxjs/operators';
+import { BehaviorSubject, Observable, of } from 'rxjs';
+import { catchError, map, tap } from 'rxjs/operators';
 import { Topic, Subtopic, SubSubtopic, LanguageTab, DifficultyLevel, LanguagePlatform, UserNote } from '../models/content.model';
 import { environment } from '../../environments/environment';
+import { logWarn } from '../core/logger';
 
 @Injectable({
   providedIn: 'root'
@@ -24,58 +25,72 @@ export class ContentService {
     this.loadTopics();
   }
 
-  // Load data from backend
+  // Load data from backend.
+  //
+  // Both loaders are called from the constructor and again after every write, so
+  // they run often and from several components at once. Two rules keep that from
+  // becoming a problem: a failure must leave the last good data in place rather
+  // than emptying the UI, and a malformed response must not throw — an exception
+  // raised inside a subscribe callback escapes to the global ErrorHandler, and
+  // whatever the caller was doing is abandoned half-done.
   private loadLanguageTabs(): void {
-    this.http.get<any>(`${this.apiUrl}/language-tabs/active`).subscribe({
-      next: (response) => {
-        if (response.success) {
-          const tabs = response.data.map((tab: any) => ({
-            id: tab._id,
-            name: tab.name,
-            code: tab.code,
-            order: tab.order,
-            isActive: tab.isActive
-          }));
-          this.languageTabsSubject.next(tabs);
-        }
-      },
-      error: (error) => {
-        console.error('Error loading language tabs:', error);
-        // Fallback to defaults if API fails
-        this.initializeDefaultTabs();
+    this.http.get<any>(`${this.apiUrl}/language-tabs/active`).pipe(
+      catchError((error) => {
+        logWarn('Could not load language tabs', error);
+        return of(null);
+      })
+    ).subscribe((response) => {
+      if (!response?.success || !Array.isArray(response.data)) {
+        // Only fall back to the built-in tabs when there is nothing to show.
+        // Overwriting real tabs with defaults on a transient failure would look
+        // to the user like content had been deleted.
+        if (!this.languageTabsSubject.value.length) this.initializeDefaultTabs();
+        return;
       }
+      this.languageTabsSubject.next(
+        response.data.map((tab: any) => ({
+          id: tab._id,
+          name: tab.name,
+          code: tab.code,
+          order: tab.order,
+          isActive: tab.isActive
+        }))
+      );
     });
   }
 
   private loadTopics(): void {
-    this.http.get<any>(`${this.apiUrl}/topics`).subscribe({
-      next: (response) => {
-        if (response.success) {
-          const topics = response.data.map((topic: any) => this.mapTopicFromBackend(topic));
-          this.topicsSubject.next(topics);
-        }
-      },
-      error: (error) => {
-        console.error('Error loading topics:', error);
-      }
+    this.http.get<any>(`${this.apiUrl}/topics`).pipe(
+      catchError((error) => {
+        logWarn('Could not load topics', error);
+        return of(null);
+      })
+    ).subscribe((response) => {
+      if (!response?.success || !Array.isArray(response.data)) return;
+      this.topicsSubject.next(response.data.map((topic: any) => this.mapTopicFromBackend(topic)));
     });
   }
 
+  // Defensive throughout: every field here comes off the wire. A topic saved
+  // before subtopics existed, or a partial document, used to throw on
+  // `backendTopic.subtopics.map` and take the whole list down with it.
   private mapTopicFromBackend(backendTopic: any): Topic {
+    const source = backendTopic ?? {};
+    const subtopics = Array.isArray(source.subtopics) ? source.subtopics : [];
     return {
-      id: backendTopic._id,
-      title: backendTopic.title,
-      description: backendTopic.description,
-      difficultyLevel: backendTopic.difficultyLevel,
-      languagePlatform: backendTopic.languagePlatform,
-      order: backendTopic.order,
-      subtopics: backendTopic.subtopics.map((st: any) => ({
-        id: st._id,
-        topicId: backendTopic._id,
-        title: st.title,
-        order: st.order,
-        subSubtopics: st.subSubtopics || [],
-        content: st.content || []
+      id: source._id,
+      title: source.title,
+      description: source.description,
+      difficultyLevel: source.difficultyLevel,
+      languagePlatform: source.languagePlatform,
+      order: source.order,
+      subtopics: subtopics.map((st: any) => ({
+        id: st?._id,
+        topicId: source._id,
+        title: st?.title,
+        order: st?.order,
+        subSubtopics: Array.isArray(st?.subSubtopics) ? st.subSubtopics : [],
+        content: Array.isArray(st?.content) ? st.content : []
       }))
     };
   }
@@ -228,7 +243,7 @@ export class ContentService {
   loadUserNotes(): Observable<UserNote[]> {
     return this.http.get<any>(`${this.apiUrl}/notes`).pipe(
       tap(response => {
-        if (response.success) {
+        if (response?.success && Array.isArray(response.data)) {
           const notes = response.data.map((note: any) => ({
             id: note._id,
             userId: note.userId,

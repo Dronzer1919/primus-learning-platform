@@ -1,5 +1,5 @@
 import { bootstrapApplication } from '@angular/platform-browser';
-import { importProvidersFrom } from '@angular/core';
+import { ErrorHandler, importProvidersFrom } from '@angular/core';
 import { RouteReuseStrategy, provideRouter, withPreloading, PreloadAllModules } from '@angular/router';
 import { IonicModule, IonicRouteStrategy } from '@ionic/angular';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
@@ -35,6 +35,11 @@ import {
   chevronDownOutline, eyeOutline, eyeOffOutline, pinOutline, logoYoutube, libraryOutline
 } from 'ionicons/icons';
 import { authInterceptor } from './app/interceptors/auth.interceptor';
+import { dedupeInterceptor } from './app/interceptors/dedupe.interceptor';
+import { errorInterceptor } from './app/interceptors/error.interceptor';
+import { GlobalErrorHandler, scheduleStaleBuildFlagClear } from './app/core/global-error-handler';
+import { installDevToolsGuard } from './app/core/devtools-guard';
+import { logError, silenceConsoleInProduction } from './app/core/logger';
 
 import { routes } from './app/app.routes';
 import { AppComponent } from './app/app.component';
@@ -71,12 +76,72 @@ addIcons({
   chevronDownOutline, eyeOutline, eyeOffOutline, pinOutline, logoYoutube, libraryOutline
 });
 
+// Production hardening, installed before Angular starts so nothing slips through
+// during bootstrap: console noise off, DevTools shortcuts blocked (a deterrent
+// only — see devtools-guard.ts), and a catch-all for rejections that happen
+// outside Angular's zone.
+silenceConsoleInProduction();
+installDevToolsGuard();
+
+window.addEventListener('unhandledrejection', (event) => {
+  // Logged, not swallowed: GlobalErrorHandler still gets the zone-tracked ones
+  // and is what decides whether to tell the user. This exists for the rest —
+  // Pyodide's loader, CodeMirror internals, anything started outside Angular.
+  logError('Unhandled promise rejection', event.reason);
+});
+
 bootstrapApplication(AppComponent, {
   providers: [
     { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
     importProvidersFrom(IonicModule.forRoot()),
     provideRouter(routes, withPreloading(PreloadAllModules)),
-    provideHttpClient(withInterceptors([authInterceptor])),
+    // Order is the request's path outwards: dedupe first so simultaneous callers
+    // share one call (and one set of retries), then the token, then the error
+    // translator closest to the wire so its retries re-issue the real request.
+    provideHttpClient(withInterceptors([dedupeInterceptor, authInterceptor, errorInterceptor])),
     provideAnimations(),
+    // Replaces Angular's default handler, which only logs. Ours keeps the app
+    // running and surfaces the failure instead of leaving a dead-looking page.
+    { provide: ErrorHandler, useClass: GlobalErrorHandler },
   ],
-});
+})
+  .then(() => scheduleStaleBuildFlagClear())
+  .catch((error) => {
+    // Bootstrap failed, so there is no Angular, no ErrorHandler and no toast —
+    // just an empty <app-root> and a user with nothing to click. Anything less
+    // than this is a white screen with no explanation and no way forward.
+    logError('Application failed to start', error);
+    showBootstrapFailure();
+  });
+
+function showBootstrapFailure(): void {
+  const host = document.querySelector('app-root');
+  if (!host) return;
+  // textContent throughout: this path can be reached while handling untrusted
+  // input, and building it as an HTML string would be an injection point in the
+  // one place with no framework left to sanitise it.
+  const wrap = document.createElement('div');
+  wrap.setAttribute(
+    'style',
+    'font-family:system-ui,sans-serif;max-width:34rem;margin:20vh auto;padding:0 1.5rem;text-align:center;color:#374151'
+  );
+
+  const heading = document.createElement('h1');
+  heading.textContent = 'This page could not load';
+  heading.setAttribute('style', 'font-size:1.25rem;margin:0 0 .5rem');
+
+  const body = document.createElement('p');
+  body.textContent = 'Something went wrong while starting the app. Reloading usually fixes it.';
+  body.setAttribute('style', 'margin:0 0 1.25rem;line-height:1.5');
+
+  const button = document.createElement('button');
+  button.textContent = 'Reload';
+  button.setAttribute(
+    'style',
+    'padding:.6rem 1.4rem;border:0;border-radius:.5rem;background:#6366f1;color:#fff;font-size:1rem;cursor:pointer'
+  );
+  button.addEventListener('click', () => window.location.reload());
+
+  wrap.append(heading, body, button);
+  host.replaceChildren(wrap);
+}

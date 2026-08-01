@@ -4,6 +4,13 @@ import { BehaviorSubject, Observable } from 'rxjs';
 import { map, tap } from 'rxjs/operators';
 import { User, LoginCredentials, SignupData, UserStats } from '../models/user.model';
 import { environment } from '../../environments/environment';
+import { logWarn } from '../core/logger';
+
+const TOKEN_KEY = 'token';
+const USER_KEY = 'currentUser';
+
+/** Dispatched by errorInterceptor when the API rejects the token with a 401. */
+export const SESSION_EXPIRED_EVENT = 'app:session-expired';
 
 @Injectable({
   providedIn: 'root'
@@ -14,11 +21,21 @@ export class AuthService {
   private apiUrl = environment.apiUrl;
 
   constructor(private http: HttpClient) {
-    const storedUser = localStorage.getItem('currentUser');
-    this.currentUserSubject = new BehaviorSubject<User | null>(
-      storedUser ? JSON.parse(storedUser) : null
-    );
+    this.currentUserSubject = new BehaviorSubject<User | null>(this.readStoredUser());
     this.currentUser = this.currentUserSubject.asObservable();
+
+    // The interceptor cannot inject this service (HttpClient would be building
+    // its own consumer), so a 401 is announced as a DOM event instead. Without
+    // this the in-memory user would stay populated after the token was cleared,
+    // and the guards would keep waving the user through to a page whose every
+    // request 401s.
+    window.addEventListener(SESSION_EXPIRED_EVENT, () => this.clearSession());
+
+    // Signing out in one tab should not leave the others authenticated. The
+    // storage event only fires in *other* tabs, so this cannot recurse.
+    window.addEventListener('storage', (event) => {
+      if (event.key === TOKEN_KEY && !event.newValue) this.clearSession();
+    });
   }
 
   public get currentUserValue(): User | null {
@@ -26,7 +43,38 @@ export class AuthService {
   }
 
   public getToken(): string | null {
-    return localStorage.getItem('token');
+    return this.readStorage(TOKEN_KEY);
+  }
+
+  /**
+   * Reads the persisted user without letting a bad value take down the app.
+   *
+   * This runs while the root injector is being built, so anything thrown here
+   * aborts bootstrap and the user gets a blank page with no way back — and the
+   * bad value survives the refresh, so the blank page is permanent. localStorage
+   * is fully under the client's control: a half-written entry from a closed tab,
+   * a value edited by hand, or a leftover from an older shape of User are all
+   * ordinary. Treat unreadable storage as "signed out" and move on.
+   */
+  private readStoredUser(): User | null {
+    const raw = this.readStorage(USER_KEY);
+    if (!raw) return null;
+
+    try {
+      const parsed = JSON.parse(raw);
+      // A stored object still has to look like a user. Without this check a
+      // truthy-but-wrong value (an array, a string, `null` from an old bug)
+      // becomes a "signed in" session whose every field is undefined.
+      if (!parsed || typeof parsed !== 'object' || !parsed.id || !parsed.username) {
+        throw new Error('stored user is missing required fields');
+      }
+      return parsed as User;
+    } catch (error) {
+      logWarn('Discarding unreadable stored session', error);
+      this.removeStorage(USER_KEY);
+      this.removeStorage(TOKEN_KEY);
+      return null;
+    }
   }
 
   private storeSession(response: any): User {
@@ -41,8 +89,8 @@ export class AuthService {
       lastLogin: response.user.lastLogin ? new Date(response.user.lastLogin) : new Date(),
       loginCount: response.user.loginCount || 0
     };
-    localStorage.setItem('currentUser', JSON.stringify(user));
-    localStorage.setItem('token', response.token);
+    this.writeStorage(USER_KEY, JSON.stringify(user));
+    this.writeStorage(TOKEN_KEY, response.token);
     this.currentUserSubject.next(user);
     return user;
   }
@@ -86,7 +134,7 @@ export class AuthService {
             lastLogin: response.user.lastLogin ? new Date(response.user.lastLogin) : undefined,
             loginCount: response.user.loginCount
           };
-          localStorage.setItem('currentUser', JSON.stringify(user));
+          this.writeStorage(USER_KEY, JSON.stringify(user));
           this.currentUserSubject.next(user);
         }
       }),
@@ -95,11 +143,18 @@ export class AuthService {
   }
 
   logout(): void {
-    // Tell backend to close the session (fire-and-forget)
+    // Fire-and-forget, and deliberately before the token is cleared: the
+    // interceptor reads it synchronously as this subscribes, so the request
+    // still carries the credential the server needs to close the session.
     this.http.post(`${this.apiUrl}/auth/logout`, {}).subscribe({ error: () => {} });
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('token');
-    this.currentUserSubject.next(null);
+    this.clearSession();
+  }
+
+  /** Drops the local session. Safe to call repeatedly. */
+  clearSession(): void {
+    this.removeStorage(USER_KEY);
+    this.removeStorage(TOKEN_KEY);
+    if (this.currentUserSubject.value !== null) this.currentUserSubject.next(null);
   }
 
   getStats(): Observable<UserStats> {
@@ -109,10 +164,80 @@ export class AuthService {
   }
 
   isAdmin(): boolean {
-    return this.currentUserValue?.role === 'admin';
+    return this.isAuthenticated() && this.currentUserValue?.role === 'admin';
   }
 
+  /**
+   * True only when there is a user *and* a token that has not already expired.
+   *
+   * The expiry check is a UX guard, not a security one — the server verifies
+   * the signature and is the only opinion that counts. What it buys is that an
+   * expired session sends the user to the login page directly, instead of into
+   * a dashboard that renders empty because every request behind it 401s.
+   */
   isAuthenticated(): boolean {
-    return this.currentUserValue !== null;
+    if (this.currentUserValue === null) return false;
+
+    const token = this.getToken();
+    if (!token) {
+      this.clearSession();
+      return false;
+    }
+    if (this.isTokenExpired(token)) {
+      logWarn('Stored token has expired — clearing the local session');
+      this.clearSession();
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Reads `exp` out of a JWT payload. Never trusts it for anything but expiry:
+   * the payload is base64, not encrypted, so a client can put whatever it likes
+   * in there. A token we cannot parse is treated as valid and left for the
+   * server to reject — failing closed here would sign users out over a token
+   * format this code simply does not recognise.
+   */
+  private isTokenExpired(token: string): boolean {
+    try {
+      const [, payload] = token.split('.');
+      if (!payload) return false;
+      // base64url -> base64 before decoding.
+      const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+      const exp = JSON.parse(json)?.exp;
+      if (typeof exp !== 'number') return false;
+      return exp * 1000 <= Date.now();
+    } catch {
+      return false;
+    }
+  }
+
+  // --- storage helpers -------------------------------------------------------
+  // Every localStorage call is wrapped: Safari's private mode throws on write
+  // once its quota is reached, and an unguarded setItem there would turn a
+  // successful login into a crash.
+
+  private readStorage(key: string): string | null {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  }
+
+  private writeStorage(key: string, value: string): void {
+    try {
+      localStorage.setItem(key, value);
+    } catch (error) {
+      logWarn(`Could not persist "${key}" — the session will not survive a reload`, error);
+    }
+  }
+
+  private removeStorage(key: string): void {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* storage unavailable */
+    }
   }
 }

@@ -1,8 +1,10 @@
-import { Component, AfterViewInit, NgZone } from '@angular/core';
+import { Component, AfterViewInit, NgZone, OnDestroy } from '@angular/core';
 import { CommonModule, Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { IonicModule } from '@ionic/angular';
+import { friendlyMessage } from '../../interceptors/error.interceptor';
 import { AuthService } from '../../services/auth.service';
 import { OtpService } from '../../services/otp.service';
 import { LoginCredentials } from '../../models/user.model';
@@ -18,7 +20,7 @@ declare const google: any;
   standalone: true,
   imports: [IonicModule, CommonModule, FormsModule, ThemeSelectorComponent]
 })
-export class LoginPage implements AfterViewInit {
+export class LoginPage implements AfterViewInit, OnDestroy {
   // 'login' -> normal sign in, 'forgot' -> password recovery flow
   mode: 'login' | 'forgot' = 'login';
 
@@ -39,10 +41,16 @@ export class LoginPage implements AfterViewInit {
   errorMessage = '';
   googleConfigured = environment.googleClientId !== 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
 
+  /** Set once Google's client has initialised; until then the button does nothing. */
+  private googleReady = false;
+  private googleInitTimer?: ReturnType<typeof setTimeout>;
+  private destroyed = false;
+
   constructor(
     private authService: AuthService,
     private otpService: OtpService,
     private router: Router,
+    private route: ActivatedRoute,
     private ngZone: NgZone,
     private location: Location
   ) {}
@@ -62,26 +70,63 @@ export class LoginPage implements AfterViewInit {
     this.initializeGoogle();
   }
 
+  /**
+   * Waits for Google's script to appear, but not forever.
+   *
+   * The previous version rescheduled itself every 300ms with no exit: if the
+   * GSI script is blocked — an ad blocker, a corporate proxy, or simply being
+   * offline — that timer runs for as long as the tab is open, and it survives
+   * navigating away from this page because nothing cancels it. Ten seconds is
+   * far longer than the script needs and short enough to give up cleanly.
+   */
   private initializeGoogle(): void {
+    const deadline = Date.now() + 10000;
+
     const tryInit = () => {
+      if (this.destroyed) return;
+
       if (typeof google !== 'undefined' && google?.accounts?.id) {
-        google.accounts.id.initialize({
-          client_id: environment.googleClientId,
-          callback: (response: any) => this.handleGoogleCallback(response),
-          use_fedcm_for_prompt: false,
-          auto_select: false,
-          cancel_on_tap_outside: true
-        });
-      } else {
-        setTimeout(tryInit, 300);
+        try {
+          google.accounts.id.initialize({
+            client_id: environment.googleClientId,
+            callback: (response: any) => this.handleGoogleCallback(response),
+            use_fedcm_for_prompt: false,
+            auto_select: false,
+            cancel_on_tap_outside: true
+          });
+          this.googleReady = true;
+        } catch {
+          // Third-party script failing to initialise is not this app's problem
+          // to crash over — username/password sign-in is unaffected.
+          this.googleReady = false;
+        }
+        return;
       }
+
+      if (Date.now() >= deadline) return;
+      this.googleInitTimer = setTimeout(tryInit, 300);
     };
+
     tryInit();
   }
 
+  ngOnDestroy(): void {
+    this.destroyed = true;
+    if (this.googleInitTimer) clearTimeout(this.googleInitTimer);
+  }
+
   triggerGoogleLogin(): void {
-    if (typeof google !== 'undefined' && google?.accounts?.id) {
+    // Only after initialize() has run: prompt() on an uninitialised client
+    // throws, and that throw would surface as an app error for what is really
+    // just a third-party script that has not loaded.
+    if (!this.googleReady) {
+      this.errorMessage = 'Google sign-in is still loading. Please try again in a moment.';
+      return;
+    }
+    try {
       google.accounts.id.prompt();
+    } catch {
+      this.errorMessage = 'Google sign-in is unavailable right now. Use your username and password.';
     }
   }
 
@@ -96,7 +141,7 @@ export class LoginPage implements AfterViewInit {
       this.authService.loginWithGoogle(response.credential).subscribe({
         next: (user) => {
           this.isLoading = false;
-          this.router.navigate([user.role === 'admin' ? '/admin' : '/user']);
+          this.goAfterLogin(user.role === 'admin' ? '/admin' : '/user');
         },
         error: () => {
           this.isLoading = false;
@@ -118,13 +163,33 @@ export class LoginPage implements AfterViewInit {
     this.authService.login(this.credentials).subscribe({
       next: (user) => {
         this.isLoading = false;
-        this.router.navigate([user.role === 'admin' ? '/admin' : '/user']);
+        this.goAfterLogin(user.role === 'admin' ? '/admin' : '/user');
       },
-      error: () => {
+      error: (error: HttpErrorResponse) => {
         this.isLoading = false;
-        this.errorMessage = 'Login failed. Please check your credentials.';
+        // The API distinguishes wrong credentials from a rate-limited IP
+        // (429 from authLimiter, which then blocks for 15 minutes). Showing
+        // "check your credentials" for the second sends people round a loop of
+        // retries that can only make the block worse.
+        this.errorMessage = error?.status === 429
+          ? friendlyMessage(error)
+          : 'Login failed. Please check your credentials.';
       }
     });
+  }
+
+  /**
+   * Honours the ?returnUrl= the guards attach, falling back to the role's home.
+   *
+   * Only same-app paths are accepted. A returnUrl is attacker-controllable —
+   * it arrives in a link anyone can send — so forwarding to it unchecked turns
+   * this page into an open redirect: a convincing primuscodex.com/login link
+   * that lands the user on someone else's copy of it after signing in.
+   */
+  private goAfterLogin(fallback: string): void {
+    const requested = this.route.snapshot.queryParamMap.get('returnUrl');
+    const safe = requested && requested.startsWith('/') && !requested.startsWith('//');
+    void this.router.navigateByUrl(safe ? requested : fallback);
   }
 
   goToSignup(): void {

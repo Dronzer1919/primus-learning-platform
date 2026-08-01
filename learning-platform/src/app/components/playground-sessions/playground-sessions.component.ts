@@ -1,4 +1,5 @@
-import { Component, OnInit, AfterViewChecked, ViewChild, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, AfterViewChecked, ViewChild, ChangeDetectorRef, DestroyRef, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule, ToastController, AlertController } from '@ionic/angular';
@@ -21,7 +22,13 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
   editingTitle = '';
   loading = false;
   isSaving = false;
+  isCreating = false;
   private pendingSession: PlaygroundSession | null = null;
+
+  // Every request below is tied to this. Without it, leaving the page mid-load
+  // leaves the response to arrive at a destroyed component and write to fields
+  // nothing will ever render — and each visit adds another one.
+  private readonly destroyRef = inject(DestroyRef);
 
   constructor(
     private pgSessionService: PlaygroundSessionService,
@@ -47,21 +54,30 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
 
   loadSessions(selectId?: string): void {
     this.loading = true;
-    this.pgSessionService.getSessions().subscribe({
+    this.pgSessionService.getSessions().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (sessions) => {
-        this.sessions = sessions;
+        // Normalised first: everything below indexes and searches this list, and
+        // a non-array response (an error page, a changed envelope) would throw
+        // inside the callback rather than simply showing nothing.
+        this.sessions = Array.isArray(sessions) ? sessions : [];
         this.loading = false;
+        const list = this.sessions;
         const target = selectId
-          ? sessions.find(s => s._id === selectId)
+          ? list.find(s => s._id === selectId)
           : (this.activeSession
-            ? sessions.find(s => s._id === this.activeSession!._id)
-            : sessions[0]);
-        const toSelect = target || sessions[0] || null;
+            ? list.find(s => s._id === this.activeSession!._id)
+            : list[0]);
+        const toSelect = target || list[0] || null;
         if (toSelect) {
           this.applySession(toSelect);
         }
       },
-      error: () => { this.loading = false; }
+      error: () => {
+        // The spinner must stop whatever happened; the list keeps whatever it
+        // last had rather than being emptied by a transient failure.
+        this.loading = false;
+        this.showToast('Could not load your sessions. Please try again.', 'danger');
+      }
     });
   }
 
@@ -93,12 +109,23 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
   }
 
   createSession(): void {
-    this.pgSessionService.createSession().subscribe({
+    // A double-tap on "New" used to create two sessions: the button stays live
+    // for the whole round trip, and nothing here was tracking that one was
+    // already in flight. POSTs are never de-duplicated at the HTTP layer — two
+    // saves are two intents — so the guard has to be here.
+    if (this.isCreating) return;
+    this.isCreating = true;
+
+    this.pgSessionService.createSession().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (session) => {
+        this.isCreating = false;
         this.sessions = [session, ...this.sessions];
         this.applySession(session);
       },
-      error: () => this.showToast('Failed to create session. Is the server running?', 'danger')
+      error: () => {
+        this.isCreating = false;
+        this.showToast('Failed to create session. Is the server running?', 'danger');
+      }
     });
   }
 
@@ -144,7 +171,9 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
       tsCode: this.workspace.tsCode,
       selectedTab: this.workspace.selectedTab,
     };
-    this.pgSessionService.updateSession(this.activeSession._id, data).subscribe({
+    this.pgSessionService.updateSession(this.activeSession._id, data).pipe(
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe({
       next: (updated) => {
         this.isSaving = false;
         this.replaceSession(updated);
@@ -160,14 +189,27 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
 
   renameSession(session: PlaygroundSession): void {
     const title = prompt('Rename session', session.title);
-    if (title && title.trim()) {
-      this.pgSessionService.updateSession(session._id, { title: title.trim() }).subscribe(updated => {
-        this.replaceSession(updated);
-        if (this.activeSession?._id === updated._id) {
-          this.activeSession = updated;
-        }
+    if (!title || !title.trim()) return;
+
+    // A cap here as well as on the server: the API rejects an over-long title
+    // with a 400, and there is no reason to make the round trip to find out.
+    const trimmed = title.trim().slice(0, 120);
+
+    this.pgSessionService
+      .updateSession(session._id, { title: trimmed })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (updated) => {
+          this.replaceSession(updated);
+          if (this.activeSession?._id === updated._id) {
+            this.activeSession = updated;
+          }
+        },
+        // This subscribe had no error callback at all, so a failed rename became
+        // an unhandled rejection — a full-page error for a request that simply
+        // did not go through.
+        error: () => this.showToast('Could not rename that session.', 'danger')
       });
-    }
   }
 
   async deleteSession(session: PlaygroundSession, event?: Event): Promise<void> {
@@ -183,17 +225,26 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
           role: 'destructive',
           cssClass: 'alert-button-danger',
           handler: () => {
-            this.pgSessionService.deleteSession(session._id).subscribe(() => {
-              this.sessions = this.sessions.filter(s => s._id !== session._id);
-              if (this.activeSession?._id === session._id) {
-                const next = this.sessions[0] || null;
-                if (next) {
-                  this.applySession(next);
-                } else {
-                  this.activeSession = null;
-                }
-              }
-            });
+            this.pgSessionService
+              .deleteSession(session._id)
+              .pipe(takeUntilDestroyed(this.destroyRef))
+              .subscribe({
+                next: () => {
+                  this.sessions = this.sessions.filter(s => s._id !== session._id);
+                  if (this.activeSession?._id === session._id) {
+                    const next = this.sessions[0] || null;
+                    if (next) {
+                      this.applySession(next);
+                    } else {
+                      this.activeSession = null;
+                    }
+                  }
+                },
+                // Without this the list would show the session as deleted only
+                // because nothing told it otherwise — and it would reappear on
+                // the next load. Say so instead.
+                error: () => this.showToast('Could not delete that session.', 'danger')
+              });
           }
         }
       ]
