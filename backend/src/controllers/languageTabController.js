@@ -1,127 +1,75 @@
 const LanguageTab = require('../models/LanguageTab');
+const { asyncHandler, AppError } = require('../middleware/errorHandler');
+
+// Whitelisted so an update body cannot inject arbitrary paths.
+const TAB_FIELDS = ['name', 'code', 'order', 'isActive'];
+
+function pick(body) {
+  const out = {};
+  for (const field of TAB_FIELDS) {
+    if (typeof body[field] !== 'undefined') out[field] = body[field];
+  }
+  return out;
+}
 
 // Get all language tabs
-exports.getAllLanguageTabs = async (req, res) => {
-  try {
-    const tabs = await LanguageTab.find().sort({ order: 1 });
-    
-    res.json({
-      success: true,
-      count: tabs.length,
-      data: tabs
-    });
-  } catch (error) {
-    console.error('Get language tabs error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
-  }
-};
+exports.getAllLanguageTabs = asyncHandler(async (req, res) => {
+  const tabs = await LanguageTab.find().sort({ order: 1 });
+
+  res.json({
+    success: true,
+    count: tabs.length,
+    data: tabs
+  });
+});
 
 // Get active language tabs
-exports.getActiveLanguageTabs = async (req, res) => {
-  try {
-    const tabs = await LanguageTab.find({ isActive: true }).sort({ order: 1 });
-    
-    res.json({
-      success: true,
-      count: tabs.length,
-      data: tabs
-    });
-  } catch (error) {
-    console.error('Get active language tabs error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
-  }
-};
+exports.getActiveLanguageTabs = asyncHandler(async (req, res) => {
+  const tabs = await LanguageTab.find({ isActive: true }).sort({ order: 1 });
+
+  res.json({
+    success: true,
+    count: tabs.length,
+    data: tabs
+  });
+});
 
 // Create language tab
-exports.createLanguageTab = async (req, res) => {
-  try {
-    const { name, code, order, isActive } = req.body;
+exports.createLanguageTab = asyncHandler(async (req, res) => {
+  const tab = await LanguageTab.create(pick(req.body));
 
-    const tab = new LanguageTab({
-      name,
-      code,
-      order,
-      isActive
-    });
-
-    await tab.save();
-
-    res.status(201).json({
-      success: true,
-      message: 'Language tab created successfully',
-      data: tab
-    });
-  } catch (error) {
-    console.error('Create language tab error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
-  }
-};
+  res.status(201).json({
+    success: true,
+    message: 'Language tab created successfully',
+    data: tab
+  });
+});
 
 // Update language tab
-exports.updateLanguageTab = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const updateData = req.body;
+exports.updateLanguageTab = asyncHandler(async (req, res) => {
+  const tab = await LanguageTab.findByIdAndUpdate(
+    req.params.id,
+    pick(req.body),
+    { new: true, runValidators: true }
+  );
 
-    const tab = await LanguageTab.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true, runValidators: true }
-    );
+  if (!tab) throw new AppError('Language tab not found', 404);
 
-    if (!tab) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Language tab not found' 
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Language tab updated successfully',
-      data: tab
-    });
-  } catch (error) {
-    console.error('Update language tab error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
-  }
-};
+  res.json({
+    success: true,
+    message: 'Language tab updated successfully',
+    data: tab
+  });
+});
 
 // Delete language tab
-exports.deleteLanguageTab = async (req, res) => {
-  try {
-    const { id } = req.params;
+exports.deleteLanguageTab = asyncHandler(async (req, res) => {
+  const tab = await LanguageTab.findByIdAndDelete(req.params.id);
 
-    const tab = await LanguageTab.findByIdAndDelete(id);
+  if (!tab) throw new AppError('Language tab not found', 404);
 
-    if (!tab) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Language tab not found' 
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Language tab deleted successfully'
-    });
-  } catch (error) {
-    console.error('Delete language tab error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
-  }
-};
+  res.json({
+    success: true,
+    message: 'Language tab deleted successfully'
+  });
+});

@@ -1,80 +1,61 @@
 const PlaygroundSession = require('../models/PlaygroundSession');
+const { asyncHandler, AppError } = require('../middleware/errorHandler');
+
+// Fields a client may set. This allow-list is the pattern the other controllers
+// now follow too — the request body never reaches an update document directly.
+const EDITABLE_FIELDS = ['title', 'mode', 'htmlCode', 'cssCode', 'jsCode', 'jsOnlyCode', 'tsCode', 'selectedTab'];
 
 async function findUserSession(userId, id) {
   return PlaygroundSession.findOne({ _id: id, userId });
 }
 
-exports.getUserSessions = async (req, res) => {
-  try {
-    const sessions = await PlaygroundSession.find({ userId: req.user.id }).sort({ updatedAt: -1 });
-    res.json({ success: true, count: sessions.length, data: sessions });
-  } catch (error) {
-    console.error('Get playground sessions error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
+async function requireUserSession(req) {
+  const session = await findUserSession(req.user.id, req.params.id);
+  if (!session) throw new AppError('Playground session not found', 404);
+  return session;
+}
 
-exports.getSessionById = async (req, res) => {
-  try {
-    const session = await findUserSession(req.user.id, req.params.id);
-    if (!session) {
-      return res.status(404).json({ success: false, message: 'Playground session not found' });
-    }
-    res.json({ success: true, data: session });
-  } catch (error) {
-    console.error('Get playground session error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
+exports.getUserSessions = asyncHandler(async (req, res) => {
+  const sessions = await PlaygroundSession.find({ userId: req.user.id }).sort({ updatedAt: -1 });
+  res.json({ success: true, count: sessions.length, data: sessions });
+});
 
-exports.createSession = async (req, res) => {
-  try {
-    const { title } = req.body;
-    const session = new PlaygroundSession({
-      userId: req.user.id,
-      title: title && title.trim() ? title.trim() : 'New Playground',
-    });
-    await session.save();
-    res.status(201).json({ success: true, message: 'Playground session created', data: session });
-  } catch (error) {
-    console.error('Create playground session error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
+exports.getSessionById = asyncHandler(async (req, res) => {
+  const session = await requireUserSession(req);
+  res.json({ success: true, data: session });
+});
 
-exports.updateSession = async (req, res) => {
-  try {
-    const session = await findUserSession(req.user.id, req.params.id);
-    if (!session) {
-      return res.status(404).json({ success: false, message: 'Playground session not found' });
-    }
-    const allowed = ['title', 'mode', 'htmlCode', 'cssCode', 'jsCode', 'jsOnlyCode', 'tsCode', 'selectedTab'];
-    for (const field of allowed) {
-      if (typeof req.body[field] !== 'undefined') {
-        if (field === 'title' && typeof req.body[field] === 'string' && req.body[field].trim()) {
-          session[field] = req.body[field].trim();
-        } else if (field !== 'title') {
-          session[field] = req.body[field];
-        }
+exports.createSession = asyncHandler(async (req, res) => {
+  const { title } = req.body;
+  const session = await PlaygroundSession.create({
+    userId: req.user.id,
+    title: title && title.trim() ? title.trim() : 'New Playground'
+  });
+  res.status(201).json({ success: true, message: 'Playground session created', data: session });
+});
+
+exports.updateSession = asyncHandler(async (req, res) => {
+  const session = await requireUserSession(req);
+
+  for (const field of EDITABLE_FIELDS) {
+    if (typeof req.body[field] === 'undefined') continue;
+
+    if (field === 'title') {
+      // A blank title would wipe the session's name; keep the existing one.
+      if (typeof req.body.title === 'string' && req.body.title.trim()) {
+        session.title = req.body.title.trim();
       }
+    } else {
+      session[field] = req.body[field];
     }
-    await session.save();
-    res.json({ success: true, message: 'Playground session updated', data: session });
-  } catch (error) {
-    console.error('Update playground session error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
   }
-};
 
-exports.deleteSession = async (req, res) => {
-  try {
-    const session = await PlaygroundSession.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
-    if (!session) {
-      return res.status(404).json({ success: false, message: 'Playground session not found' });
-    }
-    res.json({ success: true, message: 'Playground session deleted' });
-  } catch (error) {
-    console.error('Delete playground session error:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-};
+  await session.save();
+  res.json({ success: true, message: 'Playground session updated', data: session });
+});
+
+exports.deleteSession = asyncHandler(async (req, res) => {
+  const session = await PlaygroundSession.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
+  if (!session) throw new AppError('Playground session not found', 404);
+  res.json({ success: true, message: 'Playground session deleted' });
+});

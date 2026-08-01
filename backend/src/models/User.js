@@ -34,6 +34,12 @@ const userSchema = new mongoose.Schema({
   displayName: { type: String, trim: true },
   avatar: { type: String },          // Profile picture URL only (not the image)
 
+  // Brute-force protection. IP rate limiting alone cannot stop a distributed
+  // attack spread across many addresses, so failures are also counted per
+  // account and persisted — a process restart must not clear the count.
+  failedLoginAttempts: { type: Number, default: 0 },
+  lockUntil: { type: Date, default: null },
+
   // Session analytics — operational data, no PII
   lastLogin: { type: Date, default: null },
   loginCount: { type: Number, default: 0 },

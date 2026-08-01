@@ -19,8 +19,9 @@ const userSessionSchema = new mongoose.Schema({
   },
   loginAt: {
     type: Date,
-    default: Date.now,
-    index: true
+    default: Date.now
+    // Indexed by the TTL declaration below — `index: true` here as well built a
+    // second, redundant index on the same field and cost a write on every login.
   },
   logoutAt: {
     type: Date,
@@ -28,8 +29,8 @@ const userSessionSchema = new mongoose.Schema({
   },
   isActive: {
     type: Boolean,
-    default: true,
-    index: true
+    default: true
+    // Covered as the prefix of the compound index declared below.
   },
   sessionDurationMinutes: {
     type: Number,
@@ -47,5 +48,9 @@ const userSessionSchema = new mongoose.Schema({
 
 // Auto-expire inactive sessions after 8 hours (TTL index)
 userSessionSchema.index({ loginAt: 1 }, { expireAfterSeconds: 28800, partialFilterExpression: { isActive: true } });
+
+// Serves the admin stats query `find({ isActive: false }).sort({ loginAt: -1 })`.
+// The TTL index above cannot: it is partial and only covers active sessions.
+userSessionSchema.index({ isActive: 1, loginAt: -1 });
 
 module.exports = mongoose.model('UserSession', userSessionSchema);

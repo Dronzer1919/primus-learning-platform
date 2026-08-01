@@ -5,8 +5,36 @@ const User = require('./src/models/User');
 const LanguageTab = require('./src/models/LanguageTab');
 const Topic = require('./src/models/Topic');
 
+// Seeding wipes every user, topic and language tab. That is fine for a local
+// reset and catastrophic against a live database, so both guards below are
+// deliberate: refuse to run in production, and refuse to mint an admin with a
+// password baked into a file that lives in version control.
+const requireSeedPassword = (name, envVar) => {
+  const value = process.env[envVar];
+  if (!value || value.length < 8) {
+    console.error(
+      `Refusing to seed: set ${envVar} to a password of at least 8 characters ` +
+      `before creating the ${name} account.\n` +
+      `  e.g.  ${envVar}='<a strong password>' npm run seed`
+    );
+    process.exit(1);
+  }
+  return value;
+};
+
 const seedData = async () => {
   try {
+    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_PRODUCTION_SEED !== 'yes') {
+      console.error(
+        'Refusing to seed with NODE_ENV=production — this deletes all users, topics and language tabs.\n' +
+        'If that is genuinely what you want, re-run with ALLOW_PRODUCTION_SEED=yes.'
+      );
+      process.exit(1);
+    }
+
+    const adminPlain = requireSeedPassword('admin', 'SEED_ADMIN_PASSWORD');
+    const userPlain = requireSeedPassword('test user', 'SEED_USER_PASSWORD');
+
     // Connect to database
     await mongoose.connect(process.env.MONGODB_URI);
     console.log('Connected to MongoDB');
@@ -19,7 +47,7 @@ const seedData = async () => {
 
     // Create admin user
     console.log('Creating admin user...');
-    const adminPassword = await bcrypt.hash('admin123', 10);
+    const adminPassword = await bcrypt.hash(adminPlain, 10);
     const admin = await User.create({
       username: 'admin',
       email: 'admin@example.com',
@@ -30,7 +58,7 @@ const seedData = async () => {
 
     // Create regular user
     console.log('Creating regular user...');
-    const userPassword = await bcrypt.hash('user123', 10);
+    const userPassword = await bcrypt.hash(userPlain, 10);
     const user = await User.create({
       username: 'testuser',
       email: 'user@example.com',
@@ -228,9 +256,9 @@ const seedData = async () => {
     console.log('\n=================================');
     console.log('Seed data created successfully!');
     console.log('=================================');
-    console.log('\nTest Credentials:');
-    console.log('Admin - username: admin, password: admin123');
-    console.log('User  - username: testuser, password: user123');
+    console.log('\nTest Credentials (passwords are the ones you supplied):');
+    console.log('Admin - username: admin      (password: $SEED_ADMIN_PASSWORD)');
+    console.log('User  - username: testuser   (password: $SEED_USER_PASSWORD)');
     console.log('\nYou can now:');
     console.log('1. Start the backend: npm run dev');
     console.log('2. Login with test credentials');

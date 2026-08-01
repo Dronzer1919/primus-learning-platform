@@ -1,296 +1,195 @@
 const Topic = require('../models/Topic');
+const { asyncHandler, AppError } = require('../middleware/errorHandler');
+
+// Whitelisted so a client cannot inject arbitrary paths (including `_id`) into
+// an update document.
+const TOPIC_FIELDS = ['title', 'description', 'difficultyLevel', 'languagePlatform', 'order', 'subtopics'];
+const SUBTOPIC_FIELDS = ['title', 'order', 'content', 'subSubtopics'];
+
+function pick(body, fields) {
+  const out = {};
+  for (const field of fields) {
+    if (typeof body[field] !== 'undefined') out[field] = body[field];
+  }
+  return out;
+}
 
 // Get all topics
-exports.getAllTopics = async (req, res) => {
-  try {
-    const { difficultyLevel, languagePlatform } = req.query;
-    
-    let query = {};
-    if (difficultyLevel) query.difficultyLevel = difficultyLevel;
-    if (languagePlatform) query.languagePlatform = languagePlatform;
+exports.getAllTopics = asyncHandler(async (req, res) => {
+  const { difficultyLevel, languagePlatform } = req.query;
 
-    const topics = await Topic.find(query).sort({ order: 1 });
-    
-    res.json({
-      success: true,
-      count: topics.length,
-      data: topics
-    });
-  } catch (error) {
-    console.error('Get topics error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
+  // Validators coerce these to strings, so ?difficultyLevel[$ne]=x cannot turn
+  // into a query operator. String() is belt-and-braces for direct callers.
+  const query = {};
+  if (difficultyLevel) query.difficultyLevel = String(difficultyLevel);
+  if (languagePlatform) query.languagePlatform = String(languagePlatform);
+
+  // Pagination is opt-in. The frontend's content service loads the whole topic
+  // tree once and serves the admin editor from that cache — the editor reads
+  // subtopic.content back out of it when saving, so truncating the list or
+  // trimming nested fields by default would make an admin overwrite real
+  // lesson content with an empty array. Topic count is admin-controlled and
+  // small, so the unpaged default is not an abuse vector; ?page/?limit exist
+  // for when it grows.
+  const paginated = typeof req.query.page !== 'undefined' || typeof req.query.limit !== 'undefined';
+
+  let cursor = Topic.find(query).sort({ order: 1 });
+  let page = 1;
+  let limit = null;
+
+  if (paginated) {
+    page = req.query.page || 1;
+    limit = Math.min(req.query.limit || 20, 100);
+    cursor = cursor.skip((page - 1) * limit).limit(limit);
   }
-};
+
+  const [topics, total] = await Promise.all([cursor, Topic.countDocuments(query)]);
+
+  res.json({
+    success: true,
+    count: topics.length,
+    total,
+    ...(paginated && { page, totalPages: Math.ceil(total / limit) || 1 }),
+    data: topics
+  });
+});
 
 // Get single topic by ID
-exports.getTopicById = async (req, res) => {
-  try {
-    const { id } = req.params;
+exports.getTopicById = asyncHandler(async (req, res) => {
+  const topic = await Topic.findById(req.params.id);
 
-    const topic = await Topic.findById(id);
+  if (!topic) throw new AppError('Topic not found', 404);
 
-    if (!topic) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Topic not found' 
-      });
-    }
-
-    res.json({
-      success: true,
-      data: topic
-    });
-  } catch (error) {
-    console.error('Get topic error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
-  }
-};
+  res.json({
+    success: true,
+    data: topic
+  });
+});
 
 // Get subtopic content
-exports.getSubtopicContent = async (req, res) => {
-  try {
-    const { topicId, subtopicId } = req.params;
+exports.getSubtopicContent = asyncHandler(async (req, res) => {
+  const { topicId, subtopicId } = req.params;
 
-    const topic = await Topic.findById(topicId);
+  const topic = await Topic.findById(topicId);
+  if (!topic) throw new AppError('Topic not found', 404);
 
-    if (!topic) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Topic not found' 
-      });
+  const subtopic = topic.subtopics.id(subtopicId);
+  if (!subtopic) throw new AppError('Subtopic not found', 404);
+
+  res.json({
+    success: true,
+    data: {
+      topic: {
+        id: topic._id,
+        title: topic.title,
+        description: topic.description
+      },
+      subtopic: subtopic
     }
-
-    const subtopic = topic.subtopics.id(subtopicId);
-
-    if (!subtopic) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Subtopic not found' 
-      });
-    }
-
-    res.json({
-      success: true,
-      data: {
-        topic: {
-          id: topic._id,
-          title: topic.title,
-          description: topic.description
-        },
-        subtopic: subtopic
-      }
-    });
-  } catch (error) {
-    console.error('Get subtopic content error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
-  }
-};
+  });
+});
 
 // Create topic
-exports.createTopic = async (req, res) => {
-  try {
-    const { title, description, difficultyLevel, languagePlatform, order, subtopics } = req.body;
+exports.createTopic = asyncHandler(async (req, res) => {
+  const topic = await Topic.create({
+    ...pick(req.body, TOPIC_FIELDS),
+    subtopics: req.body.subtopics || []
+  });
 
-    const topic = new Topic({
-      title,
-      description,
-      difficultyLevel,
-      languagePlatform,
-      order,
-      subtopics: subtopics || []
-    });
-
-    await topic.save();
-
-    res.status(201).json({
-      success: true,
-      message: 'Topic created successfully',
-      data: topic
-    });
-  } catch (error) {
-    console.error('Create topic error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
-  }
-};
+  res.status(201).json({
+    success: true,
+    message: 'Topic created successfully',
+    data: topic
+  });
+});
 
 // Update topic
-exports.updateTopic = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const updateData = req.body;
+exports.updateTopic = asyncHandler(async (req, res) => {
+  const topic = await Topic.findByIdAndUpdate(
+    req.params.id,
+    pick(req.body, TOPIC_FIELDS),
+    { new: true, runValidators: true }
+  );
 
-    const topic = await Topic.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true, runValidators: true }
-    );
+  if (!topic) throw new AppError('Topic not found', 404);
 
-    if (!topic) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Topic not found' 
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Topic updated successfully',
-      data: topic
-    });
-  } catch (error) {
-    console.error('Update topic error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
-  }
-};
+  res.json({
+    success: true,
+    message: 'Topic updated successfully',
+    data: topic
+  });
+});
 
 // Delete topic
-exports.deleteTopic = async (req, res) => {
-  try {
-    const { id } = req.params;
+exports.deleteTopic = asyncHandler(async (req, res) => {
+  const topic = await Topic.findByIdAndDelete(req.params.id);
 
-    const topic = await Topic.findByIdAndDelete(id);
+  if (!topic) throw new AppError('Topic not found', 404);
 
-    if (!topic) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Topic not found' 
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'Topic deleted successfully'
-    });
-  } catch (error) {
-    console.error('Delete topic error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
-  }
-};
+  res.json({
+    success: true,
+    message: 'Topic deleted successfully'
+  });
+});
 
 // Add subtopic to topic
-exports.addSubtopic = async (req, res) => {
-  try {
-    const { topicId } = req.params;
-    const { title, order, content, subSubtopics } = req.body;
+exports.addSubtopic = asyncHandler(async (req, res) => {
+  const topic = await Topic.findById(req.params.topicId);
+  if (!topic) throw new AppError('Topic not found', 404);
 
-    const topic = await Topic.findById(topicId);
+  const { title, order, content, subSubtopics } = req.body;
+  topic.subtopics.push({
+    title,
+    order,
+    content: content || [],
+    subSubtopics: subSubtopics || []
+  });
 
-    if (!topic) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Topic not found' 
-      });
-    }
+  await topic.save();
 
-    topic.subtopics.push({
-      title,
-      order,
-      content: content || [],
-      subSubtopics: subSubtopics || []
-    });
-
-    await topic.save();
-
-    res.status(201).json({
-      success: true,
-      message: 'Subtopic added successfully',
-      data: topic
-    });
-  } catch (error) {
-    console.error('Add subtopic error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
-  }
-};
+  res.status(201).json({
+    success: true,
+    message: 'Subtopic added successfully',
+    data: topic
+  });
+});
 
 // Update subtopic
-exports.updateSubtopic = async (req, res) => {
-  try {
-    const { topicId, subtopicId } = req.params;
-    const updateData = req.body;
+exports.updateSubtopic = asyncHandler(async (req, res) => {
+  const { topicId, subtopicId } = req.params;
 
-    const topic = await Topic.findById(topicId);
+  const topic = await Topic.findById(topicId);
+  if (!topic) throw new AppError('Topic not found', 404);
 
-    if (!topic) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Topic not found' 
-      });
-    }
+  const subtopic = topic.subtopics.id(subtopicId);
+  if (!subtopic) throw new AppError('Subtopic not found', 404);
 
-    const subtopic = topic.subtopics.id(subtopicId);
+  Object.assign(subtopic, pick(req.body, SUBTOPIC_FIELDS));
+  await topic.save();
 
-    if (!subtopic) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Subtopic not found' 
-      });
-    }
-
-    Object.assign(subtopic, updateData);
-    await topic.save();
-
-    res.json({
-      success: true,
-      message: 'Subtopic updated successfully',
-      data: topic
-    });
-  } catch (error) {
-    console.error('Update subtopic error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
-  }
-};
+  res.json({
+    success: true,
+    message: 'Subtopic updated successfully',
+    data: topic
+  });
+});
 
 // Delete subtopic
-exports.deleteSubtopic = async (req, res) => {
-  try {
-    const { topicId, subtopicId } = req.params;
+exports.deleteSubtopic = asyncHandler(async (req, res) => {
+  const { topicId, subtopicId } = req.params;
 
-    const topic = await Topic.findById(topicId);
+  const topic = await Topic.findById(topicId);
+  if (!topic) throw new AppError('Topic not found', 404);
 
-    if (!topic) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Topic not found' 
-      });
-    }
+  const subtopic = topic.subtopics.id(subtopicId);
+  if (!subtopic) throw new AppError('Subtopic not found', 404);
 
-    topic.subtopics.pull(subtopicId);
-    await topic.save();
+  topic.subtopics.pull(subtopicId);
+  await topic.save();
 
-    res.json({
-      success: true,
-      message: 'Subtopic deleted successfully',
-      data: topic
-    });
-  } catch (error) {
-    console.error('Delete subtopic error:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server error' 
-    });
-  }
-};
+  res.json({
+    success: true,
+    message: 'Subtopic deleted successfully',
+    data: topic
+  });
+});

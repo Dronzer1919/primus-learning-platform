@@ -1,26 +1,29 @@
 const jwt = require('jsonwebtoken');
 
 module.exports = (req, res, next) => {
+  const header = req.header('Authorization') || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : null;
+
+  if (!token) {
+    return res.status(401).json({
+      success: false,
+      message: 'No token, authorization denied'
+    });
+  }
+
   try {
-    // Get token from header
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-
-    if (!token) {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'No token, authorization denied' 
-      });
-    }
-
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
     next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
-    res.status(401).json({ 
-      success: false, 
-      message: 'Token is not valid' 
+    // Distinguish an expired token from a malformed one so the client knows
+    // whether to refresh or to send the user back to the login screen. A failed
+    // verification is a routine client-side condition, not a server fault, so
+    // it is not logged as an error.
+    const expired = error.name === 'TokenExpiredError';
+    res.status(401).json({
+      success: false,
+      message: expired ? 'Token expired' : 'Token is not valid',
+      ...(expired && { expired: true })
     });
   }
 };
