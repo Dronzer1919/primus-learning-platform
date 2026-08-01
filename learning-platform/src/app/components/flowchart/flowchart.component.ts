@@ -472,6 +472,19 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     this.persist();
   }
 
+  /** Shortcut that sets both start + end arrows at once. */
+  setEdgeDirection(dir: 'forward' | 'backward' | 'both' | 'none'): void {
+    const edge = this.selectedEdge;
+    if (!edge) return;
+    switch (dir) {
+      case 'forward':  edge.endArrow = 'filled'; edge.startArrow = 'none'; break;
+      case 'backward': edge.endArrow = 'none';   edge.startArrow = 'filled'; break;
+      case 'both':     edge.endArrow = 'filled'; edge.startArrow = 'filled'; break;
+      case 'none':     edge.endArrow = 'none';   edge.startArrow = 'none'; break;
+    }
+    this.persist();
+  }
+
   setEdgeColor(color: string | null): void {
     const edge = this.selectedEdge;
     if (!edge) return;

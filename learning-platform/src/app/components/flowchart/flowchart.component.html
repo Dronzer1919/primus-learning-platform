@@ -406,6 +406,48 @@ previews and canvas nodes can both reference them by id. -->
         }
         <!-- ── Connection (edge) properties ── -->
         @if (selectedEdge; as edge) {
+          <!-- Direction (quick bidirectional shortcut) -->
+          <div class="props-section" role="group" aria-labelledby="conn-dir-title">
+            <div class="props-title" id="conn-dir-title">Direction</div>
+            <div class="conn-btn-row">
+              <button type="button" class="conn-style-btn" title="Forward arrow (→)"
+                [class.active]="(edge.endArrow ?? 'filled') !== 'none' && (edge.startArrow ?? 'none') === 'none'"
+                (click)="setEdgeDirection('forward')">
+                <svg viewBox="0 0 32 14" fill="none">
+                  <line x1="2" y1="7" x2="22" y2="7" stroke="currentColor" stroke-width="2"/>
+                  <path d="M20 3 L29 7 L20 11Z" fill="currentColor"/>
+                </svg>
+                <span>Forward</span>
+              </button>
+              <button type="button" class="conn-style-btn" title="Both directions (←→)"
+                [class.active]="(edge.endArrow ?? 'filled') !== 'none' && edge.startArrow === 'filled'"
+                (click)="setEdgeDirection('both')">
+                <svg viewBox="0 0 32 14" fill="none">
+                  <path d="M12 3 L3 7 L12 11Z" fill="currentColor"/>
+                  <line x1="3" y1="7" x2="29" y2="7" stroke="currentColor" stroke-width="2"/>
+                  <path d="M20 3 L29 7 L20 11Z" fill="currentColor"/>
+                </svg>
+                <span>Both</span>
+              </button>
+              <button type="button" class="conn-style-btn" title="Reverse arrow (←)"
+                [class.active]="(edge.endArrow) === 'none' && edge.startArrow === 'filled'"
+                (click)="setEdgeDirection('backward')">
+                <svg viewBox="0 0 32 14" fill="none">
+                  <path d="M12 3 L3 7 L12 11Z" fill="currentColor"/>
+                  <line x1="3" y1="7" x2="30" y2="7" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <span>Reverse</span>
+              </button>
+              <button type="button" class="conn-style-btn" title="No arrows"
+                [class.active]="edge.endArrow === 'none' && (edge.startArrow ?? 'none') === 'none'"
+                (click)="setEdgeDirection('none')">
+                <svg viewBox="0 0 32 14" fill="none">
+                  <line x1="2" y1="7" x2="30" y2="7" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <span>None</span>
+              </button>
+            </div>
+          </div>
           <div class="props-section" role="group" aria-labelledby="conn-routing-title">
             <div class="props-title" id="conn-routing-title">Routing</div>
             <div class="conn-btn-row">
