@@ -164,6 +164,8 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     document.removeEventListener('mousemove', this.onMoveRef);
     document.removeEventListener('mouseup', this.onMoveEndRef);
     document.removeEventListener('mousemove', this.onConnectMoveRef);
+    document.removeEventListener('mouseup', this.onConnectEndRef);
+    document.removeEventListener('mousemove', this.onEdgeMoveRef);
     document.removeEventListener('mouseup', this.onEdgeMoveEndRef);
     this.detachResizeListeners();
   }
@@ -393,21 +395,6 @@ export class FlowchartComponent implements OnInit, OnDestroy {
 
   onNodeClick(event: MouseEvent, node: FlowNode): void {
     event.stopPropagation();
-    // If in connect mode, this click on a node completes the connection.
-    if (this.connectFromId && this.connectFromId !== node.id) {
-      const from = this.connectFromId;
-      this.cancelConnect();
-      const exists = this.diagram.edges.some((e) => e.from === from && e.to === node.id);
-      if (!exists) {
-        this.diagram.edges.push({ id: this.newId(), from, to: node.id });
-        this.persist();
-      }
-      return;
-    }
-    if (this.connectFromId) {
-      this.cancelConnect();
-      return;
-    }
     if (this.moved) {
       // This click concludes a drag — don't treat it as a select toggle.
       return;
@@ -421,10 +408,6 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   }
 
   onCanvasClick(): void {
-    if (this.connectFromId) {
-      this.cancelConnect();
-      return;
-    }
     this.select(null, null);
   }
 
@@ -440,6 +423,50 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     return this.selectedNodeId
       ? this.diagram.nodes.find((n) => n.id === this.selectedNodeId) ?? null
       : null;
+  }
+
+  /** The currently selected edge, or null. */
+  get selectedEdge(): FlowEdge | null {
+    return this.selectedEdgeId
+      ? this.diagram.edges.find((e) => e.id === this.selectedEdgeId) ?? null
+      : null;
+  }
+
+  setEdgeRouting(routing: 'elbow' | 'straight'): void {
+    const edge = this.selectedEdge;
+    if (!edge) return;
+    edge.routing = routing;
+    if (routing === 'straight') delete edge.bend;
+    this.persist();
+  }
+
+  setEdgeDash(dash: 'solid' | 'dashed' | 'dotted'): void {
+    const edge = this.selectedEdge;
+    if (!edge) return;
+    edge.dash = dash;
+    this.persist();
+  }
+
+  setEdgeEndArrow(style: 'filled' | 'open' | 'none'): void {
+    const edge = this.selectedEdge;
+    if (!edge) return;
+    edge.endArrow = style;
+    this.persist();
+  }
+
+  setEdgeStartArrow(style: 'none' | 'filled' | 'open'): void {
+    const edge = this.selectedEdge;
+    if (!edge) return;
+    edge.startArrow = style;
+    this.persist();
+  }
+
+  setEdgeColor(color: string | null): void {
+    const edge = this.selectedEdge;
+    if (!edge) return;
+    if (color === null) delete edge.color;
+    else edge.color = color;
+    this.persist();
   }
 
   /** `null` clears the custom fill so the shape reverts to the theme default. */
@@ -583,33 +610,19 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     this.persist();
   }
 
-  // --- Click-to-connect -----------------------------------------------
-  // Step 1: click an arrow handle on any shape → enters "awaiting target" mode.
-  // Step 2: click any other shape → edge is created.
-  // Click on empty canvas → cancels.
+  // --- Drag-to-connect ---------------------------------------------------
 
-  /** Enters connect mode: source is fixed, waiting for a target click. */
+  /** Begins dragging a new arrow out of `node` from one of its side handles. */
   startConnect(event: MouseEvent, node: FlowNode): void {
     event.stopPropagation();
     event.preventDefault();
-    // If already in connect mode and clicking the same source, cancel.
-    if (this.connectFromId === node.id) {
-      this.cancelConnect();
-      return;
-    }
     this.connectFromId = node.id;
     this.connectTargetId = null;
     const point = this.canvasPoint(event);
     this.connectX = point.x;
     this.connectY = point.y;
-    // Track mouse for the live preview line (no mouseup needed — target is set by click).
     document.addEventListener('mousemove', this.onConnectMoveRef);
-  }
-
-  private cancelConnect(): void {
-    document.removeEventListener('mousemove', this.onConnectMoveRef);
-    this.connectFromId = null;
-    this.connectTargetId = null;
+    document.addEventListener('mouseup', this.onConnectEndRef);
   }
 
   private onConnectMove(event: MouseEvent): void {
@@ -912,6 +925,31 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   trackNode = (_: number, v: NodeView): string => v.node.id;
   trackEdge = (_: number, g: EdgeGeometry): string => g.edge.id;
 
+  /** Helper: marker URL or empty string based on arrow style. */
+  edgeMarkerEnd(edge: FlowEdge): string {
+    switch (edge.endArrow ?? 'filled') {
+      case 'filled': return 'url(#flow-arrow)';
+      case 'open':   return 'url(#flow-arrow-open)';
+      case 'none':   return '';
+    }
+  }
+
+  edgeMarkerStart(edge: FlowEdge): string {
+    switch (edge.startArrow ?? 'none') {
+      case 'filled': return 'url(#flow-arrow)';
+      case 'open':   return 'url(#flow-arrow-open)';
+      case 'none':   return '';
+    }
+  }
+
+  edgeDashArray(edge: FlowEdge): string {
+    switch (edge.dash ?? 'solid') {
+      case 'dashed': return '10 5';
+      case 'dotted': return '2 5';
+      default: return '';
+    }
+  }
+
   get edgeGeometries(): EdgeGeometry[] {
     const byId = new Map(this.diagram.nodes.map((n) => [n.id, n]));
     const geoms: EdgeGeometry[] = [];
@@ -921,8 +959,10 @@ export class FlowchartComponent implements OnInit, OnDestroy {
       if (!from || !to) {
         continue;
       }
-      const { pts, bendPt, isHoriz } = this.orthRoute(from, to, edge.bend);
-      geoms.push({ edge, points: this.poly(pts), bendPt, isHoriz });
+      const route = (edge.routing === 'straight')
+        ? this.straightRoute(from, to)
+        : this.orthRoute(from, to, edge.bend);
+      geoms.push({ edge, points: this.poly(route.pts), bendPt: route.bendPt, isHoriz: route.isHoriz });
     }
     return geoms;
   }
@@ -937,6 +977,32 @@ export class FlowchartComponent implements OnInit, OnDestroy {
       return null;
     }
     return { points: this.poly(this.orthRouteToPoint(from, { x: this.connectX, y: this.connectY })) };
+  }
+
+  /** Direct straight line between the nearest sides of two shapes. */
+  private straightRoute(a: FlowNode, b: FlowNode): { pts: number[][], bendPt: { x: number; y: number }, isHoriz: boolean } {
+    const ac = this.center(a);
+    const bc = this.center(b);
+    const dx = bc.x - ac.x;
+    const dy = bc.y - ac.y;
+    const isHoriz = Math.abs(dx) >= Math.abs(dy);
+    let sx: number, sy: number, tx: number, ty: number;
+    if (isHoriz) {
+      sx = dx >= 0 ? a.x + a.w : a.x;
+      sy = ac.y;
+      tx = dx >= 0 ? b.x : b.x + b.w;
+      ty = bc.y;
+    } else {
+      sx = ac.x;
+      sy = dy >= 0 ? a.y + a.h : a.y;
+      tx = bc.x;
+      ty = dy >= 0 ? b.y : b.y + b.h;
+    }
+    return {
+      pts: [[sx, sy], [tx, ty]],
+      bendPt: { x: (sx + tx) / 2, y: (sy + ty) / 2 },
+      isHoriz
+    };
   }
 
   // Orthogonal (right-angle) route between two shapes: exits perpendicular to the

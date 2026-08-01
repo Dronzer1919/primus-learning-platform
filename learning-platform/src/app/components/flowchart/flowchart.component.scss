@@ -942,6 +942,44 @@ $bar-height: 49px;
     border-top: 1px solid var(--editor-border);
   }
 
+  // ── Connection style picker ──────────────────────────────────────────
+  .conn-btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .conn-style-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 8px;
+    border: 1.5px solid var(--editor-border);
+    border-radius: 6px;
+    background: var(--theme-surface);
+    color: var(--editor-fg);
+    cursor: pointer;
+    font-size: 10px;
+    min-width: 52px;
+    transition: border-color 0.15s, background 0.15s;
+
+    svg {
+      width: 28px;
+      height: 20px;
+    }
+
+    &:hover {
+      border-color: var(--ion-color-primary);
+    }
+
+    &.active {
+      border-color: var(--ion-color-primary);
+      background: rgba(var(--ion-color-primary-rgb), 0.1);
+      color: var(--ion-color-primary);
+    }
+  }
+
   .props-title {
     font-size: 12px;
     font-weight: 700;

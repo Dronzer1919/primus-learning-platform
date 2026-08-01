@@ -83,6 +83,16 @@ export interface FlowEdge {
   to: string;
   /** Overrides the natural mid-point of the elbow connector (canvas px). */
   bend?: number;
+  /** How the connector is routed. Defaults to 'elbow'. */
+  routing?: 'elbow' | 'straight';
+  /** Line dash pattern. Defaults to 'solid'. */
+  dash?: 'solid' | 'dashed' | 'dotted';
+  /** Arrowhead at the end of the line. Defaults to 'filled'. */
+  endArrow?: 'filled' | 'open' | 'none';
+  /** Arrowhead at the start of the line. Defaults to 'none'. */
+  startArrow?: 'none' | 'filled' | 'open';
+  /** Custom stroke colour. Falls back to theme colour when absent. */
+  color?: string;
 }
 
 export interface FlowDiagram {
