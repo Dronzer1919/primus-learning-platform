@@ -670,10 +670,6 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     if (!from || !to || from === to) {
       return;
     }
-    const exists = this.diagram.edges.some((e) => e.from === from && e.to === to);
-    if (exists) {
-      return;
-    }
     this.diagram.edges.push({ id: this.newId(), from, to });
     this.persist();
   }
