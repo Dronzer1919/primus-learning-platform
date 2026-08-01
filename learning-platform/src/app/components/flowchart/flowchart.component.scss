@@ -601,7 +601,7 @@ $bar-height: 49px;
   .edge {
     fill: none;
     stroke: color-mix(in srgb, var(--editor-fg), transparent 20%);
-    stroke-width: 2;
+    stroke-width: 2.5;
     stroke-linejoin: round;
     pointer-events: stroke;
     cursor: pointer;
@@ -616,6 +616,15 @@ $bar-height: 49px;
     }
   }
 
+  // Wide invisible area for easier edge clicking
+  .edge-hit {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 14;
+    pointer-events: stroke;
+    cursor: pointer;
+  }
+
   .edge-preview {
     fill: none;
     stroke: var(--ion-color-primary);
@@ -626,7 +635,24 @@ $bar-height: 49px;
   }
 
   #flow-arrow path {
-    fill: color-mix(in srgb, var(--editor-fg), transparent 20%);
+    fill: context-stroke;
+  }
+
+  // Draggable elbow mid-point handle shown on selected edges
+  .edge-bend-handle {
+    fill: #fff;
+    stroke: var(--ion-color-primary);
+    stroke-width: 2.5;
+    cursor: grab;
+    pointer-events: all;
+
+    &:hover {
+      fill: var(--ion-color-primary);
+    }
+
+    &:active {
+      cursor: grabbing;
+    }
   }
 }
 

@@ -22,6 +22,8 @@ import {
 interface EdgeGeometry {
   edge: FlowEdge;
   points: string;
+  bendPt: { x: number; y: number };
+  isHoriz: boolean;
 }
 
 interface NodeView {
@@ -110,6 +112,14 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   private readonly onConnectMoveRef = (e: MouseEvent) => this.onConnectMove(e);
   private readonly onConnectEndRef = () => this.onConnectEnd();
 
+  // Edge midpoint drag bookkeeping.
+  private movingEdgeId: string | null = null;
+  private edgeDragIsHoriz = false;
+  private edgeDragStartBend = 0;
+  private edgeDragStartCanvasPt = { x: 0, y: 0 };
+  private readonly onEdgeMoveRef = (e: MouseEvent) => this.onEdgeMove(e);
+  private readonly onEdgeMoveEndRef = () => this.onEdgeMoveEnd();
+
   // --- Resize bookkeeping ------------------------------------------------
   /** The eight handles drawn around a selected shape, in clockwise order. */
   readonly resizeHandles: ResizeDir[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
@@ -155,6 +165,8 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     document.removeEventListener('mouseup', this.onMoveEndRef);
     document.removeEventListener('mousemove', this.onConnectMoveRef);
     document.removeEventListener('mouseup', this.onConnectEndRef);
+    document.removeEventListener('mousemove', this.onEdgeMoveRef);
+    document.removeEventListener('mouseup', this.onEdgeMoveEndRef);
     this.detachResizeListeners();
   }
 
@@ -878,7 +890,8 @@ export class FlowchartComponent implements OnInit, OnDestroy {
       if (!from || !to) {
         continue;
       }
-      geoms.push({ edge, points: this.poly(this.orthRoute(from, to)) });
+      const { pts, bendPt, isHoriz } = this.orthRoute(from, to, edge.bend);
+      geoms.push({ edge, points: this.poly(pts), bendPt, isHoriz });
     }
     return geoms;
   }
@@ -898,7 +911,8 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   // Orthogonal (right-angle) route between two shapes: exits perpendicular to the
   // side facing the target and enters the target the same way, with the bend on the
   // half-way line — the classic flowchart "elbow" connector.
-  private orthRoute(a: FlowNode, b: FlowNode): number[][] {
+  // `bend` overrides the natural mid-point so the user can drag the elbow.
+  private orthRoute(a: FlowNode, b: FlowNode, bend?: number): { pts: number[][], bendPt: { x: number; y: number }, isHoriz: boolean } {
     const ac = this.center(a);
     const bc = this.center(b);
     const dx = bc.x - ac.x;
@@ -906,13 +920,57 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     if (Math.abs(dx) >= Math.abs(dy)) {
       const sx = dx >= 0 ? a.x + a.w : a.x;
       const tx = dx >= 0 ? b.x : b.x + b.w;
-      const mx = (sx + tx) / 2;
-      return [[sx, ac.y], [mx, ac.y], [mx, bc.y], [tx, bc.y]];
+      const mx = bend !== undefined ? bend : (sx + tx) / 2;
+      return {
+        pts: [[sx, ac.y], [mx, ac.y], [mx, bc.y], [tx, bc.y]],
+        bendPt: { x: mx, y: (ac.y + bc.y) / 2 },
+        isHoriz: true
+      };
     }
     const sy = dy >= 0 ? a.y + a.h : a.y;
     const ty = dy >= 0 ? b.y : b.y + b.h;
-    const my = (sy + ty) / 2;
-    return [[ac.x, sy], [ac.x, my], [bc.x, my], [bc.x, ty]];
+    const my = bend !== undefined ? bend : (sy + ty) / 2;
+    return {
+      pts: [[ac.x, sy], [ac.x, my], [bc.x, my], [bc.x, ty]],
+      bendPt: { x: (ac.x + bc.x) / 2, y: my },
+      isHoriz: false
+    };
+  }
+
+  // --- Edge midpoint drag -----------------------------------------------
+
+  onEdgeMidMouseDown(event: MouseEvent, g: EdgeGeometry): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.select(null, g.edge.id);
+    this.movingEdgeId = g.edge.id;
+    this.edgeDragIsHoriz = g.isHoriz;
+    this.edgeDragStartBend = g.edge.bend !== undefined
+      ? g.edge.bend
+      : (g.isHoriz ? g.bendPt.x : g.bendPt.y);
+    this.edgeDragStartCanvasPt = this.canvasPoint(event);
+    document.addEventListener('mousemove', this.onEdgeMoveRef);
+    document.addEventListener('mouseup', this.onEdgeMoveEndRef);
+  }
+
+  private onEdgeMove(event: MouseEvent): void {
+    const edge = this.diagram.edges.find((e) => e.id === this.movingEdgeId);
+    if (!edge) return;
+    const point = this.canvasPoint(event);
+    if (this.edgeDragIsHoriz) {
+      edge.bend = this.edgeDragStartBend + (point.x - this.edgeDragStartCanvasPt.x);
+    } else {
+      edge.bend = this.edgeDragStartBend + (point.y - this.edgeDragStartCanvasPt.y);
+    }
+  }
+
+  private onEdgeMoveEnd(): void {
+    document.removeEventListener('mousemove', this.onEdgeMoveRef);
+    document.removeEventListener('mouseup', this.onEdgeMoveEndRef);
+    if (this.movingEdgeId) {
+      this.persist();
+    }
+    this.movingEdgeId = null;
   }
 
   private orthRouteToPoint(a: FlowNode, p: { x: number; y: number }): number[][] {

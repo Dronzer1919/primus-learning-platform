@@ -210,16 +210,23 @@ previews and canvas nodes can both reference them by id. -->
             <marker
               id="flow-arrow"
               viewBox="0 0 10 10"
-              refX="9"
+              refX="8"
               refY="5"
-              markerWidth="7"
-              markerHeight="7"
+              markerWidth="10"
+              markerHeight="10"
               orient="auto-start-reverse"
               >
-              <path d="M 0 0 L 10 5 L 0 10 z"></path>
+              <path d="M 0 1 L 9 5 L 0 9 Z"></path>
             </marker>
           </defs>
           @for (g of edgeGeometries; track trackEdge($index, g)) {
+            <!-- Wide transparent hit area for easier edge selection -->
+            <polyline
+              class="edge-hit"
+              [attr.points]="g.points"
+              (click)="onEdgeClick($event, g.edge)"
+            ></polyline>
+            <!-- Visible edge line -->
             <polyline
               class="edge"
               [class.selected]="selectedEdgeId === g.edge.id"
@@ -227,6 +234,16 @@ previews and canvas nodes can both reference them by id. -->
               marker-end="url(#flow-arrow)"
               (click)="onEdgeClick($event, g.edge)"
             ></polyline>
+            <!-- Draggable bend-point handle (visible only when edge is selected) -->
+            @if (selectedEdgeId === g.edge.id) {
+              <circle
+                class="edge-bend-handle"
+                [attr.cx]="g.bendPt.x"
+                [attr.cy]="g.bendPt.y"
+                r="7"
+                (mousedown)="onEdgeMidMouseDown($event, g)"
+              ></circle>
+            }
           }
 
           <!-- Live preview while dragging a new connection -->

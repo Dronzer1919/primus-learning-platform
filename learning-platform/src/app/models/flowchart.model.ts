@@ -81,6 +81,8 @@ export interface FlowEdge {
   id: string;
   from: string;
   to: string;
+  /** Overrides the natural mid-point of the elbow connector (canvas px). */
+  bend?: number;
 }
 
 export interface FlowDiagram {
