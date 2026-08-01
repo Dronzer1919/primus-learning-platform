@@ -13,10 +13,7 @@
   overflow: hidden;
 
   #shape-arrow path {
-    fill: var(--editor-fg);
-    // Modern browsers: take the colour of the line being marked, so selected
-    // shapes get primary-coloured heads for free.
-    fill: context-stroke;
+    fill: currentColor;
   }
 }
 
@@ -614,6 +611,7 @@ $bar-height: 49px;
   .edge {
     fill: none;
     stroke: color-mix(in srgb, var(--editor-fg), transparent 20%);
+    color: color-mix(in srgb, var(--editor-fg), transparent 20%);
     stroke-width: 2.5;
     stroke-linejoin: round;
     pointer-events: stroke;
@@ -621,10 +619,12 @@ $bar-height: 49px;
 
     &:hover {
       stroke: var(--ion-color-primary);
+      color: var(--ion-color-primary);
     }
 
     &.selected {
       stroke: var(--ion-color-primary);
+      color: var(--ion-color-primary);
       stroke-width: 3;
     }
   }
@@ -648,10 +648,14 @@ $bar-height: 49px;
   }
 
   #flow-arrow path {
-    fill: context-stroke;
+    fill: currentColor;
   }
 
-  // Draggable elbow mid-point handle shown on selected edges
+  #flow-arrow-open path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+  }
   .edge-bend-handle {
     fill: #fff;
     stroke: var(--ion-color-primary);

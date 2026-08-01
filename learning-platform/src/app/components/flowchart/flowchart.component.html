@@ -247,6 +247,7 @@ previews and canvas nodes can both reference them by id. -->
               [attr.marker-start]="edgeMarkerStart(g.edge)"
               [attr.stroke-dasharray]="edgeDashArray(g.edge)"
               [attr.stroke]="g.edge.color || null"
+              [style.color]="g.edge.color || null"
               (click)="onEdgeClick($event, g.edge)"
             ></polyline>
             <!-- Draggable bend-point handle (visible only when edge is selected) -->
