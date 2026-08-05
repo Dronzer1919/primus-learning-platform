@@ -155,26 +155,50 @@
     color: var(--ion-color-medium);
   }
 
+  // Contact details, as centred chips.
+  //
+  // These used to be left-aligned rows in a card that centres everything else,
+  // so the email sat off-axis under a centred avatar and greeting — the one
+  // element breaking the card's line. Centring the column fixes the alignment;
+  // the chip treatment is what stops a bare centred string from looking like
+  // stray text, by giving it an edge of its own to sit inside.
   .profile-rows {
-    text-align: left;
+    display: flex;
+    flex-direction: column;
+    align-items: center;    // each chip is only as wide as its content
+    gap: 6px;
     margin-bottom: 16px;
   }
 
   .profile-row {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 5px 0;
-    font-size: 14px;
+    justify-content: center;
+    gap: 7px;
+    // Never wider than the card, however long the address.
+    max-width: 100%;
+    padding: 6px 13px;
+    border-radius: 999px;
+    background: rgba(var(--ion-color-primary-rgb), 0.09);
+    font-size: 13.5px;
+    line-height: 1.35;
     color: var(--ion-color-medium-shade);
 
     ion-icon {
-      font-size: 17px;
+      font-size: 16px;
       flex-shrink: 0;
+      // The icon carries the accent so the text stays quiet — the address is
+      // the content, the icon is only the label for it.
+      color: var(--ion-color-primary);
     }
 
     span {
-      word-break: break-all;
+      // min-width: 0 lets a flex child actually shrink; without it the span
+      // keeps its full intrinsic width and pushes the chip past max-width.
+      min-width: 0;
+      // `anywhere`, not `break-all`: a long address wraps only when it has to,
+      // instead of being chopped mid-word even when it would have fit.
+      overflow-wrap: anywhere;
     }
   }
 }

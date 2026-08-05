@@ -59,6 +59,18 @@
       font-size: 12px;
       color: color-mix(in srgb, var(--editor-fg), transparent 45%);
     }
+
+    // Replaces the tagline once a saved session is open, so the name of the
+    // thing being edited is always visible.
+    p.active-session {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-weight: 600;
+      color: var(--ion-color-success);
+
+      ion-icon { font-size: 13px; }
+    }
   }
 
   .header-actions {
@@ -78,6 +90,9 @@
       h1 { font-size: 15px; }
       // The tagline duplicates the palette hint; drop it before anything functional.
       p { display: none; }
+      // The open session's name is not decoration — it is the only thing telling
+      // the user which diagram "Save session" will overwrite.
+      p.active-session { display: flex; }
     }
   }
 }
@@ -1202,5 +1217,84 @@ $bar-height: 49px;
   p {
     margin: 0;
     font-size: 14px;
+  }
+}
+
+// --- Saved sessions modal ---------------------------------------------------
+// Ionic moves the modal out of .flow-page when it opens, so every rule here is
+// top-level rather than nested under the page. ion-item / ion-content render in
+// shadow DOM, so their look is set through custom properties, not descendants.
+.sessions-modal {
+  --width: min(520px, 94vw);
+  --height: min(560px, 82vh);
+  --border-radius: 14px;
+  --background: var(--editor-bg);
+}
+
+.sessions-content {
+  --background: var(--editor-bg);
+  --color: var(--editor-fg);
+}
+
+.session-row {
+  --background: transparent;
+  --color: var(--editor-fg);
+  --padding-start: 12px;
+  --inner-padding-end: 6px;
+  --border-radius: 10px;
+  margin: 4px 8px;
+
+  > ion-icon[slot='start'] {
+    font-size: 20px;
+    color: color-mix(in srgb, var(--editor-fg), transparent 45%);
+    margin-inline-end: 12px;
+  }
+
+  h3 {
+    font-size: 14px;
+    font-weight: 600;
+    // A long name must not push the rename/delete buttons off the row.
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  p {
+    font-size: 12px;
+    color: color-mix(in srgb, var(--editor-fg), transparent 45%);
+  }
+
+  &.active {
+    --background: color-mix(in srgb, var(--ion-color-success), transparent 88%);
+
+    > ion-icon[slot='start'] {
+      color: var(--ion-color-success);
+    }
+  }
+}
+
+.sessions-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 48px 24px;
+  text-align: center;
+  color: color-mix(in srgb, var(--editor-fg), transparent 40%);
+
+  ion-icon {
+    font-size: 40px;
+    margin-bottom: 4px;
+  }
+
+  p {
+    margin: 0;
+    font-size: 14px;
+  }
+
+  .sessions-hint {
+    font-size: 12.5px;
+    color: color-mix(in srgb, var(--editor-fg), transparent 55%);
   }
 }

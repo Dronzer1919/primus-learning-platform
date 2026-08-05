@@ -25,6 +25,9 @@ import {
   gitNetworkOutline, shapesOutline, optionsOutline, chevronBackOutline, downloadOutline,
   clipboardOutline,
   caretUpOutline, caretDownOutline, caretForwardOutline, caretBackOutline,
+  // Flowchart saved sessions: the toolbar button, the open-session marker in the
+  // header and the empty state inside the sessions modal.
+  timeOutline, bookmarkOutline, folderOpenOutline,
   // Step-through visualizer controls and panels.
   playBackOutline, playForwardOutline, playSkipForwardOutline, pauseOutline, serverOutline,
   warningOutline,
@@ -71,6 +74,7 @@ addIcons({
   gitNetworkOutline, shapesOutline, optionsOutline, chevronBackOutline, downloadOutline,
   clipboardOutline,
   caretUpOutline, caretDownOutline, caretForwardOutline, caretBackOutline,
+  timeOutline, bookmarkOutline, folderOpenOutline,
   playBackOutline, playForwardOutline, playSkipForwardOutline, pauseOutline, serverOutline,
   warningOutline,
   chevronDownOutline, eyeOutline, eyeOffOutline, pinOutline, logoYoutube, libraryOutline

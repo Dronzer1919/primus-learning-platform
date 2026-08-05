@@ -1,10 +1,14 @@
-import { Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule, Location } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
-import { AlertController, IonicModule, ToastController } from '@ionic/angular';
+import { AlertButton, AlertController, IonicModule, ToastController } from '@ionic/angular';
 import { ThemeSelectorComponent } from '../theme-selector/theme-selector.component';
 import { FlowchartStoreService } from '../../services/flowchart-store.service';
 import { ExportFormat, FlowchartExportService } from '../../services/flowchart-export.service';
+import { FlowchartSessionService } from '../../services/flowchart-session.service';
+import { AuthService } from '../../services/auth.service';
+import { FlowchartSession } from '../../models/flowchart-session.model';
 import {
   DEFAULT_NODE_HEIGHT,
   DEFAULT_NODE_WIDTH,
@@ -143,9 +147,15 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   private readonly onResizeMoveRef = (e: PointerEvent) => this.onResizeMove(e);
   private readonly onResizeEndRef = () => this.onResizeEnd();
 
+  // Ties every session request to this component's lifetime: leaving the page
+  // mid-request must not land a response on a destroyed component.
+  private readonly destroyRef = inject(DestroyRef);
+
   constructor(
     private store: FlowchartStoreService,
     private exporter: FlowchartExportService,
+    private sessionService: FlowchartSessionService,
+    private auth: AuthService,
     private location: Location,
     private router: Router,
     private alertController: AlertController,
@@ -164,6 +174,21 @@ export class FlowchartComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.diagram = this.store.load();
+
+    // The route is public, but the sessions API is not. Signed-out visitors keep
+    // the localStorage-only behaviour and never see the two session controls.
+    this.canUseSessions = this.auth.isAuthenticated();
+    if (this.canUseSessions) {
+      // Which saved diagram the canvas is showing, so a refresh still knows
+      // whether "Save" means update-this-one or create-a-new-one. The list
+      // itself is only fetched when the modal opens.
+      const meta = this.store.loadMeta();
+      if (meta) {
+        this.activeSessionId = meta.id;
+        this.activeTitle = meta.title;
+      }
+    }
+
     this.paletteGroups = SHAPE_GROUPS.map((group) => ({
       title: group.title,
       items: group.shapes.map((shape) => ({
@@ -796,11 +821,23 @@ export class FlowchartComponent implements OnInit, OnDestroy {
 
   @HostListener('window:keydown', ['$event'])
   onKeyDown(event: KeyboardEvent): void {
-    if (this.editingNodeId) {
+    // `dialogOpen` matters as much as `editingNodeId` here: the save and rename
+    // alerts contain a text field, and this listener is on the window — without
+    // the guard, a Backspace while correcting a title deletes the selected shape
+    // and Enter starts editing its label.
+    if (this.editingNodeId || this.dialogOpen) {
       return;
     }
     if (event.key === 'Escape' && this.exportOpen) {
       this.exportOpen = false;
+      return;
+    }
+    // The sessions modal owns the keyboard while it is open: Delete typed in
+    // its rename field must not delete a shape behind it.
+    if (this.sessionsOpen) {
+      if (event.key === 'Escape') {
+        this.sessionsOpen = false;
+      }
       return;
     }
     // Ctrl on Windows/Linux, Cmd on a Mac. The editing guard above means these
@@ -946,6 +983,319 @@ export class FlowchartComponent implements OnInit, OnDestroy {
       ]
     });
     await alert.present();
+  }
+
+  // --- Saved sessions ----------------------------------------------------
+  // The diagram above is always mirrored to localStorage; this is the separate,
+  // per-user store that lets one person keep several named flowcharts and pick
+  // up any of them later. Mirrors the playground-sessions feature.
+
+  /** Gates both session controls — false for signed-out visitors. */
+  canUseSessions = false;
+  sessionsOpen = false;
+  sessions: FlowchartSession[] = [];
+  sessionsLoading = false;
+  activeSessionId: string | null = null;
+  activeTitle = '';
+  isSavingSession = false;
+  /** True when the canvas has changed since the last save or open. */
+  private dirty = false;
+  /** True while an alert with a text input is up — see onKeyDown. */
+  private dialogOpen = false;
+
+  /** Present an alert and keep the canvas keyboard shortcuts out of its input. */
+  private async presentDialog(alert: HTMLIonAlertElement): Promise<{ role?: string }> {
+    this.dialogOpen = true;
+    await alert.present();
+    const detail = await alert.onDidDismiss();
+    this.dialogOpen = false;
+    return detail;
+  }
+
+  /** Nothing to save from a blank canvas — unless a saved session is open, in
+   *  which case emptying it is itself a change worth keeping. */
+  get canSaveSession(): boolean {
+    return this.diagram.nodes.length > 0 || !!this.activeSessionId;
+  }
+
+  openSessions(event: MouseEvent): void {
+    // The document:click listener that closes the export menu would otherwise
+    // also see this click; it does no harm, but stopping it keeps the two menus
+    // independent.
+    event.stopPropagation();
+    this.sessionsOpen = true;
+    this.loadSessions();
+  }
+
+  closeSessions(): void {
+    this.sessionsOpen = false;
+  }
+
+  private loadSessions(): void {
+    this.sessionsLoading = true;
+    this.sessionService
+      .getSessions()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (sessions) => {
+          // Normalised first: everything below indexes this list, and a
+          // non-array response would throw inside the callback rather than
+          // simply showing nothing.
+          this.sessions = Array.isArray(sessions) ? sessions : [];
+          this.sessionsLoading = false;
+        },
+        error: () => {
+          // Keep whatever the list last had — a transient failure should not
+          // look like "you have no saved flowcharts".
+          this.sessionsLoading = false;
+          this.showToast('Could not load your saved flowcharts.', 'danger');
+        }
+      });
+  }
+
+  async openSaveDialog(): Promise<void> {
+    if (this.isSavingSession || !this.canSaveSession) {
+      return;
+    }
+
+    const buttons: AlertButton[] = [{ text: 'Cancel', role: 'cancel' }];
+    if (this.activeSessionId) {
+      // Editing a saved diagram: offer both overwriting it and branching off a
+      // copy, so "Save" can never silently fork or silently overwrite.
+      buttons.push(
+        {
+          text: 'Save as new',
+          handler: (data: { title?: string }) => {
+            this.saveSession(data.title, true);
+          }
+        },
+        {
+          text: 'Update',
+          cssClass: 'alert-save-btn',
+          handler: (data: { title?: string }) => {
+            this.saveSession(data.title, false);
+          }
+        }
+      );
+    } else {
+      buttons.push({
+        text: 'Save',
+        cssClass: 'alert-save-btn',
+        handler: (data: { title?: string }) => {
+          this.saveSession(data.title, false);
+        }
+      });
+    }
+
+    const alert = await this.alertController.create({
+      header: this.activeSessionId ? 'Save flowchart' : 'Save flowchart to your account',
+      cssClass: 'app-confirm-alert',
+      inputs: [
+        {
+          name: 'title',
+          type: 'text',
+          value: this.activeTitle || 'New Flowchart',
+          placeholder: 'Flowchart name',
+          attributes: { maxlength: 120, autofocus: true }
+        }
+      ],
+      buttons
+    });
+    await this.presentDialog(alert);
+  }
+
+  private saveSession(title: string | undefined, asNew: boolean): void {
+    // Writes are never de-duplicated at the HTTP layer — two saves are two
+    // intents — so a double-tap has to be stopped here.
+    if (this.isSavingSession) return;
+    this.isSavingSession = true;
+
+    const payload = {
+      // Capped client-side as well as on the server: the API rejects an
+      // over-long title with a 400, and there is no reason to make the trip.
+      title: (title ?? '').trim().slice(0, 120) || this.activeTitle || 'New Flowchart',
+      nodes: this.diagram.nodes,
+      edges: this.diagram.edges,
+      canvasBg: this.canvasBg
+    };
+
+    const request =
+      this.activeSessionId && !asNew
+        ? this.sessionService.updateSession(this.activeSessionId, payload)
+        : this.sessionService.createSession(payload);
+
+    request.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: (saved) => {
+        this.isSavingSession = false;
+        this.adoptSession(saved);
+        this.sessions = this.sessions.some((s) => s._id === saved._id)
+          ? this.sessions.map((s) => (s._id === saved._id ? saved : s))
+          : [saved, ...this.sessions];
+        this.showToast(`Saved as "${saved.title}"`, 'success');
+      },
+      error: () => {
+        this.isSavingSession = false;
+        this.showToast('Could not save your flowchart. Please try again.', 'danger');
+      }
+    });
+  }
+
+  /** Point the canvas at a saved session without touching the shapes on it. */
+  private adoptSession(session: FlowchartSession): void {
+    this.activeSessionId = session._id;
+    this.activeTitle = session.title;
+    this.store.saveMeta({ id: session._id, title: session.title });
+    this.dirty = false;
+  }
+
+  /** Resume editing a saved flowchart. */
+  async openSession(session: FlowchartSession): Promise<void> {
+    if (session._id === this.activeSessionId && !this.dirty) {
+      this.sessionsOpen = false;
+      return;
+    }
+    if (this.dirty && this.diagram.nodes.length > 0) {
+      const confirmed = await this.confirmDiscard(`"${session.title}"`);
+      if (!confirmed) return;
+    }
+
+    // Replaced wholesale rather than mutated: the ids in the old diagram mean
+    // nothing in the new one.
+    this.diagram = {
+      nodes: Array.isArray(session.nodes) ? session.nodes : [],
+      edges: Array.isArray(session.edges) ? session.edges : []
+    };
+    this.canvasBg = session.canvasBg ?? 'dots';
+    this.select(null, null);
+    this.editingNodeId = null;
+    this.connectFromId = null;
+    this.connectTargetId = null;
+
+    this.persist();
+    this.adoptSession(session);
+    this.sessionsOpen = false;
+    this.showToast(`Opened "${session.title}"`, 'success');
+  }
+
+  private async confirmDiscard(nextTitle: string): Promise<boolean> {
+    const alert = await this.alertController.create({
+      header: 'Unsaved changes',
+      cssClass: 'app-confirm-alert',
+      message: `The flowchart on the canvas has changes that are not saved. Open ${nextTitle} anyway?`,
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        { text: 'Discard and open', role: 'discard', cssClass: 'alert-button-danger' }
+      ]
+    });
+    await alert.present();
+    // Reading the role rather than using handlers means a backdrop tap or an
+    // Escape — neither of which fires a handler — also counts as "cancel".
+    const { role } = await alert.onDidDismiss();
+    return role === 'discard';
+  }
+
+  /** Start a blank flowchart, detached from any saved session. */
+  async newSession(): Promise<void> {
+    if (this.dirty && this.diagram.nodes.length > 0) {
+      const confirmed = await this.confirmDiscard('a new flowchart');
+      if (!confirmed) return;
+    }
+    this.diagram = { nodes: [], edges: [] };
+    this.select(null, null);
+    this.editingNodeId = null;
+    this.connectFromId = null;
+    this.activeSessionId = null;
+    this.activeTitle = '';
+    this.store.saveMeta(null);
+    this.persist();
+    this.dirty = false;
+    this.sessionsOpen = false;
+  }
+
+  async renameSession(session: FlowchartSession, event: Event): Promise<void> {
+    event.stopPropagation();
+    const alert = await this.alertController.create({
+      header: 'Rename flowchart',
+      cssClass: 'app-confirm-alert',
+      inputs: [
+        {
+          name: 'title',
+          type: 'text',
+          value: session.title,
+          placeholder: 'Flowchart name',
+          attributes: { maxlength: 120, autofocus: true }
+        }
+      ],
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Rename',
+          cssClass: 'alert-save-btn',
+          handler: (data: { title?: string }) => {
+            const title = (data.title ?? '').trim().slice(0, 120);
+            if (!title) return;
+            this.sessionService
+              .updateSession(session._id, { title })
+              .pipe(takeUntilDestroyed(this.destroyRef))
+              .subscribe({
+                next: (updated) => {
+                  this.sessions = this.sessions.map((s) => (s._id === updated._id ? updated : s));
+                  if (this.activeSessionId === updated._id) {
+                    this.adoptSession(updated);
+                  }
+                },
+                error: () => this.showToast('Could not rename that flowchart.', 'danger')
+              });
+          }
+        }
+      ]
+    });
+    await this.presentDialog(alert);
+  }
+
+  async deleteSession(session: FlowchartSession, event: Event): Promise<void> {
+    event.stopPropagation();
+    const alert = await this.alertController.create({
+      header: 'Delete flowchart',
+      cssClass: 'app-confirm-alert app-confirm-danger',
+      message: `Delete "${session.title}"? This cannot be undone.`,
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Delete',
+          role: 'destructive',
+          cssClass: 'alert-button-danger',
+          handler: () => {
+            this.sessionService
+              .deleteSession(session._id)
+              .pipe(takeUntilDestroyed(this.destroyRef))
+              .subscribe({
+                next: () => {
+                  this.sessions = this.sessions.filter((s) => s._id !== session._id);
+                  if (this.activeSessionId === session._id) {
+                    // The canvas keeps its shapes — only the link to the saved
+                    // copy is gone, so the next save creates a new one.
+                    this.activeSessionId = null;
+                    this.activeTitle = '';
+                    this.store.saveMeta(null);
+                    this.dirty = true;
+                  }
+                  this.showToast('Flowchart deleted', 'success');
+                },
+                // Without this the row would disappear only because nothing
+                // said otherwise, and reappear on the next load.
+                error: () => this.showToast('Could not delete that flowchart.', 'danger')
+              });
+          }
+        }
+      ]
+    });
+    await alert.present();
+  }
+
+  formatSessionDate(dateStr: string): string {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
 
   // --- Rendering ---------------------------------------------------------
@@ -1378,6 +1728,9 @@ export class FlowchartComponent implements OnInit, OnDestroy {
 
   private persist(): void {
     this.store.save(this.diagram);
+    // Every mutation funnels through here, so this is the single place the
+    // "changed since the last save" flag needs to be set.
+    this.dirty = true;
   }
 
   /** Brief confirmation of an action that leaves no visible trace of itself. */

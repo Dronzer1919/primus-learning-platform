@@ -129,6 +129,21 @@ const playgroundRules = [
   validate
 ];
 
+// ─── flowchart ───────────────────────────────────────────────────────────────
+
+// The element count is the bound that matters here: each node/edge is cast
+// against a declared sub-schema, so its shape is already fixed, and
+// express.json's 1mb limit is the outer backstop.
+const flowchartRules = [
+  body('title').optional().isString().trim().isLength({ max: LIMITS.title }),
+  body('canvasBg').optional().isString().isLength({ max: 20 }),
+  body('nodes').optional().isArray({ max: 2000 })
+    .withMessage('A diagram cannot hold more than 2000 shapes'),
+  body('edges').optional().isArray({ max: 4000 })
+    .withMessage('A diagram cannot hold more than 4000 connections'),
+  validate
+];
+
 // ─── topics / language tabs (admin-authored content) ─────────────────────────
 
 const listTopicsRules = [
@@ -170,6 +185,7 @@ module.exports = {
   todoRules,
   sessionNoteRules,
   playgroundRules,
+  flowchartRules,
   listTopicsRules,
   createTopicRules,
   languageTabRules

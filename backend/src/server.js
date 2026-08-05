@@ -18,6 +18,7 @@ const topicRoutes = require('./routes/topicRoutes');
 const noteRoutes = require('./routes/noteRoutes');
 const sessionRoutes = require('./routes/sessionRoutes');
 const playgroundSessionRoutes = require('./routes/playgroundSessionRoutes');
+const flowchartSessionRoutes = require('./routes/flowchartSessionRoutes');
 
 // ─── boot-time configuration checks ──────────────────────────────────────────
 // Fail loudly at startup rather than signing tokens with `undefined` or
@@ -95,6 +96,7 @@ app.use('/api/topics', topicRoutes);
 app.use('/api/notes', noteRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/playground-sessions', playgroundSessionRoutes);
+app.use('/api/flowchart-sessions', flowchartSessionRoutes);
 
 // 404 first, then the error translator. The previous order (error handler
 // before the 404) happened to work only because Express skips 4-arity

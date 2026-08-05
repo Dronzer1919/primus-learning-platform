@@ -23,7 +23,14 @@ previews and canvas nodes can both reference them by id. -->
       <ion-icon name="git-network-outline"></ion-icon>
       <div>
         <h1>Flowchart Builder</h1>
-        <p>Drag shapes, connect them, build your diagram</p>
+        @if (activeTitle) {
+          <p class="active-session">
+            <ion-icon name="bookmark-outline"></ion-icon>
+            {{ activeTitle }}
+          </p>
+        } @else {
+          <p>Drag shapes, connect them, build your diagram</p>
+        }
       </div>
     </div>
     <div class="header-actions">
@@ -172,6 +179,32 @@ previews and canvas nodes can both reference them by id. -->
             </div>
           }
         </div>
+
+        <!-- Saving to the account and reopening a saved diagram. Both are
+             hidden when signed out: the API behind them requires a token, and
+             the localStorage-only flow above still works without one. -->
+        @if (canUseSessions) {
+          <ion-button
+            size="small"
+            fill="outline"
+            color="success"
+            [disabled]="isSavingSession || !canSaveSession"
+            [title]="activeSessionId ? 'Save changes to ' + activeTitle : 'Save this flowchart to your account'"
+            (click)="openSaveDialog()"
+            >
+            <ion-icon slot="start" name="cloud-upload-outline"></ion-icon>
+            {{ isSavingSession ? 'Saving…' : 'Save session' }}
+          </ion-button>
+          <button
+            type="button"
+            class="panel-btn"
+            title="Open a previously saved flowchart"
+            (click)="openSessions($event)"
+            >
+            <ion-icon name="time-outline"></ion-icon>
+            <span>Sessions</span>
+          </button>
+        }
         @if (exportError) {
           <span class="toolbar-error" role="alert">{{ exportError }}</span>
         }
@@ -874,3 +907,96 @@ previews and canvas nodes can both reference them by id. -->
                                 }
                               }
                             </ng-template>
+
+<!-- Previously saved flowcharts. An inline [isOpen] modal rather than a
+     ModalController overlay: nothing else in the app uses ModalController, and
+     this needs no separate component to hold six rows and three actions. -->
+<ion-modal
+  class="sessions-modal"
+  [isOpen]="sessionsOpen"
+  (didDismiss)="sessionsOpen = false"
+  >
+  <ng-template>
+    <ion-header>
+      <ion-toolbar>
+        <ion-title>Your flowcharts</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="closeSessions()" aria-label="Close">
+            <ion-icon slot="icon-only" name="close-outline"></ion-icon>
+          </ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+
+    <ion-content class="sessions-content">
+      @if (sessionsLoading) {
+        <div class="sessions-state">
+          <ion-spinner name="crescent"></ion-spinner>
+        </div>
+      } @else {
+        <ion-list lines="none">
+          @for (s of sessions; track s._id) {
+            <ion-item
+              button
+              detail="false"
+              class="session-row"
+              [class.active]="s._id === activeSessionId"
+              (click)="openSession(s)"
+              >
+              <ion-icon slot="start" name="git-network-outline"></ion-icon>
+              <ion-label>
+                <h3>{{ s.title }}</h3>
+                <p>
+                  {{ s.nodes.length }} shape{{ s.nodes.length === 1 ? '' : 's' }}
+                  · {{ s.edges.length }} link{{ s.edges.length === 1 ? '' : 's' }}
+                  · {{ formatSessionDate(s.updatedAt) }}
+                </p>
+              </ion-label>
+              @if (s._id === activeSessionId) {
+                <ion-badge slot="end" color="success">Open</ion-badge>
+              }
+              <ion-button
+                slot="end"
+                fill="clear"
+                size="small"
+                title="Rename"
+                aria-label="Rename this flowchart"
+                (click)="renameSession(s, $event)"
+                >
+                <ion-icon slot="icon-only" name="pencil-outline"></ion-icon>
+              </ion-button>
+              <ion-button
+                slot="end"
+                fill="clear"
+                size="small"
+                color="danger"
+                title="Delete"
+                aria-label="Delete this flowchart"
+                (click)="deleteSession(s, $event)"
+                >
+                <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+              </ion-button>
+            </ion-item>
+          } @empty {
+            <div class="sessions-state sessions-empty">
+              <ion-icon name="folder-open-outline"></ion-icon>
+              <p>No saved flowcharts yet.</p>
+              <p class="sessions-hint">Build a diagram, then hit <strong>Save session</strong> to keep it here.</p>
+            </div>
+          }
+        </ion-list>
+      }
+    </ion-content>
+
+    <ion-footer>
+      <ion-toolbar>
+        <ion-buttons slot="end">
+          <ion-button fill="outline" (click)="newSession()">
+            <ion-icon slot="start" name="add-outline"></ion-icon>
+            New flowchart
+          </ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-footer>
+  </ng-template>
+</ion-modal>
