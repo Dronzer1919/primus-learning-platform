@@ -6,8 +6,14 @@
     </ion-title>
     <ion-buttons slot="end">
       <app-theme-selector></app-theme-selector>
-      <ion-button routerLink="/login">Sign In</ion-button>
-      <ion-button fill="solid" color="light" routerLink="/signup">Sign Up</ion-button>
+      <!-- Signing in should not leave Sign In / Sign Up sitting in the header. -->
+      <ng-container *ngIf="(authService.isLoggedIn$ | async); else signedOut">
+        <ion-button fill="solid" color="light" routerLink="/user">My Learning</ion-button>
+      </ng-container>
+      <ng-template #signedOut>
+        <ion-button routerLink="/login">Sign In</ion-button>
+        <ion-button fill="solid" color="light" routerLink="/signup">Sign Up</ion-button>
+      </ng-template>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>

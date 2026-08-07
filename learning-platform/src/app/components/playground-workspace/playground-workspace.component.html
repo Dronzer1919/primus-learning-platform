@@ -34,7 +34,8 @@
           <ion-icon slot="start" name="git-network-outline"></ion-icon>
           Flowchart
         </ion-button>
-        <ng-container *ngIf="(authService.currentUser | async) as user; else signInBtn">
+        <!-- isLoggedIn$, not currentUser: a stored user can outlive its token. -->
+        <ng-container *ngIf="(authService.isLoggedIn$ | async); else signInBtn">
           <ion-button size="small" (click)="logout()">
             <ion-icon slot="start" name="log-out-outline"></ion-icon>
             Logout

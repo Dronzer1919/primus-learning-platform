@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { map, tap } from 'rxjs/operators';
+import { distinctUntilChanged, map, tap } from 'rxjs/operators';
 import { User, LoginCredentials, SignupData, UserStats } from '../models/user.model';
 import { environment } from '../../environments/environment';
 import { logWarn } from '../core/logger';
@@ -18,11 +18,34 @@ export const SESSION_EXPIRED_EVENT = 'app:session-expired';
 export class AuthService {
   private currentUserSubject: BehaviorSubject<User | null>;
   public currentUser: Observable<User | null>;
+
+  /**
+   * Reactive counterpart to isAuthenticated(), for templates to bind to.
+   *
+   * Views must key off this rather than `currentUser` alone. The stored user
+   * and the token are separate entries with different lifetimes: the token can
+   * expire, or be cleared by a sign-out in another tab, while the user object
+   * is still sitting in storage. A view that only asks "is there a user?" then
+   * offers Logout for a session the server will reject on the next request —
+   * and conversely keeps Sign In on screen for a session that is perfectly
+   * valid.
+   *
+   * Deliberately free of side effects. isAuthenticated() clears the stale
+   * session as it checks, which is what a guard wants but not something that
+   * may run inside change detection — mutating state there is what produces
+   * ExpressionChangedAfterItHasBeenCheckedError.
+   */
+  public isLoggedIn$: Observable<boolean>;
+
   private apiUrl = environment.apiUrl;
 
   constructor(private http: HttpClient) {
     this.currentUserSubject = new BehaviorSubject<User | null>(this.readStoredUser());
     this.currentUser = this.currentUserSubject.asObservable();
+    this.isLoggedIn$ = this.currentUser.pipe(
+      map(user => user !== null && this.hasUsableToken()),
+      distinctUntilChanged()
+    );
 
     // The interceptor cannot inject this service (HttpClient would be building
     // its own consumer), so a 401 is announced as a DOM event instead. Without
@@ -189,6 +212,12 @@ export class AuthService {
       return false;
     }
     return true;
+  }
+
+  /** Presence and expiry of the stored token, without clearing anything. */
+  private hasUsableToken(): boolean {
+    const token = this.getToken();
+    return !!token && !this.isTokenExpired(token);
   }
 
   /**
