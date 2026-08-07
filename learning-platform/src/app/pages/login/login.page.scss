@@ -42,7 +42,15 @@
     min-height: 100%;
     display: flex;
     flex-direction: column;
-    justify-content: flex-end;
+
+    // margin-top: auto on the first child, not justify-content: flex-end on
+    // the container — auto margins clamp at 0, so once the group is taller
+    // than the scroll area it simply starts at the top (below the fixed
+    // header) and the excess scrolls below the fold. justify-content: flex-end
+    // has no such floor: on a short/narrow viewport it kept pushing the group
+    // upward past y=0, bleeding the brand heading up behind the header instead
+    // of scrolling it into view.
+    .brand { margin-top: auto; }
   }
 }
 
