@@ -309,13 +309,13 @@ h2 {
   display: flex;
   justify-content: center;
   align-items: center;
-  // ...and clip anything that still doesn't fit, so it's contained at this
-  // box's edge instead of spilling into the page past the card. No min-height
-  // here — a fixed height combined with overflow:hidden is what sliced off
-  // the button's own border/background before (Google's real rendered height
-  // didn't quite match the number guessed here); leaving height auto lets the
-  // box match Google's iframe exactly, so only width ever gets clipped.
-  overflow: hidden;
+  // ...and let anything that still doesn't fit spill past this box's own
+  // edges rather than being clipped by it. overflow: hidden here used to
+  // slice the chevron/G-icon off a personalized button whenever Google
+  // rendered it wider than the requested width (the common case — see
+  // above). The card around this wrapper has slack on both sides, so a
+  // slight overshoot just draws slightly outside this inner box; nothing
+  // about the button's own content gets cut off anymore.
   border-radius: 10px;
 }
 
