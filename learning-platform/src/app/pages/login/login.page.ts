@@ -27,7 +27,14 @@ export class LoginPage implements AfterViewInit, OnDestroy {
 
   // `email` is a legacy field name — auth.service.ts sends its value as `username`,
   // which is what the API matches on.
-  credentials: LoginCredentials = { email: '', password: '' };
+  //
+  // Prefilled with the guest account so a first-time visitor can sign in without
+  // hunting for credentials. Both fields stay editable: typing over them is how
+  // you sign in as anyone else, including admin.
+  credentials: LoginCredentials = {
+    email: environment.demoLogin.username,
+    password: environment.demoLogin.password
+  };
   showPassword = false;
 
   // Forgot-password flow state

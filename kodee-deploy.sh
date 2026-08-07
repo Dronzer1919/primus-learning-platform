@@ -45,6 +45,17 @@ MONGO_CONTAINER="lp-mongo"
 # idempotent by design and run on every deploy.
 FORCE_USER_SEED="${FORCE_USER_SEED:-no}"
 SKIP_SEED="${SKIP_SEED:-no}"
+
+# Password for the `testuser` guest account. This one is deliberately NOT secret:
+# the login page prefills it so visitors can look around in one click, which means
+# it ships in the JavaScript bundle for anyone to read.
+#
+# It must match `demoLogin.password` in learning-platform/src/environments/
+# environment.prod.ts. Change it in both places, then redeploy with
+# FORCE_USER_SEED=yes so the account is re-created with the new password.
+#
+# The admin password is the opposite: random, private, kept in backend/.env.
+DEMO_USER_PASSWORD="${DEMO_USER_PASSWORD:-GuestDemo123}"
 RECREATE_ENV="${RECREATE_ENV:-no}"       # yes = overwrite an existing backend/.env
 PRUNE_IMAGES="${PRUNE_IMAGES:-yes}"      # reclaim disk from dangling build layers
 
@@ -157,6 +168,25 @@ ensure_env_key() {
     printf '%s=%s\n' "$key" "$value" >> "$ENV_FILE"
     ok "added missing $key"
   fi
+}
+
+# Reads a key back out. Values are written single-quoted (see set_env_key), so
+# strip the quotes on the way out.
+read_env_key() {
+  [ -f "$ENV_FILE" ] || return 0
+  sed -n "s/^[[:space:]]*$1=//p" "$ENV_FILE" 2>/dev/null | head -1 | sed "s/^'//; s/'\$//"
+}
+
+# Writes a key, replacing any existing line. Rebuilt through a temp file rather
+# than `sed -i` because a password can contain / and & — the two characters that
+# turn a sed replacement into a corrupted file.
+set_env_key() {
+  local key="$1" value="$2" tmp
+  tmp="$(mktemp)"
+  grep -vE "^[[:space:]]*${key}=" "$ENV_FILE" > "$tmp" 2>/dev/null || true
+  printf "%s='%s'\n" "$key" "$value" >> "$tmp"
+  cat "$tmp" > "$ENV_FILE"          # overwrite contents, keeping mode 600
+  rm -f "$tmp"
 }
 
 if [ -f "$ENV_FILE" ] && [ "$RECREATE_ENV" != "yes" ]; then
@@ -286,19 +316,41 @@ else
     warn "$USER_COUNT existing user(s) found — skipping seed.js so real accounts are not deleted"
     warn "(re-run with FORCE_USER_SEED=yes if you truly want to wipe users, topics and tabs)"
   else
-    # seed.js refuses to mint accounts without passwords. Accept them from the
-    # environment; otherwise generate strong ones and print them once at the end,
-    # so a bare `bash kodee-deploy.sh` still produces a usable site.
-    ADMIN_PW="${SEED_ADMIN_PASSWORD:-}"
-    USER_PW="${SEED_USER_PASSWORD:-}"
-    if [ -z "$ADMIN_PW" ]; then
-      ADMIN_PW="$(openssl rand -base64 18 2>/dev/null | tr -d '/+=' || head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-      ADMIN_PASSWORD_TO_REPORT="$ADMIN_PW"
-    fi
-    if [ -z "$USER_PW" ]; then
-      USER_PW="$(openssl rand -base64 18 2>/dev/null | tr -d '/+=' || head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-      USER_PASSWORD_TO_REPORT="$USER_PW"
-    fi
+    # seed.js refuses to mint accounts without passwords. Resolve them in order:
+    #   1. the environment, if you passed one for this run
+    #   2. backend/.env, where a previous deploy stored them
+    #   3. a freshly generated one
+    # Whatever is used is then written back to backend/.env, so THE LOGIN STAYS
+    # THE SAME on every future deploy and can always be looked up again with
+    #     grep SEED_ backend/.env
+    # That file is gitignored and mode 600, which is why the password lives there
+    # and not in this script — a credential committed to the repo is public.
+    resolve_seed_password() {
+      local label="$1" supplied="$2" key="$3"
+      if [ -n "$supplied" ]; then
+        RESOLVED_PW="$supplied"
+        ok "using the $label password from the environment"
+      elif RESOLVED_PW="$(read_env_key "$key")" && [ -n "$RESOLVED_PW" ]; then
+        ok "reusing the stored $label password (unchanged since the last deploy)"
+      else
+        RESOLVED_PW="$(openssl rand -base64 18 2>/dev/null | tr -d '/+=' || head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+        ok "generated a new $label password"
+      fi
+    }
+
+    resolve_seed_password admin "${SEED_ADMIN_PASSWORD:-}" SEED_ADMIN_PASSWORD; ADMIN_PW="$RESOLVED_PW"
+
+    # testuser is the guest account the login page prefills, so it is pinned to
+    # the shared demo password rather than resolved/generated like admin's — a
+    # random one here would leave the prefilled form failing to log in.
+    USER_PW="${SEED_USER_PASSWORD:-$DEMO_USER_PASSWORD}"
+    ok "testuser pinned to the shared guest password (prefilled on the login page)"
+
+    set_env_key SEED_ADMIN_PASSWORD "$ADMIN_PW"
+    set_env_key SEED_USER_PASSWORD "$USER_PW"
+
+    ADMIN_PASSWORD_TO_REPORT="$ADMIN_PW"
+    USER_PASSWORD_TO_REPORT="$USER_PW"
 
     run_seed seed.js \
       -e ALLOW_PRODUCTION_SEED=yes \
@@ -377,11 +429,20 @@ printf '\n  Site : https://%s\n' "$DOMAIN"
 printf '  API  : https://api.%s/api/health\n' "$DOMAIN"
 printf '  Local: http://127.0.0.1:%s  (web)   http://127.0.0.1:%s/api/health  (api)\n' "$WEB_HOST_PORT" "$API_HOST_PORT"
 
+# Shown on every run, not just the run that created the accounts — the passwords
+# are kept in backend/.env, so a deploy that skipped seed.js can still tell you
+# how to log in. Recover them at any time with:  grep SEED_ backend/.env
+[ -n "$ADMIN_PASSWORD_TO_REPORT" ] || ADMIN_PASSWORD_TO_REPORT="$(read_env_key SEED_ADMIN_PASSWORD)"
+[ -n "$USER_PASSWORD_TO_REPORT" ]  || USER_PASSWORD_TO_REPORT="$(read_env_key SEED_USER_PASSWORD)"
+
 if [ -n "$ADMIN_PASSWORD_TO_REPORT" ] || [ -n "$USER_PASSWORD_TO_REPORT" ]; then
-  printf '\n%s  GENERATED LOGIN CREDENTIALS — copy these now, they are not stored anywhere:%s\n' "$C_YELLOW$C_BOLD" "$C_RESET"
-  [ -n "$ADMIN_PASSWORD_TO_REPORT" ] && printf '    admin     / %s\n' "$ADMIN_PASSWORD_TO_REPORT"
-  [ -n "$USER_PASSWORD_TO_REPORT" ]  && printf '    testuser  / %s\n' "$USER_PASSWORD_TO_REPORT"
-  printf '  %sChange them after first login, and clear this terminal history.%s\n' "$C_YELLOW" "$C_RESET"
+  printf '\n%s  LOGIN CREDENTIALS%s  (log in with the USERNAME, not the email)\n' "$C_YELLOW$C_BOLD" "$C_RESET"
+  [ -n "$ADMIN_PASSWORD_TO_REPORT" ] && \
+    printf '    admin     password: %-24s email: admin@example.com\n' "$ADMIN_PASSWORD_TO_REPORT"
+  [ -n "$USER_PASSWORD_TO_REPORT" ] && \
+    printf '    testuser  password: %-24s email: user@example.com\n' "$USER_PASSWORD_TO_REPORT"
+  printf '  Kept in %s (gitignored, mode 600) — same login on every deploy.\n' "$APP_DIR/$ENV_FILE"
+  printf '  Recover any time:  grep SEED_ %s\n' "$ENV_FILE"
 fi
 
 printf '\n  Logs: %s logs -f %s\n\n' "${DC[*]}" "$API_CONTAINER"

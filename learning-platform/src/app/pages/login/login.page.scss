@@ -341,8 +341,3 @@ h2 {
   align-items: center;
   gap: 8px;
 }
-
-// Credentials are fixed guest values, so the fields are read-only.
-.control input[readonly] {
-  cursor: default;
-}

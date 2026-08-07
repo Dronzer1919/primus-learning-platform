@@ -5,7 +5,11 @@
 export const environment = {
   production: false,
   apiUrl: 'http://localhost:3000/api',
-  googleClientId: '435199756335-8f8b4hib4beknpjhuqvauvfmqanrbgqu.apps.googleusercontent.com'
+  googleClientId: '435199756335-8f8b4hib4beknpjhuqvauvfmqanrbgqu.apps.googleusercontent.com',
+
+  // Guest account prefilled on the login page — see environment.prod.ts for the
+  // full note. Public by design; never the admin password.
+  demoLogin: { username: 'testuser', password: 'GuestDemo123' }
 };
 
 /*
