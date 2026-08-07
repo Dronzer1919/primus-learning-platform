@@ -20,6 +20,39 @@
   <meta name="twitter:description" content="Free online compiler — run HTML/CSS/JS &amp; TypeScript in the browser." />
   <meta name="twitter:image" content="https://primuscodex.com/assets/icon/logo.svg" />
 
+  <!-- Structured data. This is what lets a search result show the site name and
+       logo rather than a bare URL: the meta tags above describe the page, this
+       describes the *site*. WebSite carries the name, Organization carries the
+       logo. Both point at the same canonical origin so Google can tie them
+       together. Keep the URLs absolute — relative ones are ignored here. -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://primuscodex.com/#website",
+          "url": "https://primuscodex.com/",
+          "name": "Primus Codex",
+          "description": "Free online compiler and learning platform — run HTML/CSS/JS & TypeScript in the browser, visualize code execution, and study interview topics.",
+          "inLanguage": "en",
+          "publisher": { "@id": "https://primuscodex.com/#organization" }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://primuscodex.com/#organization",
+          "name": "Primus Codex",
+          "url": "https://primuscodex.com/",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://primuscodex.com/assets/icon/logo.svg",
+            "caption": "Primus Codex"
+          }
+        }
+      ]
+    }
+  </script>
+
   <base href="/" />
 
   <!-- Perf: warm up connections to the third-party origins used lazily (Google Sign-In
