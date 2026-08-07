@@ -297,6 +297,18 @@ h2 {
   // button as-is so nothing is cut.
 }
 
+.google-unavailable-note {
+  margin: 0;
+  padding: 11px 16px;
+  border: 1.5px dashed var(--ion-color-step-150, #e2e8f0);
+  border-radius: 10px;
+  width: 100%;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ion-color-medium);
+}
+
 .google-login-btn {
   display: flex;
   align-items: center;

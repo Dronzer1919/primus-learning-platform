@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { IonicModule } from '@ionic/angular';
 import { ThemeService } from './services/theme.service';
+import { SeoService } from './services/seo.service';
 
 @Component({
   selector: 'app-root',
@@ -9,5 +10,7 @@ import { ThemeService } from './services/theme.service';
   imports: [IonicModule],
 })
 export class AppComponent {
-  constructor(private themeService: ThemeService) {}
+  constructor(private themeService: ThemeService, seoService: SeoService) {
+    seoService.init();
+  }
 }

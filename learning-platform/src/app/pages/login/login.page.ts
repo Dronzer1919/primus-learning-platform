@@ -1,4 +1,4 @@
-import { Component, AfterViewInit, NgZone, OnDestroy } from '@angular/core';
+import { Component, AfterViewInit, NgZone, OnDestroy, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule, Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -22,6 +22,8 @@ declare const google: any;
   imports: [IonicModule, CommonModule, FormsModule, ThemeSelectorComponent]
 })
 export class LoginPage implements AfterViewInit, OnDestroy {
+  @ViewChild('googleBtnContainer') googleBtnContainer?: ElementRef<HTMLDivElement>;
+
   // 'login' -> normal sign in, 'forgot' -> password recovery flow
   mode: 'login' | 'forgot' = 'login';
 
@@ -50,8 +52,17 @@ export class LoginPage implements AfterViewInit, OnDestroy {
   errorMessage = '';
   googleConfigured = environment.googleClientId !== 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
 
-  /** Set once Google's client has initialised; until then the button does nothing. */
+  /** True once the button has actually been drawn into the container at least once. */
+  private googleButtonRendered = false;
+  /** True once initialize() has succeeded — lets a later return-to-login render the button. */
   private googleReady = false;
+  /**
+   * Set once the GSI script never showed up within the timeout — an ad blocker
+   * or privacy extension blocking accounts.google.com/gsi/client is common
+   * enough that this needs its own message rather than leaving a silent empty
+   * box where the button should be.
+   */
+  googleUnavailable = false;
   private googleInitTimer?: ReturnType<typeof setTimeout>;
   private destroyed = false;
 
@@ -83,10 +94,19 @@ export class LoginPage implements AfterViewInit, OnDestroy {
   /**
    * Waits for Google's script to appear, but not forever.
    *
+   * Renders Google's own interactive button rather than driving the passive
+   * One Tap prompt: prompt() only auto-signs-in when the browser already has
+   * exactly one obvious Google session, and otherwise either shows nothing
+   * (Incognito, no session — the prompt has no popup fallback of its own) or a
+   * small floating card. renderButton's popup, by contrast, always opens
+   * Google's real "Choose an account" chooser — the same page for one account,
+   * multiple accounts, or none — so the experience doesn't depend on prior
+   * session state and never needs a second click to recover from a miss.
+   *
    * The previous version rescheduled itself every 300ms with no exit: if the
    * GSI script is blocked — an ad blocker, a corporate proxy, or simply being
-   * offline — that timer runs for as long as the tab is open, and it survives
-   * navigating away from this page because nothing cancels it. Ten seconds is
+   * offline — that timer ran for as long as the tab was open, surviving even a
+   * navigation away from this page since nothing cancelled it. Ten seconds is
    * far longer than the script needs and short enough to give up cleanly.
    */
   private initializeGoogle(): void {
@@ -99,21 +119,26 @@ export class LoginPage implements AfterViewInit, OnDestroy {
         try {
           google.accounts.id.initialize({
             client_id: environment.googleClientId,
-            callback: (response: any) => this.handleGoogleCallback(response),
-            use_fedcm_for_prompt: false,
-            auto_select: false,
-            cancel_on_tap_outside: true
+            callback: (response: any) => this.handleGoogleCallback(response)
           });
           this.googleReady = true;
+          this.ngZone.run(() => this.renderGoogleButton());
         } catch {
           // Third-party script failing to initialise is not this app's problem
           // to crash over — username/password sign-in is unaffected.
-          this.googleReady = false;
+          this.ngZone.run(() => (this.googleUnavailable = true));
         }
         return;
       }
 
-      if (Date.now() >= deadline) return;
+      if (Date.now() >= deadline) {
+        // The script never showed up — most likely an ad blocker or privacy
+        // extension blocking accounts.google.com/gsi/client. Say so instead of
+        // leaving an empty box where the button should be; username/password
+        // sign-in still works either way.
+        this.ngZone.run(() => (this.googleUnavailable = true));
+        return;
+      }
       this.googleInitTimer = setTimeout(tryInit, 300);
     };
 
@@ -125,19 +150,25 @@ export class LoginPage implements AfterViewInit, OnDestroy {
     if (this.googleInitTimer) clearTimeout(this.googleInitTimer);
   }
 
-  triggerGoogleLogin(): void {
-    // Only after initialize() has run: prompt() on an uninitialised client
-    // throws, and that throw would surface as an app error for what is really
-    // just a third-party script that has not loaded.
-    if (!this.googleReady) {
-      this.errorMessage = 'Google sign-in is still loading. Please try again in a moment.';
-      return;
-    }
-    try {
-      google.accounts.id.prompt();
-    } catch {
-      this.errorMessage = 'Google sign-in is unavailable right now. Use your username and password.';
-    }
+  /**
+   * Safe to call more than once — it's the only way to recover the button
+   * after the "Forgot password?" flow. That flow swaps out the whole login
+   * card (including this container) behind *ngIf, so if initialize() finishes
+   * while the user is on that screen, there's nothing to render into yet; the
+   * container only comes back once they return to the login form.
+   */
+  private renderGoogleButton(): void {
+    const el = this.googleBtnContainer?.nativeElement;
+    if (!el || typeof google === 'undefined' || !google?.accounts?.id) return;
+    google.accounts.id.renderButton(el, {
+      type: 'standard',
+      theme: 'outline',
+      size: 'large',
+      text: 'continue_with',
+      shape: 'rectangular',
+      width: Math.max(200, Math.min(el.offsetWidth || 335, 400))
+    });
+    this.googleButtonRendered = true;
   }
 
   private handleGoogleCallback(response: any): void {
@@ -155,7 +186,10 @@ export class LoginPage implements AfterViewInit, OnDestroy {
         },
         error: (error: HttpErrorResponse) => {
           this.isLoading = false;
-          this.errorMessage = 'Google login failed. Please try again.';
+          // Same treatment as onLogin()'s error branch: the API's own message
+          // (rate limit, expired token, etc.) beats one generic string for
+          // every possible failure.
+          this.errorMessage = friendlyMessage(error);
           this.toastOnce(error, this.errorMessage);
         }
       });
@@ -239,6 +273,15 @@ export class LoginPage implements AfterViewInit, OnDestroy {
     this.mode = 'login';
     this.errorMessage = '';
     this.otpService.reset();
+
+    // The login card (and the Google button container inside it) was just
+    // torn down by *ngIf while on the forgot-password screen. If Google
+    // finished initializing while it was hidden, the button never got drawn —
+    // catch that here now that the container exists again. A no-op the rest
+    // of the time (already rendered, or Google still isn't ready).
+    if (this.googleReady && !this.googleButtonRendered) {
+      setTimeout(() => this.renderGoogleButton());
+    }
   }
 
   private emailValid(email: string): boolean {

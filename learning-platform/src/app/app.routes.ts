@@ -6,19 +6,48 @@ export const routes: Routes = [
     // Home page: the Programiz-style compiler workspace (Playground / JavaScript / TypeScript).
     path: '',
     loadComponent: () => import('./components/code-playground/code-playground.component').then((m) => m.CodePlaygroundComponent),
+    data: {
+      seo: {
+        title: 'Online Compiler — Primus Codex',
+        description:
+          'Free online compiler and learning platform — run HTML/CSS/JS & TypeScript in the browser, visualize code execution, and study interview topics.',
+        path: '/',
+      },
+    },
   },
   {
     // Former marketing landing page, kept reachable but no longer the home page.
     path: 'landing',
     loadComponent: () => import('./pages/landing/landing.page').then((m) => m.LandingPage),
+    data: {
+      seo: {
+        title: 'Primus Codex — Learn to Code Online',
+        description: 'Learn HTML, CSS, JavaScript and TypeScript with an in-browser compiler and interview-prep content.',
+        path: '/landing',
+      },
+    },
   },
   {
     path: 'login',
     loadComponent: () => import('./pages/login/login.page').then((m) => m.LoginPage),
+    data: {
+      seo: {
+        title: 'Log In — Primus Codex',
+        description: 'Log in to Primus Codex to save your playground sessions, notes and learning progress.',
+        path: '/login',
+      },
+    },
   },
   {
     path: 'signup',
     loadComponent: () => import('./pages/signup/signup.page').then((m) => m.SignupPage),
+    data: {
+      seo: {
+        title: 'Sign Up — Primus Codex',
+        description: 'Create a free Primus Codex account to save your playground sessions, notes and learning progress.',
+        path: '/signup',
+      },
+    },
   },
   {
     path: 'admin',
@@ -77,6 +106,13 @@ export const routes: Routes = [
     // Standalone flowchart / diagram builder.
     path: 'flowchart',
     loadComponent: () => import('./components/flowchart/flowchart.component').then((m) => m.FlowchartComponent),
+    data: {
+      seo: {
+        title: 'Flowchart Builder — Primus Codex',
+        description: 'Build and visualize flowcharts and diagrams online, free, right in your browser.',
+        path: '/flowchart',
+      },
+    },
   },
   {
     path: '**',
