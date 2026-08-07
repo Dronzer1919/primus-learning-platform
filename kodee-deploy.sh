@@ -10,8 +10,10 @@
 #  Usage (on the Hostinger VPS, as root):
 #      bash kodee-deploy.sh
 #
+#  Deploys the `dev` branch, which is where this app's code lives.
+#
 #  Everything below is overridable from the environment, e.g.
-#      BRANCH=dev bash kodee-deploy.sh
+#      BRANCH=feature/flowchart bash kodee-deploy.sh
 #      SEED_ADMIN_PASSWORD='...' SEED_USER_PASSWORD='...' bash kodee-deploy.sh
 #      FORCE_USER_SEED=yes bash kodee-deploy.sh     # DANGER: wipes all users
 # ============================================================================
@@ -23,9 +25,10 @@ set -Eeuo pipefail
 # ---------------------------------------------------------------------------
 REPO_URL="${REPO_URL:-https://github.com/Dronzer1919/primus-learning-platform.git}"
 APP_DIR="${APP_DIR:-/root/learning-platform}"
-# The repo has no `main` branch — origin/HEAD points at master, and dev is where
-# day-to-day work lands. Deploy master by default; override with BRANCH=dev.
-BRANCH="${BRANCH:-master}"
+# There is no `main` branch, and `master` is an EMPTY initial commit — origin/HEAD
+# points at it, but it carries no files. All the app code lives on `dev`, which is
+# also what the GitHub Actions workflow deploys (see DEPLOY_DEV_AUTOMATION.md).
+BRANCH="${BRANCH:-dev}"
 
 DOMAIN="${DOMAIN:-primuscodex.com}"
 API_HOST_PORT="${API_HOST_PORT:-3100}"   # published as 127.0.0.1:3100 -> container :3001
@@ -107,6 +110,20 @@ if [ -d "$APP_DIR/.git" ]; then
   # "dubious ownership" check and aborts the deploy.
   git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
   git fetch --prune origin
+
+  git rev-parse --verify "origin/$BRANCH" >/dev/null 2>&1 \
+    || die "origin/$BRANCH does not exist. Available: $(git branch -r --format='%(refname:short)' | tr '\n' ' ')"
+
+  # Checked BEFORE the hard reset, because the reset is destructive. `master` in
+  # this repo is an empty initial commit: resetting to it deletes every file in
+  # the working tree and leaves docker compose with nothing to read ("no
+  # configuration file provided"). Verifying the branch actually carries the app
+  # first means a wrong BRANCH value fails safely instead of wiping the VPS.
+  git cat-file -e "origin/$BRANCH:docker-compose.yml" 2>/dev/null \
+    || die "origin/$BRANCH has no docker-compose.yml at its root — it does not contain the app.
+  Refusing to reset $APP_DIR to it (that would delete the working tree).
+  The app lives on 'dev'. Re-run as:  BRANCH=dev bash kodee-deploy.sh"
+
   git checkout "$BRANCH" 2>/dev/null || git checkout -b "$BRANCH" "origin/$BRANCH"
   # Hard reset rather than pull: a deploy box should mirror the remote exactly,
   # and a stray local edit must never be able to stall a deploy with a conflict.
@@ -118,6 +135,11 @@ else
   cd "$APP_DIR"
   ok "cloned $REPO_URL into $APP_DIR"
 fi
+
+# Belt and braces for the clone path, and a clear message instead of docker's
+# cryptic "no configuration file provided: not found".
+[ -f docker-compose.yml ] \
+  || die "docker-compose.yml is missing from $APP_DIR after checking out '$BRANCH'."
 
 ok "now at $(git rev-parse --short HEAD) — $(git log -1 --pretty=%s)"
 
