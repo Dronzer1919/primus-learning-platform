@@ -269,6 +269,12 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
   }
 
   runJavaScriptOnly(): void {
+    // The output panel is *ngIf-swapped with the visualizer — running new code
+    // while the visualizer is open would compute fresh console output behind a
+    // still-playing trace of the *previous* code, with no visible sign the run
+    // even happened. Closing it switches back to the console panel and (via
+    // the visualizer's own ngOnDestroy) stops its play timer.
+    this.showVisualizer = false;
     this.jsOnlyConsole = this.codeExecutionService.runInPage(this.jsOnlyCode);
     this.scheduleCelebration(() => this.jsOnlyConsole);
   }

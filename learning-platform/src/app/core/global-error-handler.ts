@@ -65,12 +65,11 @@ export class GlobalErrorHandler implements ErrorHandler {
       return;
     }
 
-    // Toasts must be created inside the zone — errors frequently surface from
-    // outside it (timers, native callbacks, promise rejections), and a toast
-    // presented there would not trigger change detection.
-    this.zone.run(() => {
-      void this.notifier.error('Something went wrong. The page is still usable — please try that again.');
-    });
+    // No user-facing toast here by design: this handler catches *any* uncaught
+    // error app-wide, including ones that don't visibly break anything the user
+    // is looking at, and the generic "Something went wrong" message was firing
+    // often enough to read as noise rather than signal. The error is still
+    // captured above via logError for diagnosis.
   }
 
   /** Rejected promises and zone.js wrap the real error; report the cause, not the wrapper. */
