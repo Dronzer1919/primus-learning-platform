@@ -10,6 +10,7 @@
     "seed:html-interview": "node seed-html-interview.js",
     "seed:css-interview": "node seed-css-interview.js",
     "seed:js-interview": "node seed-js-interview.js",
+    "ensure-accounts": "node ensure-accounts.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

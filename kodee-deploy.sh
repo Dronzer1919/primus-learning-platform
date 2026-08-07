@@ -378,6 +378,30 @@ else
       warn "$seed_file not found in the image — skipped"
     fi
   done
+
+  # --- 6c. Make the login accounts correct. Runs on EVERY deploy, and it has to:
+  #     the common case is the one where seed.js was skipped because real users
+  #     exist, and that is exactly when the login page can end up prefilled with
+  #     guest credentials that no account actually has — "Invalid credentials" on
+  #     a form the site filled in itself. Deletes nothing.
+  printf '\n  %s— ensuring login accounts%s\n' "$C_BOLD" "$C_RESET"
+  if docker exec "$API_CONTAINER" test -f ensure-accounts.js; then
+    # ADMIN_PW is only set when seed.js ran, so fall back to the stored value.
+    ENSURE_ADMIN_PW="${ADMIN_PW:-$(read_env_key SEED_ADMIN_PASSWORD)}"
+    if docker exec \
+         -e "DEMO_USER_PASSWORD=$DEMO_USER_PASSWORD" \
+         -e "SEED_ADMIN_PASSWORD=$ENSURE_ADMIN_PW" \
+         "$API_CONTAINER" node ensure-accounts.js; then
+      ok "login accounts ready"
+      # ensure-accounts forces the guest password, so this is what now works.
+      USER_PASSWORD_TO_REPORT="$DEMO_USER_PASSWORD"
+    else
+      fail "ensure-accounts.js FAILED — the guest login will not work"
+      SEED_FAILURES+=("ensure-accounts.js")
+    fi
+  else
+    warn "ensure-accounts.js not found in the image — skipped"
+  fi
 fi
 
 # ---------------------------------------------------------------------------
