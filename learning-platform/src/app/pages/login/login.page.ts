@@ -169,9 +169,19 @@ export class LoginPage implements AfterViewInit, OnDestroy {
 
     // Deferred a frame: called right as initialize() resolves, which can land
     // mid-layout (e.g. an Ionic page-transition just starting) and read the
-    // container at 0 width. A fallback of Google's 400px max — the widest it
-    // can go — then overflows a mobile card that's often only ~300px wide;
-    // 280 is a safe width that fits comfortably even there.
+    // container at 0 width.
+    //
+    // width is always Google's own documented max (400), not a measurement of
+    // the container. That used to be capped to the container's own offsetWidth
+    // (down to a 200px floor) to avoid overflowing narrow phone cards — but on
+    // a *personalized* button ("Continue as Name — email@…") Google doesn't
+    // widen the button to fit that text, it clips the label to whatever width
+    // it's told, inside its own iframe where no CSS on this page can reach it.
+    // A ~300px-wide card requesting a ~230px button got the chevron and G icon
+    // sliced off with no way to recover them. Always requesting the max avoids
+    // that clipping; the .google-rendered-btn CSS caps and centers the box, so
+    // on a narrow card the worst case is the button overflowing its own box by
+    // a symmetric few pixels — visible in full, just not perfectly contained.
     requestAnimationFrame(() => {
       google.accounts.id.renderButton(el, {
         type: 'standard',
@@ -179,7 +189,7 @@ export class LoginPage implements AfterViewInit, OnDestroy {
         size: 'large',
         text: 'continue_with',
         shape: 'rectangular',
-        width: Math.max(200, Math.min(el.offsetWidth || 280, 400))
+        width: 400
       });
       this.googleButtonRendered = true;
     });
