@@ -337,7 +337,13 @@
   border-radius: 14px;
   background: color-mix(in srgb, var(--theme-card-background), transparent 45%);
 
-  ion-icon {
+  // Direct child, not a plain descendant selector: the button below also has
+  // an ion-icon (the + on "Create First Note"), and a bare `ion-icon` selector
+  // here was matching that one too — handing it this 44-60px, mostly-transparent,
+  // margin-bottom:10px styling meant for the big centered document icon. That
+  // made the button's icon effectively invisible and knocked it out of line
+  // with its own label.
+  > ion-icon {
     font-size: fluid(44px, 60px);
     color: color-mix(in srgb, var(--ion-color-primary), transparent 65%);
     margin-bottom: 10px;
