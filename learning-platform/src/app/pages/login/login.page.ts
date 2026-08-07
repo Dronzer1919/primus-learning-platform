@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { IonicModule } from '@ionic/angular';
 import { friendlyMessage } from '../../interceptors/error.interceptor';
+import { NotificationService } from '../../core/notification.service';
 import { AuthService } from '../../services/auth.service';
 import { OtpService } from '../../services/otp.service';
 import { LoginCredentials } from '../../models/user.model';
@@ -49,6 +50,7 @@ export class LoginPage implements AfterViewInit, OnDestroy {
 
   constructor(
     private authService: AuthService,
+    private notifications: NotificationService,
     private otpService: OtpService,
     private router: Router,
     private route: ActivatedRoute,
@@ -144,9 +146,10 @@ export class LoginPage implements AfterViewInit, OnDestroy {
           this.isLoading = false;
           this.goAfterLogin(user.role === 'admin' ? '/admin' : '/user');
         },
-        error: () => {
+        error: (error: HttpErrorResponse) => {
           this.isLoading = false;
           this.errorMessage = 'Google login failed. Please try again.';
+          this.toastOnce(error, this.errorMessage);
         }
       });
     });
@@ -174,8 +177,26 @@ export class LoginPage implements AfterViewInit, OnDestroy {
         // rather than all collapsing into "check your credentials" — which sends
         // people round a retry loop that can only make a block worse.
         this.errorMessage = friendlyMessage(error);
+        this.toastOnce(error, this.errorMessage);
       }
     });
+  }
+
+  /**
+   * Toasts a login failure alongside the inline message, so a submit that fails
+   * is noticed even when the error line is scrolled out of view.
+   *
+   * The interceptor's `report()` already announces two cases itself — a 429 and
+   * an offline status 0. Repeating them here would stack two toasts for one
+   * submit, so those are left to it.
+   */
+  private toastOnce(error: HttpErrorResponse, message: string): void {
+    const alreadyAnnounced =
+      error?.status === 429 ||
+      (error?.status === 0 && typeof navigator !== 'undefined' && navigator.onLine === false);
+    if (alreadyAnnounced) return;
+
+    void this.notifications.error(message);
   }
 
   /**
