@@ -31,6 +31,19 @@
   max-width: 460px;
   margin: 0 auto;
   padding: 12px 18px 48px;
+
+  // Anchor the brand + card group to the bottom of the screen on phones,
+  // instead of sitting wherever the content happens to end near the top.
+  // min-height keys off ion-content's scroll area, which stretches to the
+  // full viewport when the content is shorter than it — once content grows
+  // past that (the multi-step forgot-password flow, or the keyboard opening
+  // over the form), the column scrolls normally rather than clipping.
+  @include below('sm') {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
 }
 
 .brand {
@@ -285,10 +298,15 @@ h2 {
 }
 
 .google-rendered-btn {
-  // Fixed 335px (tested to sit nicely inside the card with the G branding clear
-  // of the edge); shrinks to fit on narrow screens. Centered by .google-btn-wrapper.
-  width: 335px;
-  max-width: 100%;
+  // 400px is Google's own documented max for renderButton — anything smaller
+  // and a *personalized* button ("Continue as Name — email@…") can need more
+  // room than a plain "Continue with Google" one and overflow the box, since
+  // Google draws it as a fixed-width iframe that doesn't shrink to fit. Fill
+  // available space up to that cap instead of a smaller fixed width.
+  // (auto_select: false in login.page.ts is what actually stops Google from
+  // choosing the wider personalized button in the first place.)
+  width: 100%;
+  max-width: 400px;
   min-height: 44px;
   display: flex;
   justify-content: center;

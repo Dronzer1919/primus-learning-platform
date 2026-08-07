@@ -119,7 +119,13 @@ export class LoginPage implements AfterViewInit, OnDestroy {
         try {
           google.accounts.id.initialize({
             client_id: environment.googleClientId,
-            callback: (response: any) => this.handleGoogleCallback(response)
+            callback: (response: any) => this.handleGoogleCallback(response),
+            // Without this, Google can render the button in its "personalized"
+            // form — "Continue as Name — email@…" with an avatar — for a
+            // session it already recognizes. That copy is wider than a plain
+            // "Continue with Google" button and is what was overflowing the
+            // card on the right edge.
+            auto_select: false
           });
           this.googleReady = true;
           this.ngZone.run(() => this.renderGoogleButton());
@@ -160,15 +166,23 @@ export class LoginPage implements AfterViewInit, OnDestroy {
   private renderGoogleButton(): void {
     const el = this.googleBtnContainer?.nativeElement;
     if (!el || typeof google === 'undefined' || !google?.accounts?.id) return;
-    google.accounts.id.renderButton(el, {
-      type: 'standard',
-      theme: 'outline',
-      size: 'large',
-      text: 'continue_with',
-      shape: 'rectangular',
-      width: Math.max(200, Math.min(el.offsetWidth || 335, 400))
+
+    // Deferred a frame: called right as initialize() resolves, which can land
+    // mid-layout (e.g. an Ionic page-transition just starting) and read the
+    // container at 0 width. A fallback of Google's 400px max — the widest it
+    // can go — then overflows a mobile card that's often only ~300px wide;
+    // 280 is a safe width that fits comfortably even there.
+    requestAnimationFrame(() => {
+      google.accounts.id.renderButton(el, {
+        type: 'standard',
+        theme: 'outline',
+        size: 'large',
+        text: 'continue_with',
+        shape: 'rectangular',
+        width: Math.max(200, Math.min(el.offsetWidth || 280, 400))
+      });
+      this.googleButtonRendered = true;
     });
-    this.googleButtonRendered = true;
   }
 
   private handleGoogleCallback(response: any): void {
