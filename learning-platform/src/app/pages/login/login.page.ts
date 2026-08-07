@@ -24,8 +24,9 @@ export class LoginPage implements AfterViewInit, OnDestroy {
   // 'login' -> normal sign in, 'forgot' -> password recovery flow
   mode: 'login' | 'forgot' = 'login';
 
-  // Pre-filled (read-only) guest credentials — the page signs in as this user.
-  credentials: LoginCredentials = { email: 'testuser', password: 'user123' };
+  // `email` is a legacy field name — auth.service.ts sends its value as `username`,
+  // which is what the API matches on.
+  credentials: LoginCredentials = { email: '', password: '' };
   showPassword = false;
 
   // Forgot-password flow state
@@ -167,13 +168,12 @@ export class LoginPage implements AfterViewInit, OnDestroy {
       },
       error: (error: HttpErrorResponse) => {
         this.isLoading = false;
-        // The API distinguishes wrong credentials from a rate-limited IP
-        // (429 from authLimiter, which then blocks for 15 minutes). Showing
-        // "check your credentials" for the second sends people round a loop of
-        // retries that can only make the block worse.
-        this.errorMessage = error?.status === 429
-          ? friendlyMessage(error)
-          : 'Login failed. Please check your credentials.';
+        // Defer to the API's own message. errorHandler.js already decides what is
+        // safe to surface per status, so a 423 lockout ("try again in N minutes"),
+        // a 429 IP block and a 400 validation failure each read as themselves
+        // rather than all collapsing into "check your credentials" — which sends
+        // people round a retry loop that can only make a block worse.
+        this.errorMessage = friendlyMessage(error);
       }
     });
   }

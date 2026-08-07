@@ -54,8 +54,29 @@ echo ""
 echo "=============================="
 echo " Step 5: Seed the database"
 echo "=============================="
-docker exec lp-api node seed.js
-echo "Database seeded."
+# seed.js refuses to run when NODE_ENV=production unless ALLOW_PRODUCTION_SEED=yes,
+# and refuses to mint accounts without passwords. Those guards are deliberate — it
+# wipes User, LanguageTab and Topic before inserting. Supply the passwords from the
+# environment rather than this file, which lives in version control:
+#
+#   SEED_ADMIN_PASSWORD='...' SEED_USER_PASSWORD='...' bash kodee-deploy.sh
+if [ -z "$SEED_ADMIN_PASSWORD" ] || [ -z "$SEED_USER_PASSWORD" ]; then
+  echo "SKIPPED: set SEED_ADMIN_PASSWORD and SEED_USER_PASSWORD (8+ chars) to seed."
+  echo "The deploy itself succeeded — only the seed step was skipped."
+else
+  docker exec \
+    -e ALLOW_PRODUCTION_SEED=yes \
+    -e SEED_ADMIN_PASSWORD="$SEED_ADMIN_PASSWORD" \
+    -e SEED_USER_PASSWORD="$SEED_USER_PASSWORD" \
+    lp-api node seed.js
+
+  # Content seeds must follow seed.js, which deletes every topic.
+  docker exec lp-api node seed-html-interview.js
+  docker exec lp-api node seed-css-interview.js
+  docker exec lp-api node seed-js-interview.js
+  docker exec lp-api node seed-interview-content.js
+  echo "Database seeded."
+fi
 
 echo ""
 echo "=============================="

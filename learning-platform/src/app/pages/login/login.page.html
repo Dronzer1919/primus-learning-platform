@@ -28,10 +28,12 @@
     <div class="auth-card" *ngIf="mode === 'login'">
       <form (ngSubmit)="onLogin()">
         <div class="field">
-          <label>Username or email</label>
+          <label>Username</label>
           <div class="control">
             <ion-icon name="person-outline"></ion-icon>
-            <input type="text" [(ngModel)]="credentials.email" name="email" placeholder="you@example.com" autocomplete="username" readonly />
+            <!-- Username only: the API looks users up with findOne({ username }),
+                 so an email address here can never match. -->
+            <input type="text" [(ngModel)]="credentials.email" name="email" placeholder="Your username" autocomplete="username" />
           </div>
         </div>
 
@@ -42,7 +44,7 @@
           </div>
           <div class="control">
             <ion-icon name="lock-closed-outline"></ion-icon>
-            <input [type]="showPassword ? 'text' : 'password'" [(ngModel)]="credentials.password" name="password" placeholder="Your password" autocomplete="current-password" readonly />
+            <input [type]="showPassword ? 'text' : 'password'" [(ngModel)]="credentials.password" name="password" placeholder="Your password" autocomplete="current-password" />
             <button type="button" class="ghost" (click)="showPassword = !showPassword">
               <ion-icon [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
             </button>
