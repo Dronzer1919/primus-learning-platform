@@ -189,6 +189,12 @@ export class LoginPage implements AfterViewInit, OnDestroy {
         size: 'large',
         text: 'continue_with',
         shape: 'rectangular',
+        // The personalized variant right-aligns the G logo by default, which
+        // makes it the first casualty whenever Google's content runs wider
+        // than the box — truncation eats from the right edge inward. Pinning
+        // the logo to the left keeps the branding visible in full; anything
+        // that still doesn't fit loses trailing text instead.
+        logo_alignment: 'left',
         width: 400
       });
       this.googleButtonRendered = true;
