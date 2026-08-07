@@ -280,6 +280,17 @@ iframe {
   max-width: 100%;
 }
 
+/* Exempt the Google Sign-In button iframe from the clamp above. GIS sizes its
+   iframe to the exact width requested via renderButton (plus its own focus-ring
+   margins) and lays the button content out inside for that width; squeezing the
+   iframe narrower doesn't reflow that content, it just cuts off its right edge
+   — on the personalized "Continue as …" variant, that's the G logo. Has to
+   live here rather than in login.page.scss: GIS injects the iframe at runtime,
+   so it never gets the component's view-encapsulation attribute. */
+.google-rendered-btn iframe {
+  max-width: none;
+}
+
 img,
 video {
   height: auto;
