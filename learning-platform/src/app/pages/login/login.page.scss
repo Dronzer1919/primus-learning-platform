@@ -298,21 +298,25 @@ h2 {
 }
 
 .google-rendered-btn {
-  // 400px is Google's own documented max for renderButton — anything smaller
-  // and a *personalized* button ("Continue as Name — email@…") can need more
-  // room than a plain "Continue with Google" one and overflow the box, since
-  // Google draws it as a fixed-width iframe that doesn't shrink to fit. Fill
-  // available space up to that cap instead of a smaller fixed width.
-  // (auto_select: false in login.page.ts is what actually stops Google from
-  // choosing the wider personalized button in the first place.)
+  // 400px is Google's own documented max for renderButton, but a
+  // *personalized* button ("Continue as Name — email@…", plus an
+  // account-switcher chevron the plain button doesn't have) can still need
+  // more room than that to avoid truncating the email, and Google does not
+  // reliably honor the requested width for that variant. Fill available
+  // space up to the cap...
   width: 100%;
   max-width: 400px;
-  min-height: 44px;
   display: flex;
   justify-content: center;
-  // No overflow clipping / forced border-radius here: it slices the Google
-  // button's own outline at the corners. Use Google's standard rectangular
-  // button as-is so nothing is cut.
+  align-items: center;
+  // ...and clip anything that still doesn't fit, so it's contained at this
+  // box's edge instead of spilling into the page past the card. No min-height
+  // here — a fixed height combined with overflow:hidden is what sliced off
+  // the button's own border/background before (Google's real rendered height
+  // didn't quite match the number guessed here); leaving height auto lets the
+  // box match Google's iframe exactly, so only width ever gets clipped.
+  overflow: hidden;
+  border-radius: 10px;
 }
 
 .google-unavailable-note {

@@ -120,11 +120,11 @@ export class LoginPage implements AfterViewInit, OnDestroy {
           google.accounts.id.initialize({
             client_id: environment.googleClientId,
             callback: (response: any) => this.handleGoogleCallback(response),
-            // Without this, Google can render the button in its "personalized"
-            // form — "Continue as Name — email@…" with an avatar — for a
-            // session it already recognizes. That copy is wider than a plain
-            // "Continue with Google" button and is what was overflowing the
-            // card on the right edge.
+            // Turns off silent auto sign-in for a recognized session — it does
+            // NOT stop Google from rendering the personalized "Continue as
+            // Name — email@…" button copy (that's tied to session recognition
+            // itself, with no documented way to opt out); kept for its actual
+            // purpose, which is requiring an explicit click either way.
             auto_select: false
           });
           this.googleReady = true;
