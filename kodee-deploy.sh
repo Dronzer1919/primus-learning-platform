@@ -238,8 +238,48 @@ fi
 # ---------------------------------------------------------------------------
 step "Build images and start containers"
 
+# Repeated deploys on a small VPS quietly fill the disk with old image layers,
+# and "no space left on device" mid-build is the most common way this step dies.
+# Prune dangling layers up front; drop the build cache too when space is tight.
+FREE_MB="$(df -Pm /var/lib/docker 2>/dev/null | awk 'NR==2{print $4}' || true)"
+[[ "$FREE_MB" =~ ^[0-9]+$ ]] || FREE_MB="$(df -Pm / | awk 'NR==2{print $4}' || true)"
+[[ "$FREE_MB" =~ ^[0-9]+$ ]] || FREE_MB=999999
+if [ "$FREE_MB" -lt 3072 ]; then
+  warn "only ${FREE_MB}MB of disk free — pruning old images and build cache first"
+  docker image prune -f >/dev/null 2>&1 || true
+  docker builder prune -f >/dev/null 2>&1 || true
+  FREE_MB="$(df -Pm / | awk 'NR==2{print $4}' || true)"
+  ok "${FREE_MB:-?}MB free after pruning"
+fi
+
 "${DC[@]}" down --remove-orphans 2>/dev/null || true
-"${DC[@]}" up -d --build
+
+# Build and start are separate phases so a failure names the phase that broke
+# and prints that phase's diagnostics — the ERR trap alone reports only a line
+# number while the real docker error scrolls away above it.
+if ! "${DC[@]}" build; then
+  fail "image build failed — the docker error is printed directly above"
+  df -h / 2>/dev/null | sed 's/^/    /' || true
+  free -m 2>/dev/null | sed 's/^/    /' || true
+  die "docker build failed. Usual causes on a small VPS:
+  - 'no space left on device'   -> run: docker system prune -af   then re-run this script
+  - build killed (exit code 137) -> out of memory; add swap:
+        fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+  - npm registry network timeout -> simply re-run this script"
+fi
+ok "images built"
+
+if ! "${DC[@]}" up -d; then
+  fail "containers failed to start — status:"
+  docker ps -a --filter name=lp- --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' 2>/dev/null | sed 's/^/    /' || true
+  for c in "$API_CONTAINER" "$WEB_CONTAINER" "$MONGO_CONTAINER"; do
+    printf '    --- last 15 log lines: %s ---\n' "$c"
+    docker logs --tail 15 "$c" 2>&1 | sed 's/^/    /' || true
+  done
+  die "docker compose up failed — see the docker error and logs above.
+  If a port is 'already allocated', something else holds 127.0.0.1:${API_HOST_PORT} or
+  127.0.0.1:${WEB_HOST_PORT} — find it with:  docker ps ; ss -ltnp"
+fi
 ok "containers started"
 
 # ---------------------------------------------------------------------------
