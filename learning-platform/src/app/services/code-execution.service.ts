@@ -17,41 +17,99 @@ export class CodeExecutionService {
   private pyodideInstance: any | null = null;
   private pyodideLoadingPromise: Promise<any> | null = null;
 
+  // How long a run's pending-timer bookkeeping is kept around after its synchronous
+  // portion finishes, so getPendingTimerCount() stays meaningful while its setTimeout/
+  // promise chains are still in flight. Bounded so a snippet with a very long-lived timer
+  // can't leave the "is this run still going" state pinned open forever.
+  private static readonly ASYNC_CAPTURE_WINDOW_MS = 15000;
+
+  private activeCapture: { timer: any; pendingTimers: number } | null = null;
+
   constructor(private sanitizer: DomSanitizer) {}
 
-  // Runs JavaScript directly in the current page (no iframe) and returns the captured
-  // console output. Normal logs are prefixed "> "; errors are prefixed "ERROR: " so the
-  // console panel can style them. console.* is overridden only for the (synchronous)
-  // duration of the run and always restored, so the app's own logging is unaffected.
+  // Runs JavaScript directly in the current page (no iframe, but sandboxed via parameter
+  // shadowing — see below) and returns the captured console output as a live array: the
+  // same array instance keeps receiving pushes from async callbacks (setTimeout, promises)
+  // that log after this call returns. Normal logs are prefixed "> "; errors are prefixed
+  // "ERROR: " so the console panel can style them.
   //
-  // Note: because capture is synchronous, output from async code (setTimeout, promises)
-  // that logs AFTER the run returns is not captured here.
-  runInPage(js: string): string[] {
+  // `console`, `setTimeout` and `clearTimeout` are passed as parameters of the executed
+  // function rather than patched on `window`. Because JS scoping is lexical, every closure
+  // the run creates — including ones that don't fire until long after this call returns,
+  // like a setTimeout callback or an awaited promise — still resolves bare `console.log`/
+  // `setTimeout` to these sandboxed versions, without ever touching the real globals. That
+  // matters: patching `window.setTimeout` directly previously caused the app's OWN internal
+  // timers (e.g. this component's success-banner debounce) to route through the patch too,
+  // which even triggered infinite recursion once a callback of ours called `clearTimeout`.
+  //
+  // The sandboxed setTimeout/clearTimeout also count timers the run has scheduled but not
+  // yet fired or cancelled (getPendingTimerCount()). Promise chains built on setTimeout (the
+  // common `sleep` pattern) are covered transitively, since they call this same function.
+  //
+  // `onActivity`, if given, fires after every console line pushed and after every pending-
+  // timer count change — so callers can tell "the run is still doing something" apart from
+  // "nothing left is scheduled", which the returned array alone can't distinguish.
+  runInPage(js: string, onActivity?: () => void): string[] {
+    this.stopCapture();
+
     const logs: string[] = [];
     const format = (args: any) =>
       Array.prototype.map.call(args, (arg: any) => this.formatArg(arg)).join(' ');
-
-    const native = {
-      log: console.log, info: console.info, warn: console.warn, error: console.error
+    const push = (line: string) => {
+      logs.push(line);
+      onActivity?.();
     };
-    console.log = function () { logs.push('> ' + format(arguments)); };
-    console.info = function () { logs.push('> ' + format(arguments)); };
-    console.warn = function () { logs.push('> ' + format(arguments)); };
-    console.error = function () { logs.push('ERROR: ' + format(arguments)); };
+
+    const sandboxConsole = {
+      log: (...args: any[]) => push('> ' + format(args)),
+      info: (...args: any[]) => push('> ' + format(args)),
+      warn: (...args: any[]) => push('> ' + format(args)),
+      error: (...args: any[]) => push('ERROR: ' + format(args))
+    };
+
+    const capture = { timer: null as any, pendingTimers: 0 };
+    const sandboxSetTimeout = ((handler: TimerHandler, timeout?: number, ...args: any[]) => {
+      if (typeof handler !== 'function') return window.setTimeout(handler, timeout, ...args);
+      capture.pendingTimers++;
+      return window.setTimeout(() => {
+        capture.pendingTimers--;
+        try {
+          handler(...args);
+        } finally {
+          onActivity?.();
+        }
+      }, timeout);
+    }) as typeof setTimeout;
+    const sandboxClearTimeout = ((id: any) => {
+      capture.pendingTimers = Math.max(0, capture.pendingTimers - 1);
+      window.clearTimeout(id);
+      onActivity?.();
+    }) as typeof clearTimeout;
 
     try {
       // eslint-disable-next-line no-new-func
-      const run = new Function(js);
-      run();
+      const run = new Function('console', 'setTimeout', 'clearTimeout', js);
+      run(sandboxConsole, sandboxSetTimeout, sandboxClearTimeout);
     } catch (error: any) {
-      logs.push('ERROR: ' + (error && error.message ? error.message : String(error)));
-    } finally {
-      console.log = native.log;
-      console.info = native.info;
-      console.warn = native.warn;
-      console.error = native.error;
+      push('ERROR: ' + (error && error.message ? error.message : String(error)));
     }
+
+    capture.timer = window.setTimeout(() => this.stopCapture(), CodeExecutionService.ASYNC_CAPTURE_WINDOW_MS);
+    this.activeCapture = capture;
+
     return logs;
+  }
+
+  /** Timers the current (or most recent) run has scheduled but not yet fired or cancelled. */
+  getPendingTimerCount(): number {
+    return this.activeCapture?.pendingTimers ?? 0;
+  }
+
+  /** Drops pending-timer bookkeeping for the current run. Safe to call when none is active. */
+  stopCapture(): void {
+    if (!this.activeCapture) return;
+    window.clearTimeout(this.activeCapture.timer);
+    this.activeCapture = null;
   }
 
   // Builds the markup for the Web (HTML/CSS/JS) preview, injected into a page container

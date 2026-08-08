@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnDestroy, OnInit } from '@angular/core';
+import { Component, Input, Output, EventEmitter, NgZone, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { IonicModule, ToastController } from '@ionic/angular';
@@ -119,6 +119,10 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
   confetti: Array<{ left: number; color: string; delay: number; duration: number; drift: number }> = [];
   private celebrationCheckTimer: any = null;
   private celebrationHideTimer: any = null;
+  // True once this run has celebrated. Async output (setTimeout, promises) can keep
+  // arriving well after that first decision — without this flag, each burst of output
+  // that goes quiet for 500ms would retrigger a fresh confetti burst.
+  private celebrated = false;
 
   // TypeScript state
   tsCode = DEFAULT_TS;
@@ -128,7 +132,8 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
     private codeExecutionService: CodeExecutionService,
     private toastController: ToastController,
     public authService: AuthService,
-    private router: Router
+    private router: Router,
+    private ngZone: NgZone
   ) {}
 
   logout(): void {
@@ -152,6 +157,7 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
     this.accordionMql?.removeEventListener('change', this.onAccordionChangeRef);
     clearTimeout(this.celebrationCheckTimer);
     clearTimeout(this.celebrationHideTimer);
+    this.codeExecutionService.stopCapture();
   }
 
   get modeIcon(): string {
@@ -241,11 +247,12 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
 
   runCode(): void {
     this.consoleOutput = [];
+    this.celebrated = false;
     // Render the HTML/CSS into the in-page preview container (no iframe).
     this.output = this.codeExecutionService.buildWebMarkup(this.htmlCode, this.cssCode);
     // Run the JS after Angular paints the markup so document queries resolve.
     setTimeout(() => {
-      this.consoleOutput = this.codeExecutionService.runInPage(this.jsCode);
+      this.consoleOutput = this.codeExecutionService.runInPage(this.jsCode, () => this.scheduleCelebration(() => this.consoleOutput));
       this.scheduleCelebration(() => this.consoleOutput);
     });
   }
@@ -258,6 +265,8 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
     this.consoleOutput = [];
     this.runSucceeded = false;
     this.showCelebration = false;
+    this.celebrated = false;
+    this.codeExecutionService.stopCapture();
   }
 
   resetCode(): void {
@@ -275,7 +284,8 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
     // even happened. Closing it switches back to the console panel and (via
     // the visualizer's own ngOnDestroy) stops its play timer.
     this.showVisualizer = false;
-    this.jsOnlyConsole = this.codeExecutionService.runInPage(this.jsOnlyCode);
+    this.celebrated = false;
+    this.jsOnlyConsole = this.codeExecutionService.runInPage(this.jsOnlyCode, () => this.scheduleCelebration(() => this.jsOnlyConsole));
     this.scheduleCelebration(() => this.jsOnlyConsole);
   }
 
@@ -283,6 +293,8 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
     this.jsOnlyConsole = [];
     this.runSucceeded = false;
     this.showCelebration = false;
+    this.celebrated = false;
+    this.codeExecutionService.stopCapture();
   }
 
   /** Opens the step-through visualizer for the current JavaScript code. */
@@ -312,27 +324,56 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
 
   async runTypeScript(): Promise<void> {
     this.tsConsole = [];
+    this.celebrated = false;
     try {
       const js = await this.codeExecutionService.transpileTypeScript(this.tsCode);
-      this.tsConsole = this.codeExecutionService.runInPage(js);
+      this.tsConsole = this.codeExecutionService.runInPage(js, () => this.scheduleCelebration(() => this.tsConsole));
       this.scheduleCelebration(() => this.tsConsole);
     } catch (error: any) {
       this.tsConsole.push('ERROR: ' + (error?.message ?? 'Failed to compile TypeScript.'));
     }
   }
 
-  // Runs after a run populates the console, then celebrates only if no error line appeared.
+  // Called once right after a run, and again on every subsequent activity (a console line,
+  // or a setTimeout scheduled/fired/cancelled by the run's own code — see
+  // CodeExecutionService.runInPage). Before the first decision is made, each call hides the
+  // success line and restarts the 500ms debounce, so it only shows once activity has gone
+  // quiet for 500ms with no error line AND no timers left pending — never mid-stream while
+  // a setTimeout/promise chain is still running (e.g. `await sleep(2500)` followed by more
+  // code). Once decided, later activity no longer retriggers the celebration; it only
+  // revokes an already-shown success if a late line turns out to be an error.
+  //
+  // Wrapped in NgZone.run(): this app's dev build doesn't patch window.setTimeout (plain
+  // `setTimeout` callbacks land in the root zone here, not Angular's), and the run's own
+  // async output arrives via exactly such callbacks — so without an explicit run(), neither
+  // the console lines nor this celebration state would trigger change detection at all.
   private scheduleCelebration(getConsole: () => string[]): void {
-    // A fresh run clears the previous success line until this run proves clean.
-    this.runSucceeded = false;
-    this.showCelebration = false;
-    clearTimeout(this.celebrationCheckTimer);
-    this.celebrationCheckTimer = setTimeout(() => {
-      const hasError = getConsole().some((line) => this.isErrorLine(line));
-      if (!hasError) {
-        this.triggerCelebration();
+    this.ngZone.run(() => {
+      if (this.celebrated) {
+        if (getConsole().some((line) => this.isErrorLine(line))) {
+          this.runSucceeded = false;
+          this.showCelebration = false;
+        }
+        return;
       }
-    }, 500);
+
+      // A fresh run clears the previous success line until this run proves clean.
+      this.runSucceeded = false;
+      this.showCelebration = false;
+      clearTimeout(this.celebrationCheckTimer);
+      this.celebrationCheckTimer = setTimeout(() => {
+        this.ngZone.run(() => {
+          const hasError = getConsole().some((line) => this.isErrorLine(line));
+          const stillPending = this.codeExecutionService.getPendingTimerCount() > 0;
+          if (!hasError && !stillPending) {
+            this.celebrated = true;
+            this.triggerCelebration();
+          }
+          // If timers are still pending, no new check is scheduled here — the next
+          // setTimeout firing/scheduling will call back into this method via onActivity.
+        });
+      }, 500);
+    });
   }
 
   private triggerCelebration(): void {
@@ -347,13 +388,17 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
     }));
     this.showCelebration = true;
     clearTimeout(this.celebrationHideTimer);
-    this.celebrationHideTimer = setTimeout(() => (this.showCelebration = false), 1900);
+    // See the note on scheduleCelebration: this callback also needs an explicit run() to be
+    // seen by change detection.
+    this.celebrationHideTimer = setTimeout(() => this.ngZone.run(() => (this.showCelebration = false)), 1900);
   }
 
   clearTypeScriptOutput(): void {
     this.tsConsole = [];
     this.runSucceeded = false;
     this.showCelebration = false;
+    this.celebrated = false;
+    this.codeExecutionService.stopCapture();
   }
 
   async shareCode(): Promise<void> {
