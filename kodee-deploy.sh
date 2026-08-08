@@ -254,6 +254,38 @@ fi
 
 "${DC[@]}" down --remove-orphans 2>/dev/null || true
 
+# This stack is Docker-only, but the pre-Docker deploys ran the backend under
+# PM2 with a systemd boot service (deployment-scripts/initial-setup.sh). That
+# service can still resurrect an OLD host copy of the API on our port: it
+# answers with stale code, crash-loops (the site flaps 200/502), and blocks the
+# container's bind with "address already in use". With our containers now down,
+# anything still listening on our ports is such a squatter — remove it, and if
+# PM2 exists, dismantle it at the source so the squatter cannot come back.
+clear_port_squatter() {
+  local port="$1" pid
+  pid="$(ss -lntpH "sport = :$port" 2>/dev/null | grep -v docker-proxy | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2 || true)"
+  [ -n "$pid" ] || return 0
+  warn "port $port is held by a non-docker process (pid $pid):"
+  ps -fp "$pid" 2>/dev/null | sed 's/^/    /' || true
+  if command -v pm2 >/dev/null 2>&1; then
+    pm2 delete all >/dev/null 2>&1 || true
+    pm2 save --force >/dev/null 2>&1 || true
+    pm2 kill >/dev/null 2>&1 || true
+    systemctl disable --now pm2-root >/dev/null 2>&1 || true
+    ok "PM2 processes removed and its boot service disabled"
+  fi
+  kill "$pid" 2>/dev/null || true
+  sleep 2
+  kill -9 "$pid" 2>/dev/null || true
+  sleep 1
+  if ss -lntH "sport = :$port" 2>/dev/null | grep -q .; then
+    die "port $port is STILL occupied after killing pid $pid — something respawns it. Inspect with: ss -lntp"
+  fi
+  ok "port $port is free again"
+}
+clear_port_squatter "$API_HOST_PORT"
+clear_port_squatter "$WEB_HOST_PORT"
+
 # Build and start are separate phases so a failure names the phase that broke
 # and prints that phase's diagnostics — the ERR trap alone reports only a line
 # number while the real docker error scrolls away above it.
