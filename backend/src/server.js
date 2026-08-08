@@ -1,4 +1,5 @@
 require('dotenv').config();
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -19,6 +20,7 @@ const noteRoutes = require('./routes/noteRoutes');
 const sessionRoutes = require('./routes/sessionRoutes');
 const playgroundSessionRoutes = require('./routes/playgroundSessionRoutes');
 const flowchartSessionRoutes = require('./routes/flowchartSessionRoutes');
+const issueRoutes = require('./routes/issueRoutes');
 
 // ─── boot-time configuration checks ──────────────────────────────────────────
 // Fail loudly at startup rather than signing tokens with `undefined` or
@@ -56,6 +58,22 @@ const corsOrigins = process.env.CORS_ORIGIN
   ? process.env.CORS_ORIGIN.split(',').map((o) => o.trim())
   : null;
 app.use(cors({ origin: corsOrigins || true, credentials: true }));
+
+// Uploaded issue-report images. Public and unauthenticated, keyed by an
+// unguessable random filename (see middleware/upload.js) — not access-controlled
+// beyond that. helmet() above sets Cross-Origin-Resource-Policy: same-origin
+// globally, which would silently block <img> loads from the web app's origin in
+// production (a different origin from the API — primuscodex.com vs
+// api.primuscodex.com). Overriding it only on this path is safe: nothing else
+// served here is cross-origin-sensitive.
+app.use(
+  '/uploads',
+  (req, res, next) => {
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  },
+  express.static(path.join(__dirname, '..', 'uploads'))
+);
 
 // Explicit ceiling on request bodies. Playground sessions carry several code
 // fields, so the default 100kb is too tight, but the cap must still exist —
@@ -97,6 +115,7 @@ app.use('/api/notes', noteRoutes);
 app.use('/api/sessions', sessionRoutes);
 app.use('/api/playground-sessions', playgroundSessionRoutes);
 app.use('/api/flowchart-sessions', flowchartSessionRoutes);
+app.use('/api/issues', issueRoutes);
 
 // 404 first, then the error translator. The previous order (error handler
 // before the 404) happened to work only because Express skips 4-arity

@@ -1,0 +1,87 @@
+<div class="issues-container">
+  <div class="header-section">
+    <div class="title-group">
+      <ion-icon name="flag-outline" class="level-icon"></ion-icon>
+      <h1>Reported Issues <span class="count-badge">({{ issues.length }})</span></h1>
+    </div>
+    <ion-button size="small" fill="outline" (click)="reload()">
+      <ion-icon slot="start" name="refresh-outline"></ion-icon>
+      Refresh
+    </ion-button>
+  </div>
+
+  <div *ngIf="loading" class="ion-text-center ion-padding">
+    <ion-spinner name="crescent"></ion-spinner>
+  </div>
+
+  <div class="issues-error" *ngIf="error && !loading" role="alert">
+    <ion-icon name="alert-circle-outline"></ion-icon>
+    <span>{{ error }}</span>
+    <ion-button fill="clear" size="small" (click)="reload()">Retry</ion-button>
+  </div>
+
+  <ion-card *ngIf="!loading && issues.length">
+    <ion-card-content>
+      <div class="issues-table">
+        <div class="issue-row header-row">
+          <span>Image</span>
+          <span>Reporter</span>
+          <span>Description</span>
+          <span>Submitted</span>
+          <span>Status</span>
+        </div>
+
+        <div class="issue-row" *ngFor="let issue of issues">
+          <span class="cell-image">
+            <button type="button" class="thumb" *ngIf="issue.imageUrl" (click)="openLightbox(issue.imageUrl)" aria-label="View full-size image">
+              <img [src]="issue.imageUrl" alt="Attachment" />
+            </button>
+            <span class="thumb thumb-empty" *ngIf="!issue.imageUrl" aria-hidden="true">
+              <ion-icon name="image-outline"></ion-icon>
+            </span>
+          </span>
+
+          <span class="cell-reporter">
+            <strong>{{ issue.name }}</strong>
+            <small>{{ issue.email }}</small>
+          </span>
+
+          <span class="cell-description" [title]="issue.description">{{ issue.description }}</span>
+
+          <span class="cell-date">{{ formatDate(issue.createdAt) }}</span>
+
+          <span class="cell-status">
+            <ion-select
+              [ngClass]="'status-select status-' + issue.status"
+              interface="popover"
+              [(ngModel)]="issue.status"
+              (ionChange)="onStatusChange(issue, $event.detail.value)"
+            >
+              <ion-select-option value="pending">Pending</ion-select-option>
+              <ion-select-option value="in-progress">In Progress</ion-select-option>
+              <ion-select-option value="resolved">Resolved</ion-select-option>
+              <ion-select-option value="rejected">Rejected</ion-select-option>
+            </ion-select>
+          </span>
+        </div>
+      </div>
+    </ion-card-content>
+  </ion-card>
+
+  <div class="empty-state" *ngIf="!loading && !issues.length && !error">
+    <ion-icon name="checkmark-done-circle-outline"></ion-icon>
+    <h2>No Issues Reported</h2>
+    <p>Nothing here yet — reports submitted by users will show up in this list.</p>
+  </div>
+
+  <ion-modal class="lightbox-modal" [isOpen]="!!lightboxUrl" (didDismiss)="closeLightbox()">
+    <ng-template>
+      <div class="lightbox-backdrop" (click)="closeLightbox()">
+        <img [src]="lightboxUrl" alt="Full size attachment" />
+        <button type="button" class="lightbox-close" (click)="closeLightbox()" aria-label="Close">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+      </div>
+    </ng-template>
+  </ion-modal>
+</div>

@@ -65,7 +65,7 @@ export class UserPage implements OnInit, OnDestroy {
   }
 
   // Routes that own the full width and have nothing to navigate with the topic sidebar.
-  private static readonly SIDEBAR_HIDDEN_ROUTES = ['playground-sessions', 'notes'];
+  private static readonly SIDEBAR_HIDDEN_ROUTES = ['playground-sessions', 'notes', 'report-issue'];
   isProfileOpen = false;
   private routeSub!: Subscription;
   profileEvent?: Event;              // anchors the popover under the avatar (dropdown)
@@ -264,5 +264,9 @@ export class UserPage implements OnInit, OnDestroy {
 
   navigateToNotes() {
     this.router.navigate(['/user/notes']);
+  }
+
+  navigateToReportIssue() {
+    this.router.navigate(['/user/report-issue']);
   }
 }

@@ -40,7 +40,8 @@ export class AdminPage implements OnInit {
     { id: 'intermediate', label: 'Intermediate', icon: 'fitness-outline', route: '/admin/topics/intermediate' },
     { id: 'advance', label: 'Advance', icon: 'rocket-outline', route: '/admin/topics/advance' },
     { id: 'expert', label: 'Expert', icon: 'trophy-outline', route: '/admin/topics/expert' },
-    { id: 'playground', label: 'Playground Settings', icon: 'code-slash-outline', route: '/admin/playground' }
+    { id: 'playground', label: 'Playground Settings', icon: 'code-slash-outline', route: '/admin/playground' },
+    { id: 'issues', label: 'Reported Issues', icon: 'flag-outline', route: '/admin/issues' }
   ];
 
   constructor(

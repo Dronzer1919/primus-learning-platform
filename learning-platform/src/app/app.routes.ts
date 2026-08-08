@@ -66,6 +66,10 @@ export const routes: Routes = [
         path: 'topics/:level',
         loadComponent: () => import('./pages/admin/topics-manager/topics-manager.component').then((m) => m.TopicsManagerComponent),
       },
+      {
+        path: 'issues',
+        loadComponent: () => import('./pages/admin/issues-manager/issues-manager.component').then((m) => m.IssuesManagerComponent),
+      },
     ]
   },
   {
@@ -93,6 +97,10 @@ export const routes: Routes = [
       {
         path: 'playground-sessions',
         loadComponent: () => import('./components/playground-sessions/playground-sessions.component').then((m) => m.PlaygroundSessionsComponent),
+      },
+      {
+        path: 'report-issue',
+        loadComponent: () => import('./components/report-issue/report-issue.component').then((m) => m.ReportIssueComponent),
       },
     ]
   },

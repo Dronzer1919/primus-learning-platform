@@ -113,6 +113,20 @@
         </ng-template>
       </div>
 
+      <!-- Dev-only shortcut: only rendered when devAdminLogin is set, which itself
+           only exists outside a production build (see login.page.ts). Never appears
+           in a deployed build. -->
+      <div class="dev-tools" *ngIf="devAdminLogin">
+        <div class="dev-tools-label">
+          <ion-icon name="construct-outline"></ion-icon>
+          Dev tools
+        </div>
+        <button type="button" class="dev-admin-btn" [disabled]="isLoading" (click)="loginAsDevAdmin()">
+          <ion-icon name="flash-outline"></ion-icon>
+          Login as Admin (Dev)
+        </button>
+      </div>
+
     </div>
 
     <!-- ==================== FORGOT PASSWORD ==================== -->

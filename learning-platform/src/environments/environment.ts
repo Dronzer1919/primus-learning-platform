@@ -9,7 +9,16 @@ export const environment = {
 
   // Guest account prefilled on the login page — see environment.prod.ts for the
   // full note. Public by design; never the admin password.
-  demoLogin: { username: 'testuser', password: 'GuestDemo123' }
+  demoLogin: { username: 'testuser', password: 'GuestDemo123' },
+
+  // Dev-only convenience login for checking the admin panel locally (see the
+  // "Login as Admin (Dev)" button on the login page, gated on !production).
+  // Deliberately absent from environment.prod.ts, not just hidden behind that
+  // check — fileReplacements swaps this whole file out for a production build,
+  // so these credentials can never end up in a bundle that ships anywhere.
+  // Backed by a dedicated "devadmin" account (backend/ensure-dev-admin.js),
+  // separate from any real user's credentials.
+  devAdminLogin: { username: 'devadmin', password: 'DevAdmin123!' }
 };
 
 /*

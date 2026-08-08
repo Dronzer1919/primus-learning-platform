@@ -31,7 +31,9 @@ const LIMITS = {
   note: 50000,
   code: 200000,
   title: 200,
-  text: 2000
+  text: 2000,
+  issueName: 100,
+  issueDescription: 3000
 };
 
 // ─── auth ────────────────────────────────────────────────────────────────────
@@ -173,6 +175,33 @@ const languageTabRules = [
   validate
 ];
 
+// ─── issues (user-reported bugs/problems) ────────────────────────────────────
+
+const createIssueRules = [
+  body('name')
+    .isString().withMessage('Name must be text')
+    .trim()
+    .isLength({ min: 1, max: LIMITS.issueName }).withMessage(`Name must be 1-${LIMITS.issueName} characters`),
+  body('email')
+    .isString().withMessage('Email must be text')
+    .trim()
+    .isEmail().withMessage('A valid email is required')
+    .normalizeEmail({ gmail_remove_dots: false, gmail_remove_subaddress: false }),
+  body('description')
+    .isString().withMessage('Description must be text')
+    .trim()
+    .isLength({ min: 1, max: LIMITS.issueDescription }).withMessage(`Description must be 1-${LIMITS.issueDescription} characters`),
+  validate
+];
+
+const updateIssueStatusRules = [
+  objectId('id'),
+  body('status')
+    .isString().withMessage('Status must be text')
+    .isIn(['pending', 'in-progress', 'resolved', 'rejected']).withMessage('Invalid status'),
+  validate
+];
+
 module.exports = {
   validate,
   objectId,
@@ -188,5 +217,7 @@ module.exports = {
   flowchartRules,
   listTopicsRules,
   createTopicRules,
-  languageTabRules
+  languageTabRules,
+  createIssueRules,
+  updateIssueStatusRules
 };

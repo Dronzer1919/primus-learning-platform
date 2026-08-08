@@ -26,6 +26,8 @@ services:
       - backend/.env
     ports:
       - "127.0.0.1:3100:3001"      # host:container (container reads PORT=3001 from .env)
+    volumes:
+      - lp-uploads-data:/app/uploads   # issue-report images; otherwise wiped on every redeploy
     depends_on:
       - lp-mongo
     networks:
@@ -48,3 +50,4 @@ networks:
 
 volumes:
   lp-mongo-data:
+  lp-uploads-data:

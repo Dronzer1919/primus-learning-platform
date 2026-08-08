@@ -26,6 +26,9 @@
       <ion-button class="nav-btn" (click)="navigateToNotes()" title="My Notes">
         <ion-icon slot="icon-only" name="document-text-outline"></ion-icon>
       </ion-button>
+      <ion-button class="nav-btn" (click)="navigateToReportIssue()" title="Report an Issue">
+        <ion-icon slot="icon-only" name="alert-circle-outline"></ion-icon>
+      </ion-button>
       <ion-button class="profile-btn" (click)="openProfile($event)">
         <div class="avatar">
           <img *ngIf="avatarUrl" [src]="avatarUrl" alt="avatar" />
@@ -102,6 +105,10 @@
         <button type="button" (click)="isProfileOpen = false; navigateToNotes()">
           <ion-icon name="document-text-outline"></ion-icon>
           <span>My Notes</span>
+        </button>
+        <button type="button" (click)="isProfileOpen = false; navigateToReportIssue()">
+          <ion-icon name="alert-circle-outline"></ion-icon>
+          <span>Report an Issue</span>
         </button>
       </div>
 

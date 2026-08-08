@@ -358,6 +358,50 @@ h2 {
   .google-icon { flex-shrink: 0; }
 }
 
+// ---- Dev tools (only rendered outside a production build) ----
+.dev-tools {
+  width: 100%;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--ion-color-step-150, #e2e8f0);
+}
+
+.dev-tools-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ion-color-medium);
+
+  ion-icon { font-size: 14px; }
+}
+
+.dev-admin-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  border: 1.5px dashed var(--ion-color-warning, #f4a707);
+  border-radius: 10px;
+  background: rgba(244, 167, 7, 0.1);
+  color: var(--ion-text-color);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  ion-icon { color: var(--ion-color-warning, #f4a707); }
+
+  &:hover { background: rgba(244, 167, 7, 0.18); }
+  &:disabled { opacity: 0.6; cursor: default; }
+}
+
 .google-setup-notice {
   width: 100%;
 

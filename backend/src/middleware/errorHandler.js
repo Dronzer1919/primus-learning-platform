@@ -71,6 +71,11 @@ function errorHandler(err, req, res, next) {
   } else if (err.type === 'entity.parse.failed') {
     status = 400;
     message = 'Malformed JSON in request body';
+  } else if (err.name === 'MulterError') {
+    status = 400;
+    message = err.code === 'LIMIT_FILE_SIZE'
+      ? 'Image is too large (max 5MB)'
+      : 'Image upload failed — please try a different file';
   } else if (status < 500) {
     // Something upstream already classified this as a client error.
     message = err.message;

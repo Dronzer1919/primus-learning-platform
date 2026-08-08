@@ -1,0 +1,127 @@
+<div class="report-issue-container">
+  <div class="page-header">
+    <h1>Report an Issue</h1>
+    <p class="subtitle">Found a bug, or something not working as expected? Let us know.</p>
+  </div>
+
+  <ion-segment [(ngModel)]="segment" class="issue-segment">
+    <ion-segment-button value="report">
+      <ion-icon name="alert-circle-outline"></ion-icon>
+      <ion-label>Report an Issue</ion-label>
+    </ion-segment-button>
+    <ion-segment-button value="my-reports">
+      <ion-icon name="list-outline"></ion-icon>
+      <ion-label>My Reports ({{ myIssues.length }})</ion-label>
+    </ion-segment-button>
+  </ion-segment>
+
+  <!-- Report tab -->
+  <form *ngIf="segment === 'report'" class="issue-form" (ngSubmit)="submitReport()">
+    <div class="form-row two-col">
+      <div class="field">
+        <label for="issue-name">Your Name</label>
+        <ion-input id="issue-name" [(ngModel)]="name" name="name" required maxlength="100" placeholder="Jane Doe"></ion-input>
+      </div>
+      <div class="field">
+        <label for="issue-email">Your Email</label>
+        <ion-input id="issue-email" type="email" [(ngModel)]="email" name="email" required placeholder="jane@example.com"></ion-input>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="field-head">
+        <label for="issue-description">Describe the issue</label>
+        <span class="char-count">{{ description.length }}/3000</span>
+      </div>
+      <ion-textarea
+        id="issue-description"
+        [(ngModel)]="description"
+        name="description"
+        rows="6"
+        required
+        maxlength="3000"
+        placeholder="What happened? What did you expect instead?"
+      ></ion-textarea>
+    </div>
+
+    <div class="field">
+      <label>Screenshot (optional)</label>
+      <input #fileInput type="file" accept="image/*" hidden (change)="onImageSelected($event)" />
+
+      <div class="upload-zone" *ngIf="!imagePreviewUrl" (click)="fileInput.click()" role="button" tabindex="0" (keydown.enter)="fileInput.click()">
+        <ion-icon name="cloud-upload-outline"></ion-icon>
+        <p>Click to attach an image</p>
+        <span>PNG, JPG, GIF or WEBP — up to 5MB</span>
+      </div>
+
+      <div class="image-preview" *ngIf="imagePreviewUrl">
+        <img [src]="imagePreviewUrl" alt="Attachment preview" />
+        <button type="button" class="remove-image" (click)="removeImage()" aria-label="Remove image">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+      </div>
+    </div>
+
+    <ion-button
+      expand="block"
+      type="submit"
+      class="submit-btn"
+      [disabled]="saving || !name.trim() || !email.trim() || !description.trim()"
+    >
+      <ion-spinner *ngIf="saving" name="crescent"></ion-spinner>
+      <ng-container *ngIf="!saving">
+        <ion-icon slot="start" name="send-outline"></ion-icon>
+        Submit Report
+      </ng-container>
+    </ion-button>
+  </form>
+
+  <!-- My Reports tab -->
+  <div *ngIf="segment === 'my-reports'" class="my-reports">
+    <div class="reports-error" *ngIf="error" role="alert">
+      <ion-icon name="alert-circle-outline"></ion-icon>
+      <span>{{ error }}</span>
+      <ion-button fill="clear" size="small" (click)="reload()">
+        <ion-icon slot="start" name="refresh-outline"></ion-icon>
+        Retry
+      </ion-button>
+    </div>
+
+    <div class="report-card" *ngFor="let issue of myIssues">
+      <button type="button" class="thumb" *ngIf="issue.imageUrl" (click)="openLightbox(issue.imageUrl)" aria-label="View full-size image">
+        <img [src]="issue.imageUrl" alt="Issue attachment" />
+      </button>
+      <div class="thumb thumb-empty" *ngIf="!issue.imageUrl" aria-hidden="true">
+        <ion-icon name="image-outline"></ion-icon>
+      </div>
+
+      <div class="report-body">
+        <p class="report-desc">{{ issue.description }}</p>
+        <span class="report-date">{{ formatDate(issue.createdAt) }}</span>
+      </div>
+
+      <ion-badge [color]="statusColor(issue.status)">{{ statusLabel(issue.status) }}</ion-badge>
+    </div>
+
+    <div class="empty-state" *ngIf="!myIssues.length && !error">
+      <ion-icon name="checkmark-done-circle-outline"></ion-icon>
+      <h2>No Issues Reported</h2>
+      <p>Nothing reported yet — that's a good sign!</p>
+      <ion-button size="small" (click)="segment = 'report'">
+        <ion-icon slot="start" name="add-outline"></ion-icon>
+        Report an Issue
+      </ion-button>
+    </div>
+  </div>
+
+  <ion-modal class="lightbox-modal" [isOpen]="!!lightboxUrl" (didDismiss)="closeLightbox()">
+    <ng-template>
+      <div class="lightbox-backdrop" (click)="closeLightbox()">
+        <img [src]="lightboxUrl" alt="Full size attachment" />
+        <button type="button" class="lightbox-close" (click)="closeLightbox()" aria-label="Close">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+      </div>
+    </ng-template>
+  </ion-modal>
+</div>

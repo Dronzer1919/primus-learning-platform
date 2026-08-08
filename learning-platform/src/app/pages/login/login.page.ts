@@ -52,6 +52,11 @@ export class LoginPage implements AfterViewInit, OnDestroy {
   errorMessage = '';
   googleConfigured = environment.googleClientId !== 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
 
+  // Dev-only "Login as Admin" shortcut (see loginAsDevAdmin()). devAdminLogin only
+  // exists in environment.ts — environment.prod.ts has no such field, so this is
+  // false (and the credentials themselves absent from the bundle) in production.
+  devAdminLogin = !environment.production ? (environment as any).devAdminLogin : null;
+
   /** True once the button has actually been drawn into the container at least once. */
   private googleButtonRendered = false;
   /** True once initialize() has succeeded — lets a later return-to-login render the button. */
@@ -251,6 +256,34 @@ export class LoginPage implements AfterViewInit, OnDestroy {
         this.toastOnce(error, this.errorMessage);
       }
     });
+  }
+
+  /**
+   * One-click sign-in as the local-only "devadmin" account, for checking the
+   * admin panel without hunting for real credentials. Guarded on devAdminLogin
+   * (itself derived from !environment.production), so this is inert — and the
+   * button that calls it isn't rendered — outside a dev build.
+   */
+  loginAsDevAdmin(): void {
+    if (!this.devAdminLogin || this.isLoading) return;
+
+    this.isLoading = true;
+    this.errorMessage = '';
+
+    this.authService
+      .login({ email: this.devAdminLogin.username, password: this.devAdminLogin.password })
+      .subscribe({
+        next: (user) => {
+          this.isLoading = false;
+          this.goAfterLogin(user.role === 'admin' ? '/admin' : '/user');
+        },
+        error: (error: HttpErrorResponse) => {
+          this.isLoading = false;
+          // Most likely cause: the devadmin account doesn't exist yet locally.
+          this.errorMessage = "Dev admin login failed — run 'npm run ensure-dev-admin' in backend/ first.";
+          this.toastOnce(error, this.errorMessage);
+        }
+      });
   }
 
   /**
