@@ -278,7 +278,10 @@ if ! "${DC[@]}" up -d; then
   done
   die "docker compose up failed — see the docker error and logs above.
   If a port is 'already allocated', something else holds 127.0.0.1:${API_HOST_PORT} or
-  127.0.0.1:${WEB_HOST_PORT} — find it with:  docker ps ; ss -ltnp"
+  127.0.0.1:${WEB_HOST_PORT} — find it with:  docker ps ; ss -ltnp
+  If it says 'address already in use' but ss shows NOTHING on that port, it is a
+  stale docker-proxy / iptables leftover from an earlier failed deploy — fix with:
+      systemctl restart docker    then re-run this script."
 fi
 ok "containers started"
 
