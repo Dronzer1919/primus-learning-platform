@@ -122,8 +122,14 @@ export class CodeExecutionService {
 
   // Transpiles TypeScript to plain JavaScript in the browser (no execution). `typescript`
   // is dynamically imported so it lands in its own lazy chunk, not the initial bundle.
+  //
+  // `typescript` is CommonJS, and the esbuild-produced chunk for a dynamic import()
+  // of a CJS module sometimes returns a namespace object with the real exports nested
+  // under `.default` instead of flattened onto the namespace itself. Fall back to
+  // `.default` when the flattened shape is missing `ScriptTarget`.
   async transpileTypeScript(code: string): Promise<string> {
-    const ts = await import('typescript');
+    const tsModule: any = await import('typescript');
+    const ts = tsModule.ScriptTarget ? tsModule : tsModule.default;
     return ts.transpileModule(code, {
       compilerOptions: { target: ts.ScriptTarget.ES2017 }
     }).outputText;
