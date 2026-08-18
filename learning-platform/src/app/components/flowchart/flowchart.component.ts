@@ -117,15 +117,25 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   connectX = 0;
   connectY = 0;
 
-  // Node move bookkeeping.
+  // Node move bookkeeping. Pointer events (not mouse events) so a finger drag on a
+  // touch screen moves the shape too — `touch-action: none` on .node stops the
+  // canvas from scrolling underneath the finger instead.
   private movingNodeId: string | null = null;
   private moveOffsetX = 0;
   private moveOffsetY = 0;
   private moved = false;
-  private readonly onMoveRef = (e: MouseEvent) => this.onMove(e);
+  private readonly onMoveRef = (e: PointerEvent) => this.onMove(e);
   private readonly onMoveEndRef = () => this.onMoveEnd();
   private readonly onConnectMoveRef = (e: MouseEvent) => this.onConnectMove(e);
   private readonly onConnectEndRef = () => this.onConnectEnd();
+
+  // Rotate bookkeeping. Same pointer-event pattern as resize below.
+  readonly minRotateStep = 15;
+  private rotatingNodeId: string | null = null;
+  private rotateStart = { pointerAngle: 0, centerX: 0, centerY: 0, nodeAngle: 0 };
+  private rotated = false;
+  private readonly onRotateMoveRef = (e: PointerEvent) => this.onRotateMove(e);
+  private readonly onRotateEndRef = () => this.onRotateEnd();
 
   // Edge midpoint drag bookkeeping.
   private movingEdgeId: string | null = null;
@@ -199,13 +209,15 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    document.removeEventListener('mousemove', this.onMoveRef);
-    document.removeEventListener('mouseup', this.onMoveEndRef);
+    document.removeEventListener('pointermove', this.onMoveRef);
+    document.removeEventListener('pointerup', this.onMoveEndRef);
+    document.removeEventListener('pointercancel', this.onMoveEndRef);
     document.removeEventListener('mousemove', this.onConnectMoveRef);
     document.removeEventListener('mouseup', this.onConnectEndRef);
     document.removeEventListener('mousemove', this.onEdgeMoveRef);
     document.removeEventListener('mouseup', this.onEdgeMoveEndRef);
     this.detachResizeListeners();
+    this.detachRotateListeners();
   }
 
   /** Pointer position relative to the (possibly scrolled) canvas. */
@@ -273,9 +285,15 @@ export class FlowchartComponent implements OnInit, OnDestroy {
 
   // --- Moving a node -----------------------------------------------------
 
-  onNodeMouseDown(event: MouseEvent, node: FlowNode): void {
-    // Left button only; ignore while editing the label.
-    if (event.button !== 0 || this.editingNodeId === node.id) {
+  // Pointer events cover mouse, touch and pen from one handler — mouse-only
+  // events never fire from a finger drag, which is why moving a shape used to
+  // do nothing on a phone. `preventDefault()` is deliberately NOT called here:
+  // on touch it would suppress the synthetic `click` a tap-without-drag relies
+  // on for selection (see onNodeClick). Instead `.node` sets `touch-action: none`
+  // in CSS, which stops the canvas from panning under the finger just as well.
+  onNodePointerDown(event: PointerEvent, node: FlowNode): void {
+    // Left button only for a mouse; ignore while editing the label.
+    if ((event.pointerType === 'mouse' && event.button !== 0) || this.editingNodeId === node.id) {
       return;
     }
     event.stopPropagation();
@@ -284,11 +302,12 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     const point = this.canvasPoint(event);
     this.moveOffsetX = point.x - node.x;
     this.moveOffsetY = point.y - node.y;
-    document.addEventListener('mousemove', this.onMoveRef);
-    document.addEventListener('mouseup', this.onMoveEndRef);
+    document.addEventListener('pointermove', this.onMoveRef);
+    document.addEventListener('pointerup', this.onMoveEndRef);
+    document.addEventListener('pointercancel', this.onMoveEndRef);
   }
 
-  private onMove(event: MouseEvent): void {
+  private onMove(event: PointerEvent): void {
     const node = this.diagram.nodes.find((n) => n.id === this.movingNodeId);
     if (!node) {
       return;
@@ -300,8 +319,9 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   }
 
   private onMoveEnd(): void {
-    document.removeEventListener('mousemove', this.onMoveRef);
-    document.removeEventListener('mouseup', this.onMoveEndRef);
+    document.removeEventListener('pointermove', this.onMoveRef);
+    document.removeEventListener('pointerup', this.onMoveEndRef);
+    document.removeEventListener('pointercancel', this.onMoveEndRef);
     if (this.moved) {
       this.persist();
     }
@@ -407,6 +427,75 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     document.removeEventListener('pointercancel', this.onResizeEndRef);
   }
 
+  // --- Rotating a node -----------------------------------------------------
+
+  /**
+   * Starts a free rotation drag from the handle above the selected shape.
+   * The dragged angle is measured from the shape's centre (canvas coords), so
+   * it works the same regardless of where the handle itself currently sits.
+   * Hold Shift to snap to 15° steps.
+   */
+  startRotate(event: PointerEvent, node: FlowNode): void {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+      return;
+    }
+    event.stopPropagation();
+    event.preventDefault();
+    this.select(node.id, null);
+    this.rotatingNodeId = node.id;
+    this.rotated = false;
+    const center = this.center(node);
+    const point = this.canvasPoint(event);
+    this.rotateStart = {
+      pointerAngle: this.angleDeg(point, center),
+      centerX: center.x,
+      centerY: center.y,
+      nodeAngle: node.rotation ?? 0
+    };
+    document.addEventListener('pointermove', this.onRotateMoveRef);
+    document.addEventListener('pointerup', this.onRotateEndRef);
+    document.addEventListener('pointercancel', this.onRotateEndRef);
+  }
+
+  private onRotateMove(event: PointerEvent): void {
+    const node = this.diagram.nodes.find((n) => n.id === this.rotatingNodeId);
+    if (!node) {
+      return;
+    }
+    this.rotated = true;
+    const start = this.rotateStart;
+    const point = this.canvasPoint(event);
+    const currentAngle = this.angleDeg(point, { x: start.centerX, y: start.centerY });
+    let deg = start.nodeAngle + (currentAngle - start.pointerAngle);
+    if (event.shiftKey) {
+      deg = Math.round(deg / this.minRotateStep) * this.minRotateStep;
+    }
+    node.rotation = this.normalizeDeg(deg);
+  }
+
+  private onRotateEnd(): void {
+    this.detachRotateListeners();
+    if (this.rotated) {
+      this.persist();
+    }
+    this.rotatingNodeId = null;
+  }
+
+  private detachRotateListeners(): void {
+    document.removeEventListener('pointermove', this.onRotateMoveRef);
+    document.removeEventListener('pointerup', this.onRotateEndRef);
+    document.removeEventListener('pointercancel', this.onRotateEndRef);
+  }
+
+  /** Angle in degrees from `origin` to `point`, clockwise from 3 o'clock (matches CSS rotate()). */
+  private angleDeg(point: { x: number; y: number }, origin: { x: number; y: number }): number {
+    return (Math.atan2(point.y - origin.y, point.x - origin.x) * 180) / Math.PI;
+  }
+
+  private normalizeDeg(deg: number): number {
+    return ((Math.round(deg) % 360) + 360) % 360;
+  }
+
   /** Width/height fields in the properties panel — the keyboard route to resizing. */
   setNodeSize(dimension: 'w' | 'h', value: number): void {
     const node = this.selectedNode;
@@ -426,6 +515,25 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     const preset = this.palette.find((p) => p.type === node.type);
     node.w = preset?.w ?? DEFAULT_NODE_WIDTH;
     node.h = preset?.h ?? DEFAULT_NODE_HEIGHT;
+    this.persist();
+  }
+
+  /** Rotation field in the properties panel — the keyboard route to rotating. */
+  setNodeRotation(value: number): void {
+    const node = this.selectedNode;
+    if (!node || !Number.isFinite(value)) {
+      return;
+    }
+    node.rotation = this.normalizeDeg(value);
+    this.persist();
+  }
+
+  resetNodeRotation(): void {
+    const node = this.selectedNode;
+    if (!node) {
+      return;
+    }
+    delete node.rotation;
     this.persist();
   }
 

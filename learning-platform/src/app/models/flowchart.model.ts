@@ -63,6 +63,8 @@ export interface FlowNode {
   textColor?: string;
   /** Line height as a percentage, e.g. 120 for 120%. */
   lineHeight?: number;
+  /** Rotation in degrees (0-359), clockwise. Unset/0 means unrotated. */
+  rotation?: number;
 }
 
 /** Font families offered in the Text panel. */

@@ -138,8 +138,11 @@ export class FlowchartExportService {
       const stroke = node.stroke || request.colors.stroke;
       const parts = this.shapeMarkup(shape, node, fill, stroke, markerId);
       const label = this.labelMarkup(node, request);
+      const rotate = node.rotation
+        ? ` rotate(${this.round(node.rotation)},${this.round(node.w / 2)},${this.round(node.h / 2)})`
+        : '';
       body.push(
-        `<g transform="translate(${this.round(node.x)},${this.round(node.y)})">${parts}${label}</g>`
+        `<g transform="translate(${this.round(node.x)},${this.round(node.y)})${rotate}">${parts}${label}</g>`
       );
     }
 

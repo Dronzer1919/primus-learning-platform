@@ -25,6 +25,8 @@ import {
   gitNetworkOutline, shapesOutline, optionsOutline, chevronBackOutline, downloadOutline,
   clipboardOutline,
   caretUpOutline, caretDownOutline, caretForwardOutline, caretBackOutline,
+  // The rotate handle drawn above a selected shape.
+  syncOutline,
   // Flowchart saved sessions: the toolbar button, the open-session marker in the
   // header and the empty state inside the sessions modal.
   timeOutline, bookmarkOutline, folderOpenOutline,
@@ -74,6 +76,7 @@ addIcons({
   gitNetworkOutline, shapesOutline, optionsOutline, chevronBackOutline, downloadOutline,
   clipboardOutline,
   caretUpOutline, caretDownOutline, caretForwardOutline, caretBackOutline,
+  syncOutline,
   timeOutline, bookmarkOutline, folderOpenOutline,
   playBackOutline, playForwardOutline, playSkipForwardOutline, pauseOutline, serverOutline,
   warningOutline,

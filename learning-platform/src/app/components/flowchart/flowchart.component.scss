@@ -697,6 +697,11 @@ $bar-height: 49px;
   justify-content: center;
   cursor: move;
   user-select: none;
+  // Without this, a finger drag on the shape pans/scrolls the canvas instead of
+  // moving it — the browser's default touch gesture wins the race against the
+  // pointermove listener that actually drags the node. Resize/rotate handles
+  // set this themselves too, for the same reason.
+  touch-action: none;
 
   &.selected {
     outline: 1px dashed var(--ion-color-primary);
@@ -914,10 +919,71 @@ $bar-height: 49px;
   &.rh-sw { top: 100%; left: 0;    cursor: nesw-resize; }
   &.rh-w  { top: 50%;  left: 0;    cursor: ew-resize; }
 
-  // Fingers need a bigger target than a 10px square.
+  // Fingers need a bigger target than a 10px square — rh-n (top) and rh-w (left)
+  // included, so scaling from those edges is as reachable as the corners.
   @include touch {
-    width: 16px;
-    height: 16px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+// --- Rotate handle --------------------------------------------------------
+// A single handle above the selected shape's top edge, connected by a thin
+// stem. Dragging it spins the shape a full 360° around its own centre; see
+// startRotate() in the component. Sits above the top connect-handle so the
+// two never overlap.
+.rotate-handle {
+  position: absolute;
+  z-index: 5;
+  top: -54px;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  margin-left: -10px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--ion-color-primary);
+  color: var(--ion-color-primary-contrast);
+  cursor: grab;
+  touch-action: none;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    width: 1.5px;
+    height: 34px;
+    background: var(--ion-color-primary);
+    opacity: 0.6;
+    transform: translateX(-50%);
+  }
+
+  ion-icon {
+    font-size: 12px;
+    pointer-events: none;
+  }
+
+  &:hover {
+    transform: scale(1.1);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  @include touch {
+    width: 28px;
+    height: 28px;
+    margin-left: -14px;
+    top: -62px;
+
+    ion-icon { font-size: 15px; }
   }
 }
 
@@ -1113,6 +1179,11 @@ $bar-height: 49px;
     overflow: hidden;
     clip: rect(0 0 0 0);
   }
+}
+
+.rotation-slider {
+  flex: 1;
+  accent-color: var(--ion-color-primary);
 }
 
 .num-field {

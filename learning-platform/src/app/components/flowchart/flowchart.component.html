@@ -89,6 +89,8 @@ previews and canvas nodes can both reference them by id. -->
             saves, Escape cancels. Hover a shape to reveal its side arrows, then drag from
             an arrow onto another shape to connect them. Select a shape and drag any of the
             eight square grips to resize it — hold Shift on a corner to keep its proportions.
+            Drag the round handle above a selected shape to rotate it a full 360° — hold
+            Shift to snap to 15° steps.
             <strong>Ctrl+C / Ctrl+V</strong> copies and pastes the selected shape (Ctrl+X cuts).
           </div>
         </div>
@@ -319,7 +321,8 @@ previews and canvas nodes can both reference them by id. -->
             [style.height.px]="v.node.h"
             [style.--node-fill]="v.node.fill"
             [style.--node-stroke]="v.node.stroke"
-            (mousedown)="onNodeMouseDown($event, v.node)"
+            [style.transform]="v.node.rotation ? 'rotate(' + v.node.rotation + 'deg)' : null"
+            (pointerdown)="onNodePointerDown($event, v.node)"
             (click)="onNodeClick($event, v.node)"
             (dblclick)="startEditing($event, v.node)"
             >
@@ -387,8 +390,12 @@ previews and canvas nodes can both reference them by id. -->
             </button>
             <!-- Resize grips, on the selected shape only. Hidden while its label is
                  being edited or a connection is being dragged, so they never sit on
-                 top of the textarea or steal the drop target. -->
-            @if (selectedNodeId === v.node.id && editingNodeId !== v.node.id && !connectFromId) {
+                 top of the textarea or steal the drop target. Also hidden while the
+                 shape is rotated: the drag math below works in unrotated canvas
+                 coordinates, so a diagonal drag on a rotated shape would resize in
+                 the wrong direction — reset rotation to 0 (or use the W/H fields,
+                 which work at any angle) to resize, then rotate again. -->
+            @if (selectedNodeId === v.node.id && editingNodeId !== v.node.id && !connectFromId && !v.node.rotation) {
               @for (dir of resizeHandles; track dir) {
                 <span
                   class="resize-handle rh-{{ dir }}"
@@ -399,6 +406,21 @@ previews and canvas nodes can both reference them by id. -->
                   (click)="$event.stopPropagation()"
                 ></span>
               }
+            }
+            <!-- Rotate handle: drag around the shape's centre to spin it a full
+                 360°. Hold Shift while dragging to snap to 15° steps. -->
+            @if (selectedNodeId === v.node.id && editingNodeId !== v.node.id && !connectFromId) {
+              <button
+                type="button"
+                class="rotate-handle"
+                title="Drag to rotate — hold Shift to snap to 15°"
+                aria-label="Rotate shape"
+                (pointerdown)="startRotate($event, v.node)"
+                (mousedown)="$event.stopPropagation()"
+                (click)="$event.stopPropagation()"
+                >
+                <ion-icon name="sync-outline"></ion-icon>
+              </button>
             }
           </div>
         }
@@ -825,6 +847,37 @@ previews and canvas nodes can both reference them by id. -->
                   <button type="button" class="props-btn" (click)="resetNodeSize()">
                     Reset to default
                   </button>
+                </div>
+                <!-- Rotation — the keyboard/precise equivalent of dragging the handle above the shape -->
+                <div class="props-section" role="group" aria-labelledby="rotation-title">
+                  <div class="props-title" id="rotation-title">Rotation</div>
+                  <div class="props-row">
+                    <input
+                      type="range"
+                      class="rotation-slider"
+                      min="0"
+                      max="359"
+                      aria-label="Rotation in degrees"
+                      [value]="sel.rotation ?? 0"
+                      (input)="setNodeRotation($any($event.target).valueAsNumber)"
+                      />
+                    <div class="num-field">
+                      <input
+                        type="number"
+                        min="0"
+                        max="359"
+                        aria-label="Rotation in degrees"
+                        [value]="sel.rotation ?? 0"
+                        (change)="setNodeRotation($any($event.target).valueAsNumber)"
+                        />
+                      <span class="unit" aria-hidden="true">°</span>
+                    </div>
+                  </div>
+                  @if (sel.rotation) {
+                    <button type="button" class="props-btn" (click)="resetNodeRotation()">
+                      Reset rotation
+                    </button>
+                  }
                 </div>
                 <!-- Line height -->
                 <div class="props-section">
