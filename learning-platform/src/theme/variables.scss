@@ -30,6 +30,20 @@ body {
   // Left playground container + preview/output surfaces.
   --playground-page-bg: var(--editor-header-bg);
   --playground-surface-bg: var(--theme-surface);
+
+  // Syntax colour palette consumed by code-editor.component.ts's HighlightStyle. This is the
+  // dark-mode set, shared by every theme except theme-default (overridden below).
+  --syntax-keyword: #ff7b72;
+  --syntax-string: #a5d6ff;
+  --syntax-number: #79c0ff;
+  --syntax-comment: #8b949e;
+  --syntax-function: #d2a8ff;
+  --syntax-property: #ffa657;
+  --syntax-type: #ffa657;
+  --syntax-tag: #7ee787;
+  --syntax-attribute: #79c0ff;
+  --syntax-atom: #79c0ff;
+  --syntax-operator: var(--editor-fg);
 }
 
 // Default is a light/white compiler: white header, light toolbar, white code area (dark syntax).
@@ -39,12 +53,29 @@ body.theme-default {
   --editor-bg: #ffffff;
   --editor-border: #e3e6ea;
   --editor-fg: #1f2933;
+
+  --syntax-keyword: #cf222e;
+  --syntax-string: #0a3069;
+  --syntax-number: #0550ae;
+  --syntax-comment: #6e7781;
+  --syntax-function: #8250df;
+  --syntax-property: #953800;
+  --syntax-type: #953800;
+  --syntax-tag: #116329;
+  --syntax-attribute: #0550ae;
+  --syntax-atom: #0550ae;
+  --syntax-operator: var(--editor-fg);
 }
 
-// Dark uses a neutral slate hierarchy (its blue primary would otherwise tint the compiler blue);
-// toolbar/editor still derive as +20%/+35% from this base.
+// Dark uses a neutral slate hierarchy (its blue primary would otherwise tint the compiler blue).
+// Unlike the other dark themes below, the code area itself is set to true black rather than the
+// shared +20%/+35% derivation, which only ever lands on a mid-grey.
 body.theme-dark {
   --editor-header-bg: #15171c;
+  --editor-tab-bg: #0a0a0a;
+  --editor-bg: #000000;
+  --editor-border: #1f1f1f;
+  --editor-fg: #eef1f5;
 }
 
 // Luminous sets every surface explicitly rather than deriving them: the shared +20%/+35%

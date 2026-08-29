@@ -2,17 +2,18 @@ import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnChanges, O
 import { Compartment, EditorState, Extension } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
-import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
+import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
+import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
+import { tags } from '@lezer/highlight';
 import { javascript } from '@codemirror/lang-javascript';
 import { html } from '@codemirror/lang-html';
 import { css } from '@codemirror/lang-css';
-import { oneDarkHighlightStyle } from '@codemirror/theme-one-dark';
 import { ThemeService, Theme } from '../../services/theme.service';
 
 export type CodeEditorLanguage = 'javascript' | 'typescript' | 'html' | 'css';
 
-// Themes whose compiler surfaces are light — the editor uses dark-on-light syntax colours for them.
-// Every other theme uses the dark, theme-tinted hierarchy with One Dark tokens.
+// Themes whose compiler surfaces are light — the editor uses the light --syntax-* palette for them.
+// Every other theme uses the dark, theme-tinted hierarchy with the dark --syntax-* palette.
 const LIGHT_EDITOR_THEMES: ReadonlySet<Theme> = new Set<Theme>(['default']);
 
 // Editor chrome colours are driven by the active theme's CSS variables (see theme/variables.scss),
@@ -47,6 +48,28 @@ const editorChromeLight = EditorView.theme(
   },
   { dark: false }
 );
+
+// App-owned syntax palette: every colour is a CSS var (see theme/variables.scss --syntax-*),
+// so this single HighlightStyle adapts to every theme instead of needing a light/dark pair.
+const appHighlightStyle = HighlightStyle.define([
+  { tag: tags.keyword, color: 'var(--syntax-keyword)' },
+  { tag: [tags.string, tags.special(tags.string)], color: 'var(--syntax-string)' },
+  { tag: tags.number, color: 'var(--syntax-number)' },
+  { tag: [tags.comment, tags.lineComment, tags.blockComment], color: 'var(--syntax-comment)', fontStyle: 'italic' },
+  { tag: tags.function(tags.variableName), color: 'var(--syntax-function)' },
+  { tag: tags.propertyName, color: 'var(--syntax-property)' },
+  { tag: [tags.className, tags.typeName], color: 'var(--syntax-type)' },
+  { tag: tags.tagName, color: 'var(--syntax-tag)' },
+  { tag: tags.attributeName, color: 'var(--syntax-attribute)' },
+  { tag: tags.attributeValue, color: 'var(--syntax-string)' },
+  { tag: [tags.bool, tags.atom, tags.null], color: 'var(--syntax-atom)' },
+  { tag: tags.operator, color: 'var(--syntax-operator)' }
+  // Brackets/braces/parens are deliberately left unstyled (inherit --editor-fg): TypeScript's
+  // generic-type angle brackets (`wrap<T>`) carry no syntax tag at all in this grammar, so no
+  // HighlightStyle rule can ever reach them — giving the other bracket kinds their own colour
+  // made every bracket except those look inconsistent. Leaving all of them at the default text
+  // colour keeps every bracket, tagged or not, genuinely the same.
+]);
 
 @Component({
   selector: 'app-code-editor',
@@ -112,7 +135,8 @@ export class CodeEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
       extensions: [
         lineNumbers(),
         history(),
-        keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+        closeBrackets(),
+        keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, indentWithTab]),
         this.themeCompartment.of(this.editorThemeExtension(this.themeService.currentTheme())),
         this.getLanguageExtension(),
         EditorView.updateListener.of((update) => {
@@ -138,9 +162,8 @@ export class CodeEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   private editorThemeExtension(theme: Theme): Extension {
-    return LIGHT_EDITOR_THEMES.has(theme)
-      ? [editorChromeLight, syntaxHighlighting(defaultHighlightStyle)]
-      : [editorChromeDark, syntaxHighlighting(oneDarkHighlightStyle)];
+    const chrome = LIGHT_EDITOR_THEMES.has(theme) ? editorChromeLight : editorChromeDark;
+    return [chrome, syntaxHighlighting(appHighlightStyle)];
   }
 
   private getLanguageExtension(): Extension {
