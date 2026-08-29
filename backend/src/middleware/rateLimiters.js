@@ -131,11 +131,26 @@ const authLimiter = rateLimit({
   }
 });
 
+// RAG asks hit the Gemini API, unlike everything else in globalLimiter —
+// capped well below it so one client can't burn through the free tier's
+// requests-per-minute quota and lock the feature for everyone else.
+const ragLimiter = rateLimit({
+  ...limiterDefaults,
+  windowMs: MINUTE,
+  limit: 15,
+  handler: (req, res) =>
+    res.status(429).json({
+      success: false,
+      message: 'Too many questions. Please wait a moment before asking another.'
+    })
+});
+
 module.exports = {
   blocklistGuard,
   globalLimiter,
   writeLimiter,
   authLimiter,
+  ragLimiter,
   // exported for tests / operational tooling
   blockIp,
   isBlocked,

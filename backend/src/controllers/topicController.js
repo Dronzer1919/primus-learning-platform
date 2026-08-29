@@ -1,5 +1,6 @@
 const Topic = require('../models/Topic');
 const { asyncHandler, AppError } = require('../middleware/errorHandler');
+const ragIndexService = require('../services/ragIndexService');
 
 // Whitelisted so a client cannot inject arbitrary paths (including `_id`) into
 // an update document.
@@ -96,6 +97,8 @@ exports.createTopic = asyncHandler(async (req, res) => {
     subtopics: req.body.subtopics || []
   });
 
+  ragIndexService.reindexTopicInBackground(topic._id);
+
   res.status(201).json({
     success: true,
     message: 'Topic created successfully',
@@ -113,6 +116,8 @@ exports.updateTopic = asyncHandler(async (req, res) => {
 
   if (!topic) throw new AppError('Topic not found', 404);
 
+  ragIndexService.reindexTopicInBackground(topic._id);
+
   res.json({
     success: true,
     message: 'Topic updated successfully',
@@ -125,6 +130,8 @@ exports.deleteTopic = asyncHandler(async (req, res) => {
   const topic = await Topic.findByIdAndDelete(req.params.id);
 
   if (!topic) throw new AppError('Topic not found', 404);
+
+  ragIndexService.removeTopicInBackground(topic._id);
 
   res.json({
     success: true,
@@ -146,6 +153,7 @@ exports.addSubtopic = asyncHandler(async (req, res) => {
   });
 
   await topic.save();
+  ragIndexService.reindexTopicInBackground(topic._id);
 
   res.status(201).json({
     success: true,
@@ -166,6 +174,7 @@ exports.updateSubtopic = asyncHandler(async (req, res) => {
 
   Object.assign(subtopic, pick(req.body, SUBTOPIC_FIELDS));
   await topic.save();
+  ragIndexService.reindexTopicInBackground(topic._id);
 
   res.json({
     success: true,
@@ -186,6 +195,7 @@ exports.deleteSubtopic = asyncHandler(async (req, res) => {
 
   topic.subtopics.pull(subtopicId);
   await topic.save();
+  ragIndexService.reindexTopicInBackground(topic._id);
 
   res.json({
     success: true,

@@ -202,6 +202,17 @@ const updateIssueStatusRules = [
   validate
 ];
 
+// ─── RAG assistant ────────────────────────────────────────────────────────────
+
+const askRagRules = [
+  body('question')
+    .isString().withMessage('Question must be text')
+    .trim()
+    .isLength({ min: 1, max: 500 }).withMessage('Question must be 1-500 characters'),
+  body('languagePlatform').optional().isString().trim().isLength({ max: 50 }),
+  validate
+];
+
 module.exports = {
   validate,
   objectId,
@@ -219,5 +230,6 @@ module.exports = {
   createTopicRules,
   languageTabRules,
   createIssueRules,
-  updateIssueStatusRules
+  updateIssueStatusRules,
+  askRagRules
 };

@@ -95,6 +95,11 @@ export const routes: Routes = [
         loadComponent: () => import('./components/user-notes/user-notes.component').then((m) => m.UserNotesComponent),
       },
       {
+        // Ask-AI chat: RAG over the platform's own topic library.
+        path: 'rag',
+        loadComponent: () => import('./components/rag-assistant/rag-assistant.component').then((m) => m.RagAssistantComponent),
+      },
+      {
         path: 'playground-sessions',
         loadComponent: () => import('./components/playground-sessions/playground-sessions.component').then((m) => m.PlaygroundSessionsComponent),
       },

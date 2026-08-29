@@ -21,6 +21,8 @@ const sessionRoutes = require('./routes/sessionRoutes');
 const playgroundSessionRoutes = require('./routes/playgroundSessionRoutes');
 const flowchartSessionRoutes = require('./routes/flowchartSessionRoutes');
 const issueRoutes = require('./routes/issueRoutes');
+const ragRoutes = require('./routes/ragRoutes');
+const ragIndexService = require('./services/ragIndexService');
 
 // ─── boot-time configuration checks ──────────────────────────────────────────
 // Fail loudly at startup rather than signing tokens with `undefined` or
@@ -37,7 +39,18 @@ if (process.env.NODE_ENV === 'production' && !process.env.CORS_ORIGIN) {
 
 const app = express();
 
-connectDB();
+connectDB().then(() => {
+  // Builds the RAG search index on first boot (or after a fresh DB); a no-op
+  // once it exists. Runtime topic edits keep it current via the reindex hooks
+  // in topicController — this is only the cold-start case.
+  ragIndexService.reindexAllIfEmpty()
+    .then((result) => {
+      if (!result.skipped) {
+        console.log(`RAG index built: ${result.topics} topic(s) -> ${result.chunks} chunk(s)`);
+      }
+    })
+    .catch((err) => console.error('RAG index build failed at startup:', err.message));
+});
 
 // ─── middleware ──────────────────────────────────────────────────────────────
 // Order matters throughout this section.
@@ -116,6 +129,7 @@ app.use('/api/sessions', sessionRoutes);
 app.use('/api/playground-sessions', playgroundSessionRoutes);
 app.use('/api/flowchart-sessions', flowchartSessionRoutes);
 app.use('/api/issues', issueRoutes);
+app.use('/api/rag', ragRoutes);
 
 // 404 first, then the error translator. The previous order (error handler
 // before the 404) happened to work only because Express skips 4-arity

@@ -1,0 +1,255 @@
+@use 'breakpoints' as *;
+
+.rag-container {
+  display: flex;
+  flex-direction: column;
+  // Not height: 100% — .main-content (the scrolling ancestor) doesn't reliably
+  // report a definite height inside ion-content's shadow-DOM scroller across
+  // browsers, and a percentage height against an indefinite one just resolves
+  // to auto. Letting the page flow normally and pinning the composer with
+  // `position: sticky` below is the layout every other full-width route here
+  // (notes, report-issue) already relies on.
+  min-height: 60vh;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+
+  @include below('sm') {
+    padding: 12px;
+  }
+}
+
+/* --- Header --------------------------------------------------------------- */
+
+.rag-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+
+  .title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    ion-icon {
+      font-size: 26px;
+      color: var(--ion-color-primary);
+      flex-shrink: 0;
+    }
+
+    h1 {
+      font-size: fluid(19px, 24px);
+      font-weight: 650;
+      letter-spacing: -0.01em;
+      margin: 0;
+    }
+
+    .subtitle {
+      margin: 2px 0 0;
+      color: var(--ion-color-medium);
+      font-size: 13px;
+    }
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .scope-select {
+    --padding-start: 10px;
+    --padding-end: 6px;
+    max-width: 160px;
+    border: 1px solid color-mix(in srgb, var(--theme-border-color), transparent 30%);
+    border-radius: 8px;
+    font-size: 13px;
+  }
+}
+
+/* --- Message list ----------------------------------------------------------- */
+
+.rag-messages {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 2px 20px;
+}
+
+.empty-state {
+  margin: auto;
+  text-align: center;
+  max-width: 420px;
+  padding: 24px;
+  color: var(--ion-color-medium);
+
+  ion-icon {
+    font-size: 34px;
+    color: var(--ion-color-primary);
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ion-text-color);
+    margin: 0 0 6px;
+  }
+
+  p {
+    margin: 0;
+    line-height: 1.5;
+    font-size: 13.5px;
+  }
+}
+
+.message-row {
+  display: flex;
+
+  &.user-row {
+    justify-content: flex-end;
+  }
+
+  &.assistant-row {
+    justify-content: flex-start;
+  }
+}
+
+.bubble {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 85%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--theme-border-color), transparent 30%);
+  background: var(--theme-card-background);
+
+  .user-row & {
+    background: var(--ion-color-primary);
+    color: var(--ion-color-primary-contrast);
+    border-color: transparent;
+  }
+
+  &.failed {
+    border-color: color-mix(in srgb, var(--ion-color-danger, #eb445a), transparent 40%);
+    background: color-mix(in srgb, var(--ion-color-danger, #eb445a), transparent 92%);
+  }
+
+  .bubble-icon {
+    font-size: 18px;
+    color: var(--ion-color-primary);
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+
+  .bubble-body {
+    min-width: 0;
+  }
+
+  .bubble-text {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.55;
+    font-size: 14.5px;
+  }
+}
+
+.typing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ion-color-medium);
+  font-size: 13px;
+
+  ion-spinner {
+    width: 18px;
+    height: 18px;
+    color: var(--ion-color-primary);
+  }
+}
+
+/* --- Citations ---------------------------------------------------------------- */
+
+.citations {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.citations-label {
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ion-color-medium);
+  margin-right: 2px;
+}
+
+.citation-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ion-color-primary), transparent 60%);
+  background: color-mix(in srgb, var(--ion-color-primary), transparent 95%);
+  color: var(--ion-color-primary);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+
+  ion-icon {
+    font-size: 12px;
+  }
+
+  &:hover {
+    background: color-mix(in srgb, var(--ion-color-primary), transparent 85%);
+  }
+}
+
+/* --- Composer ------------------------------------------------------------------ */
+
+.rag-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--theme-border-color), transparent 30%);
+  background: var(--theme-card-background);
+  flex-shrink: 0;
+  // Pins the composer to the bottom of the scrolling ancestor (.main-content)
+  // once the message list grows past the viewport, without depending on this
+  // page having a fixed height of its own.
+  position: sticky;
+  bottom: 8px;
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--theme-shadow, rgba(0, 0, 0, 0.15)), transparent 20%);
+}
+
+.rag-input {
+  flex: 1;
+  --padding-start: 8px;
+  --padding-end: 8px;
+  --padding-top: 6px;
+  --padding-bottom: 6px;
+  --color: var(--ion-text-color);
+  --placeholder-color: rgba(var(--ion-text-color-rgb), 0.5);
+  font-size: 14.5px;
+  max-height: 140px;
+}
+
+.rag-composer ion-button {
+  --border-radius: 50%;
+  width: 42px;
+  height: 42px;
+  margin: 0;
+  flex-shrink: 0;
+}

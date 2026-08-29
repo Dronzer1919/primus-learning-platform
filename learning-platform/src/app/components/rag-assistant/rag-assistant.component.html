@@ -1,0 +1,91 @@
+<div class="rag-container">
+  <header class="rag-header">
+    <div class="title">
+      <ion-icon name="sparkles-outline"></ion-icon>
+      <div>
+        <h1>Ask AI</h1>
+        <p class="subtitle">Answers grounded in this platform's own topic library.</p>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <ion-select
+        class="scope-select"
+        interface="popover"
+        [(ngModel)]="scope"
+        aria-label="Search scope"
+      >
+        <ion-select-option value="">All topics</ion-select-option>
+        <ion-select-option *ngFor="let tab of languageTabs" [value]="tab.code">{{ tab.name }}</ion-select-option>
+      </ion-select>
+
+      <ion-button fill="clear" size="small" (click)="clearChat()" [disabled]="!messages.length" title="Clear chat">
+        <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+      </ion-button>
+    </div>
+  </header>
+
+  <div class="rag-messages">
+    <div class="empty-state" *ngIf="!messages.length">
+      <ion-icon name="sparkles-outline"></ion-icon>
+      <h2>What are you trying to learn?</h2>
+      <p>
+        Ask about anything covered in the topic library — HTML, CSS, JavaScript, TypeScript, Angular,
+        Node.js or RxJS. Answers link back to the exact lesson they came from.
+      </p>
+    </div>
+
+    <div
+      class="message-row"
+      *ngFor="let message of messages; trackBy: trackByIndex"
+      [class.user-row]="message.role === 'user'"
+      [class.assistant-row]="message.role === 'assistant'"
+    >
+      <div class="bubble" [class.failed]="message.failed">
+        <ion-icon *ngIf="message.role === 'assistant'" class="bubble-icon" name="sparkles-outline"></ion-icon>
+
+        <div class="bubble-body">
+          <p class="bubble-text" *ngIf="message.text">{{ message.text }}</p>
+
+          <div class="typing" *ngIf="message.pending && !message.text">
+            <ion-spinner name="dots"></ion-spinner>
+            <span>Thinking…</span>
+          </div>
+
+          <div class="citations" *ngIf="message.citations?.length">
+            <span class="citations-label">Sources</span>
+            <button
+              type="button"
+              class="citation-chip"
+              *ngFor="let citation of message.citations"
+              (click)="openCitation(citation)"
+            >
+              {{ citation.title }}
+              <ion-icon name="chevron-forward-outline"></ion-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div #scrollAnchor></div>
+  </div>
+
+  <form class="rag-composer" (ngSubmit)="send()">
+    <ion-textarea
+      class="rag-input"
+      [(ngModel)]="question"
+      name="question"
+      placeholder="Ask a question about HTML, CSS, JS, TypeScript, Angular, Node.js or RxJS…"
+      autoGrow="true"
+      rows="1"
+      maxlength="500"
+      [disabled]="asking"
+      (keydown.enter)="onEnter($event)"
+    ></ion-textarea>
+
+    <ion-button type="submit" [disabled]="asking || !question.trim()" shape="round">
+      <ion-icon slot="icon-only" name="paper-plane-outline"></ion-icon>
+    </ion-button>
+  </form>
+</div>
