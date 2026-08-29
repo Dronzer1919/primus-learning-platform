@@ -179,10 +179,64 @@
 
 
       </nav>
+
+      <div class="sidebar-footer">
+        <img src="assets/icon/logo.svg" alt="Primus Codex" class="sidebar-logo" />
+        <button
+          type="button"
+          class="drafts-btn"
+          title="Recent playground sessions"
+          (click)="openDrafts()"
+        >
+          <ion-icon name="document-text-outline"></ion-icon>
+        </button>
+      </div>
     </aside>
 
     <main class="main-content">
       <router-outlet></router-outlet>
     </main>
+
+    <!-- Drafts quick-access panel: lists recent playground sessions so one can be
+         reopened without leaving the current page. Independent of the topic
+         sidebar above — its own scrim/open state, nothing shared. -->
+    <div
+      class="drafts-scrim"
+      *ngIf="draftsOpen"
+      (click)="closeDrafts()"
+      aria-hidden="true"
+    ></div>
+
+    <aside class="drafts-panel" [class.drafts-open]="draftsOpen">
+      <div class="drafts-header">
+        <h3>Recent Playground Sessions</h3>
+        <button type="button" class="drafts-close" (click)="closeDrafts()" aria-label="Close">
+          <ion-icon name="close-outline"></ion-icon>
+        </button>
+      </div>
+
+      <div class="drafts-list">
+        <div *ngIf="draftsLoading" class="drafts-loading">
+          <ion-spinner name="dots"></ion-spinner>
+        </div>
+
+        <p *ngIf="!draftsLoading && draftSessions.length === 0" class="drafts-empty">
+          No saved playground sessions yet.
+        </p>
+
+        <button
+          type="button"
+          *ngFor="let session of draftSessions"
+          class="drafts-item"
+          (click)="openDraft(session)"
+        >
+          <ion-icon name="code-slash-outline"></ion-icon>
+          <span class="drafts-item-info">
+            <span class="drafts-item-title">{{ session.title }}</span>
+            <span class="drafts-item-meta">{{ session.mode }} · {{ formatDraftDate(session.updatedAt) }}</span>
+          </span>
+        </button>
+      </div>
+    </aside>
   </div>
 </ion-content>

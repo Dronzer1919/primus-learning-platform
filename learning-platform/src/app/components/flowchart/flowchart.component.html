@@ -182,31 +182,28 @@ previews and canvas nodes can both reference them by id. -->
           }
         </div>
 
-        <!-- Saving to the account and reopening a saved diagram. Both are
-             hidden when signed out: the API behind them requires a token, and
-             the localStorage-only flow above still works without one. -->
-        @if (canUseSessions) {
-          <ion-button
-            size="small"
-            fill="outline"
-            color="success"
-            [disabled]="isSavingSession || !canSaveSession"
-            [title]="activeSessionId ? 'Save changes to ' + activeTitle : 'Save this flowchart to your account'"
-            (click)="openSaveDialog()"
-            >
-            <ion-icon slot="start" name="cloud-upload-outline"></ion-icon>
-            {{ isSavingSession ? 'Saving…' : 'Save session' }}
-          </ion-button>
-          <button
-            type="button"
-            class="panel-btn"
-            title="Open a previously saved flowchart"
-            (click)="openSessions($event)"
-            >
-            <ion-icon name="time-outline"></ion-icon>
-            <span>Sessions</span>
-          </button>
-        }
+        <!-- Named, saved-sessions library: backend-backed for signed-in users,
+             IndexedDB-backed on this device for guests. -->
+        <ion-button
+          size="small"
+          fill="outline"
+          color="success"
+          [disabled]="isSavingSession || !canSaveSession"
+          [title]="canUseSessions ? (activeSessionId ? 'Save changes to ' + activeTitle : 'Save this flowchart to your account') : 'Save this flowchart'"
+          (click)="canUseSessions ? openSaveDialog() : openGuestSaveDialog()"
+          >
+          <ion-icon slot="start" name="cloud-upload-outline"></ion-icon>
+          {{ isSavingSession ? 'Saving…' : 'Save session' }}
+        </ion-button>
+        <button
+          type="button"
+          class="panel-btn"
+          title="Open a previously saved flowchart"
+          (click)="openSessions($event)"
+          >
+          <ion-icon name="time-outline"></ion-icon>
+          <span>Sessions</span>
+        </button>
         @if (exportError) {
           <span class="toolbar-error" role="alert">{{ exportError }}</span>
         }

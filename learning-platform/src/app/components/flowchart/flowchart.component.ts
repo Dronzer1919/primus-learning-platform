@@ -3,12 +3,16 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule, Location } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { AlertButton, AlertController, IonicModule, ToastController } from '@ionic/angular';
+import { Observable } from 'rxjs';
 import { ThemeSelectorComponent } from '../theme-selector/theme-selector.component';
 import { FlowchartStoreService } from '../../services/flowchart-store.service';
 import { ExportFormat, FlowchartExportService } from '../../services/flowchart-export.service';
 import { FlowchartSessionService } from '../../services/flowchart-session.service';
+import { LocalFlowchartSessionService, LocalFlowchartSessionPayload } from '../../services/local-flowchart-session.service';
+import { GuestSavePromptService } from '../../core/guest-save-prompt.service';
 import { AuthService } from '../../services/auth.service';
-import { FlowchartSession } from '../../models/flowchart-session.model';
+import { FlowchartSession, FlowchartSessionPayload } from '../../models/flowchart-session.model';
+import { LocalFlowchartSession } from '../../models/local-session.model';
 import {
   DEFAULT_NODE_HEIGHT,
   DEFAULT_NODE_WIDTH,
@@ -47,6 +51,16 @@ interface PaletteGroupView {
 
 /** Which corner/edge of a shape a resize handle drags. */
 type ResizeDir = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+
+type AnyFlowchartSession = FlowchartSession | LocalFlowchartSession;
+
+/** Whichever store backs the current visit — backend for signed-in users, IndexedDB for guests. */
+interface FlowchartSessionSource {
+  getSessions(): Observable<AnyFlowchartSession[]>;
+  createSession(payload: FlowchartSessionPayload | LocalFlowchartSessionPayload): Observable<AnyFlowchartSession>;
+  updateSession(id: string, payload: FlowchartSessionPayload | LocalFlowchartSessionPayload): Observable<AnyFlowchartSession>;
+  deleteSession(id: string): Observable<void>;
+}
 
 @Component({
   selector: 'app-flowchart',
@@ -165,6 +179,8 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     private store: FlowchartStoreService,
     private exporter: FlowchartExportService,
     private sessionService: FlowchartSessionService,
+    private localSessionService: LocalFlowchartSessionService,
+    private savePrompt: GuestSavePromptService,
     private auth: AuthService,
     private location: Location,
     private router: Router,
@@ -185,18 +201,19 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.diagram = this.store.load();
 
-    // The route is public, but the sessions API is not. Signed-out visitors keep
-    // the localStorage-only behaviour and never see the two session controls.
+    // The route is public; signed-out visitors get the same named-sessions
+    // library as signed-in users, just backed by IndexedDB instead of the API.
     this.canUseSessions = this.auth.isAuthenticated();
-    if (this.canUseSessions) {
-      // Which saved diagram the canvas is showing, so a refresh still knows
-      // whether "Save" means update-this-one or create-a-new-one. The list
-      // itself is only fetched when the modal opens.
-      const meta = this.store.loadMeta();
-      if (meta) {
-        this.activeSessionId = meta.id;
-        this.activeTitle = meta.title;
-      }
+    this.source = this.canUseSessions ? this.sessionService : this.localSessionService;
+
+    // Which saved diagram the canvas is showing, so a refresh still knows
+    // whether "Save" means update-this-one or create-a-new-one — true for a
+    // local id just as much as a backend one. The list itself is only fetched
+    // when the modal opens.
+    const meta = this.store.loadMeta();
+    if (meta) {
+      this.activeSessionId = meta.id;
+      this.activeTitle = meta.title;
     }
 
     this.paletteGroups = SHAPE_GROUPS.map((group) => ({
@@ -1098,10 +1115,11 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   // per-user store that lets one person keep several named flowcharts and pick
   // up any of them later. Mirrors the playground-sessions feature.
 
-  /** Gates both session controls — false for signed-out visitors. */
+  /** True only for signed-in users — gates the "to your account" wording and the two-choice save dialog. */
   canUseSessions = false;
+  private source!: FlowchartSessionSource;
   sessionsOpen = false;
-  sessions: FlowchartSession[] = [];
+  sessions: AnyFlowchartSession[] = [];
   sessionsLoading = false;
   activeSessionId: string | null = null;
   activeTitle = '';
@@ -1141,7 +1159,7 @@ export class FlowchartComponent implements OnInit, OnDestroy {
 
   private loadSessions(): void {
     this.sessionsLoading = true;
-    this.sessionService
+    this.source
       .getSessions()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
@@ -1212,6 +1230,47 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     await this.presentDialog(alert);
   }
 
+  /** Guest equivalent of openSaveDialog: fork to local-vs-login first, then a
+   *  single-choice title prompt (no "save as new" — a guest's local library
+   *  doesn't need the branching a shared account does). */
+  async openGuestSaveDialog(): Promise<void> {
+    if (this.isSavingSession || !this.canSaveSession) {
+      return;
+    }
+
+    const destination = await this.savePrompt.promptSaveDestination('Save this flowchart');
+    if (destination === 'login') {
+      this.router.navigate(['/login'], { queryParams: { returnUrl: '/flowchart' } });
+      return;
+    }
+    if (destination !== 'local') {
+      return;
+    }
+
+    const alert = await this.alertController.create({
+      header: 'Save flowchart to this device',
+      cssClass: 'app-confirm-alert',
+      inputs: [
+        {
+          name: 'title',
+          type: 'text',
+          value: this.activeTitle || 'New Flowchart',
+          placeholder: 'Flowchart name',
+          attributes: { maxlength: 120, autofocus: true }
+        }
+      ],
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Save',
+          cssClass: 'alert-save-btn',
+          handler: (data: { title?: string }) => this.saveSession(data.title, false)
+        }
+      ]
+    });
+    await this.presentDialog(alert);
+  }
+
   private saveSession(title: string | undefined, asNew: boolean): void {
     // Writes are never de-duplicated at the HTTP layer — two saves are two
     // intents — so a double-tap has to be stopped here.
@@ -1229,8 +1288,8 @@ export class FlowchartComponent implements OnInit, OnDestroy {
 
     const request =
       this.activeSessionId && !asNew
-        ? this.sessionService.updateSession(this.activeSessionId, payload)
-        : this.sessionService.createSession(payload);
+        ? this.source.updateSession(this.activeSessionId, payload)
+        : this.source.createSession(payload);
 
     request.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (saved) => {
@@ -1249,7 +1308,7 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   }
 
   /** Point the canvas at a saved session without touching the shapes on it. */
-  private adoptSession(session: FlowchartSession): void {
+  private adoptSession(session: AnyFlowchartSession): void {
     this.activeSessionId = session._id;
     this.activeTitle = session.title;
     this.store.saveMeta({ id: session._id, title: session.title });
@@ -1257,7 +1316,7 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   }
 
   /** Resume editing a saved flowchart. */
-  async openSession(session: FlowchartSession): Promise<void> {
+  async openSession(session: AnyFlowchartSession): Promise<void> {
     if (session._id === this.activeSessionId && !this.dirty) {
       this.sessionsOpen = false;
       return;
@@ -1320,7 +1379,7 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     this.sessionsOpen = false;
   }
 
-  async renameSession(session: FlowchartSession, event: Event): Promise<void> {
+  async renameSession(session: AnyFlowchartSession, event: Event): Promise<void> {
     event.stopPropagation();
     const alert = await this.alertController.create({
       header: 'Rename flowchart',
@@ -1342,7 +1401,7 @@ export class FlowchartComponent implements OnInit, OnDestroy {
           handler: (data: { title?: string }) => {
             const title = (data.title ?? '').trim().slice(0, 120);
             if (!title) return;
-            this.sessionService
+            this.source
               .updateSession(session._id, { title })
               .pipe(takeUntilDestroyed(this.destroyRef))
               .subscribe({
@@ -1361,7 +1420,7 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     await this.presentDialog(alert);
   }
 
-  async deleteSession(session: FlowchartSession, event: Event): Promise<void> {
+  async deleteSession(session: AnyFlowchartSession, event: Event): Promise<void> {
     event.stopPropagation();
     const alert = await this.alertController.create({
       header: 'Delete flowchart',
@@ -1374,7 +1433,7 @@ export class FlowchartComponent implements OnInit, OnDestroy {
           role: 'destructive',
           cssClass: 'alert-button-danger',
           handler: () => {
-            this.sessionService
+            this.source
               .deleteSession(session._id)
               .pipe(takeUntilDestroyed(this.destroyRef))
               .subscribe({

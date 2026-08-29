@@ -189,6 +189,21 @@
   font-size: 10px;
 }
 
+// Pushed to the foot of the vertical rail via margin-top: auto — the rail is a
+// column flexbox stretched to the container's full height, so this is the one
+// item that isn't just the next one in the language list.
+.rail-sessions {
+  margin-top: auto;
+  margin-bottom: 0;
+
+  @include below('md') {
+    // The rail is a horizontal strip here instead: push to the far end of the
+    // row rather than to a "bottom" that no longer exists.
+    margin-top: 0;
+    margin-left: auto;
+  }
+}
+
 .playground-main {
   flex: 1;
   display: flex;
@@ -770,14 +785,37 @@
   margin: 12px 0 8px;
 }
 
+// Two lines that stretch to fill whatever width is available, rather than a
+// fixed run of "=" characters — a fixed-length divider either falls short of
+// a wide desktop pane or overflows/wraps mid-symbol on a narrow phone.
 .run-success-text {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-family: 'Fira Code', 'Consolas', monospace;
   font-weight: 700;
   font-size: 13px;
   letter-spacing: 0.5px;
   color: #86efac;                    // light green
-  word-break: break-word;
+
+  @include below('xs') {
+    font-size: 11px;
+    gap: 6px;
+  }
+}
+
+.run-success-line {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background-color: #86efac;
+}
+
+.run-success-label {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 // The animation plays inside this fixed-height strip below the success line.

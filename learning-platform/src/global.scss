@@ -225,6 +225,92 @@ ion-content {
   border-color: color-mix(in srgb, var(--ion-color-danger, #eb445a), transparent 55%);
 }
 
+/* Guest save-destination prompt ("Save on this device" / "Log in / Sign up" / dismiss):
+   the two real choices are filled pill buttons, side by side on desktop and stacked on
+   mobile; dismiss is pulled out of that row entirely and floated as a small round × over
+   the top-right corner, so closing reads as "dismiss the dialog" rather than a third
+   equal choice. Scoped to this one dialog (guest-save-prompt.service.ts) rather than
+   folded into .app-confirm-alert, so no other confirm/delete dialog in the app is affected. */
+.guest-save-alert {
+  .alert-wrapper {
+    position: relative;
+  }
+
+  .alert-head {
+    padding-right: 44px;
+  }
+
+  .alert-message {
+    margin-top: 4px;
+    line-height: 1.5;
+  }
+
+  .alert-button-group {
+    flex-direction: column;
+    padding: 14px;
+    gap: 10px;
+
+    // Desktop: the two real choices share one row instead of stacking.
+    @include above('md') {
+      flex-direction: row;
+      flex-wrap: nowrap;
+    }
+  }
+
+  .alert-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 12px 16px;
+    border-radius: 10px;
+    text-align: center;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  /* Ionic's MD-mode alert right-aligns each button's label by default
+     (.alert-button-inner { justify-content: flex-end }) — that's the actual
+     text-holding element, so centering only the outer .alert-button above
+     left a run of blank space before the label on every button. */
+  .alert-button-inner {
+    justify-content: center;
+  }
+
+  .alert-button.guest-save-btn-local,
+  .alert-button.guest-save-btn-login {
+    @include above('md') {
+      flex: 1 1 0;
+    }
+  }
+
+  .alert-button.guest-save-btn-local {
+    background: var(--ion-color-success, #2dd36f);
+    color: var(--ion-color-success-contrast, #fff);
+  }
+
+  .alert-button.guest-save-btn-login {
+    background: var(--ion-color-primary);
+    color: var(--ion-color-primary-contrast);
+  }
+
+  /* Taken out of the button row and pinned over the card's top-right corner. */
+  .alert-button.guest-save-btn-cancel {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    margin: 0;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--ion-text-color), transparent 92%);
+    color: color-mix(in srgb, var(--ion-text-color), transparent 35%);
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+}
+
 /* Toasts ship square-cornered and shadowless by default, which reads as a system
    notification rather than part of this app. Match the alert card's depth and radius. */
 .app-toast {

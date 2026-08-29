@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject, Observable, Subject } from 'rxjs';
 import { distinctUntilChanged, map, tap } from 'rxjs/operators';
 import { User, LoginCredentials, SignupData, UserStats } from '../models/user.model';
 import { environment } from '../../environments/environment';
@@ -36,6 +36,15 @@ export class AuthService {
    * ExpressionChangedAfterItHasBeenCheckedError.
    */
   public isLoggedIn$: Observable<boolean>;
+
+  /**
+   * Fires once per successful login/signup/Google-login — never on the
+   * initial page-load rehydration from storage. Lets a single subscriber
+   * (see app.component.ts) offer to migrate guest-mode local data without
+   * every auth entry point having to remember to call it.
+   */
+  private justAuthenticatedSubject = new Subject<User>();
+  public justAuthenticated: Observable<User> = this.justAuthenticatedSubject.asObservable();
 
   private apiUrl = environment.apiUrl;
 
@@ -115,6 +124,7 @@ export class AuthService {
     this.writeStorage(USER_KEY, JSON.stringify(user));
     this.writeStorage(TOKEN_KEY, response.token);
     this.currentUserSubject.next(user);
+    this.justAuthenticatedSubject.next(user);
     return user;
   }
 
