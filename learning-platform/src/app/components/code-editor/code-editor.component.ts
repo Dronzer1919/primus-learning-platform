@@ -3,7 +3,7 @@ import { Compartment, EditorState, Extension } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
-import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
+import { syntaxHighlighting, HighlightStyle, getIndentation } from '@codemirror/language';
 import { tags } from '@lezer/highlight';
 import { javascript } from '@codemirror/lang-javascript';
 import { html } from '@codemirror/lang-html';
@@ -164,6 +164,34 @@ export class CodeEditorComponent implements AfterViewInit, OnChanges, OnDestroy 
   private editorThemeExtension(theme: Theme): Extension {
     const chrome = LIGHT_EDITOR_THEMES.has(theme) ? editorChromeLight : editorChromeDark;
     return [chrome, syntaxHighlighting(appHighlightStyle)];
+  }
+
+  // Re-indents every line using the active language's own indentation rules
+  // (from @codemirror/language) — structural cleanup only, doesn't touch code content.
+  // Returns whether anything actually changed, so callers can tell a real fix apart from a no-op.
+  formatCode(): boolean {
+    if (!this.view) {
+      return false;
+    }
+    const state = this.view.state;
+    const changes: { from: number; to: number; insert: string }[] = [];
+    for (let lineNum = 1; lineNum <= state.doc.lines; lineNum++) {
+      const line = state.doc.line(lineNum);
+      const trimmedText = line.text.replace(/^[ \t]+/, '');
+      if (trimmedText.length === 0) {
+        continue;
+      }
+      const indent = Math.max(0, getIndentation(state, line.from) ?? 0);
+      const newText = ' '.repeat(indent) + trimmedText;
+      if (newText !== line.text) {
+        changes.push({ from: line.from, to: line.to, insert: newText });
+      }
+    }
+    if (changes.length === 0) {
+      return false;
+    }
+    this.view.dispatch({ changes });
+    return true;
   }
 
   private getLanguageExtension(): Extension {

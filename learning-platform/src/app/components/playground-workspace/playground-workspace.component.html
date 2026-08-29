@@ -75,6 +75,10 @@
           </ion-button>
         </div>
         <div class="toolbar-actions">
+          <ion-button size="small" fill="outline" title="Format" (click)="formatActiveCode()">
+            <ion-icon slot="start" name="code-slash-outline"></ion-icon>
+            <span class="btn-label">Format</span>
+          </ion-button>
           <ion-button size="small" fill="outline" title="Reset" (click)="resetCode()">
             <ion-icon slot="start" name="refresh-outline"></ion-icon>
             <span class="btn-label">Reset</span>
@@ -164,6 +168,10 @@
         <div class="toolbar-actions">
           <!-- .btn-label is dropped below `sm`, leaving these as icon-only buttons so
                the whole toolbar fits one phone row alongside Run and Visualize. -->
+          <ion-button size="small" fill="outline" title="Format" (click)="formatActiveCode()">
+            <ion-icon slot="start" name="code-slash-outline"></ion-icon>
+            <span class="btn-label">Format</span>
+          </ion-button>
           <ion-button size="small" fill="outline" title="Share" (click)="shareCode()">
             <ion-icon slot="start" name="share-social-outline"></ion-icon>
             <span class="btn-label">Share</span>
@@ -238,6 +246,10 @@
           </ion-button>
         </div>
         <div class="toolbar-actions">
+          <ion-button size="small" fill="outline" title="Format" (click)="formatActiveCode()">
+            <ion-icon slot="start" name="code-slash-outline"></ion-icon>
+            <span class="btn-label">Format</span>
+          </ion-button>
           <ion-button size="small" fill="outline" title="Share" (click)="shareCode()">
             <ion-icon slot="start" name="share-social-outline"></ion-icon>
             <span class="btn-label">Share</span>

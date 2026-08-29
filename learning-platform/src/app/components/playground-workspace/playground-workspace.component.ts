@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, NgZone, OnDestroy, OnInit } from '@angular/core';
+import { Component, Input, Output, EventEmitter, NgZone, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
 import { IonicModule, ToastController } from '@ionic/angular';
@@ -63,6 +63,10 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
   @Input() showSave = false;
   @Input() sessionUpdatedAt: string | null = null;
   @Output() saveClick = new EventEmitter<void>();
+
+  // Only one app-code-editor is ever in the DOM at a time (the others are behind *ngIf for the
+  // inactive tab/mode), so this always resolves to whichever editor is currently visible.
+  @ViewChild(CodeEditorComponent) activeEditor?: CodeEditorComponent;
 
   languages: PlaygroundLanguage[] = PLAYGROUND_LANGUAGES;
   selectedMode: PlaygroundModeId = this.mode;
@@ -275,6 +279,20 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
     this.jsCode = DEFAULT_JS;
     this.output = '';
     this.consoleOutput = [];
+  }
+
+  async formatActiveCode(): Promise<void> {
+    if (!this.activeEditor) {
+      return;
+    }
+    const changed = this.activeEditor.formatCode();
+    const toast = await this.toastController.create({
+      message: changed ? 'Code formatted.' : 'Already formatted.',
+      duration: 1500,
+      color: 'medium',
+      position: 'bottom'
+    });
+    toast.present();
   }
 
   runJavaScriptOnly(): void {
