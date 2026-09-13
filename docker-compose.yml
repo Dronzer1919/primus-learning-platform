@@ -2,9 +2,10 @@
 # volume, network and HOST ports so it coexists with the ecom project on the VPS.
 #
 #   ecom:      api 127.0.0.1:3000  web 127.0.0.1:8080  (containers sindhu-*)
-#   this app:  api 127.0.0.1:3100  web 127.0.0.1:8081  (containers lp-*)
+#   this app:  api 127.0.0.1:3101  web 127.0.0.1:8081  (containers lp-*)
+#   (was 3100 until it collided with an unrelated app's native process on the VPS)
 #
-# The host Nginx reverse-proxies primuscodex.com -> :8081 and api.primuscodex.com -> :3100.
+# The host Nginx reverse-proxies primuscodex.com -> :8081 and api.primuscodex.com -> :3101.
 services:
   lp-mongo:
     image: mongo:7
@@ -25,7 +26,7 @@ services:
     env_file:
       - backend/.env
     ports:
-      - "127.0.0.1:3100:3001"      # host:container (container reads PORT=3001 from .env)
+      - "127.0.0.1:3101:3001"      # host:container (container reads PORT=3001 from .env)
     volumes:
       - lp-uploads-data:/app/uploads   # issue-report images; otherwise wiped on every redeploy
     depends_on:

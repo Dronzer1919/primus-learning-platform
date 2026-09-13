@@ -31,7 +31,7 @@ APP_DIR="${APP_DIR:-/root/learning-platform}"
 BRANCH="${BRANCH:-dev}"
 
 DOMAIN="${DOMAIN:-primuscodex.com}"
-API_HOST_PORT="${API_HOST_PORT:-3100}"   # published as 127.0.0.1:3100 -> container :3001
+API_HOST_PORT="${API_HOST_PORT:-3101}"   # published as 127.0.0.1:3101 -> container :3001
 WEB_HOST_PORT="${WEB_HOST_PORT:-8081}"   # published as 127.0.0.1:8081 -> container :80
 MONGO_DB_NAME="${MONGO_DB_NAME:-learning-platform}"
 

@@ -2,7 +2,7 @@
 # One-command setup + deploy for the Learning Platform (Docker Compose) on a VPS that
 # ALREADY hosts another project. Clones the repo (no manual git clone needed), then
 # builds and starts the stack. Coexists with the ecom project:
-#   - containers lp-mongo / lp-api / lp-web on host ports 127.0.0.1:3100 and :8081
+#   - containers lp-mongo / lp-api / lp-web on host ports 127.0.0.1:3101 and :8081
 #   - its own volume + network + isolated MongoDB
 #   - its own HOST Nginx sites (primuscodex.com / api.primuscodex.com)
 #
@@ -65,7 +65,7 @@ install_site nginx-api.conf      learning-platform-api
 install_site nginx-frontend.conf learning-platform-frontend
 nginx -t && systemctl reload nginx
 
-log "Deploy complete. api -> 127.0.0.1:3100, web -> 127.0.0.1:8081."
+log "Deploy complete. api -> 127.0.0.1:3101, web -> 127.0.0.1:8081."
 cat <<EOF
 
 Remaining one-time steps (need your input / DNS):
