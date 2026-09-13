@@ -127,7 +127,7 @@
           </div>
         </div>
 
-        <div class="resize-divider" (mousedown)="startResize($event)" title="Drag to resize"></div>
+        <div class="resize-divider" (pointerdown)="startResize($event)" title="Drag to resize"></div>
 
         <div class="preview-section">
           <div class="preview-content">
@@ -198,7 +198,7 @@
           </button>
           <app-code-editor [value]="jsOnlyCode" (valueChange)="jsOnlyCode = $event" language="javascript"></app-code-editor>
         </div>
-        <div class="resize-divider" (mousedown)="startResize($event)" title="Drag to resize"></div>
+        <div class="resize-divider" (pointerdown)="startResize($event)" title="Drag to resize"></div>
         <div class="output-panel" *ngIf="!showVisualizer">
           <div *ngFor="let log of jsOnlyConsole" class="console-line" [class.console-error]="isErrorLine(log)" [class.console-frame]="isErrorFrame(log)">
             {{ log }}
@@ -253,7 +253,7 @@
         <div class="editor-section">
           <app-code-editor [value]="tsCode" (valueChange)="tsCode = $event" language="typescript"></app-code-editor>
         </div>
-        <div class="resize-divider" (mousedown)="startResize($event)" title="Drag to resize"></div>
+        <div class="resize-divider" (pointerdown)="startResize($event)" title="Drag to resize"></div>
         <div class="output-panel">
           <div *ngFor="let log of tsConsole" class="console-line" [class.console-error]="isErrorLine(log)" [class.console-frame]="isErrorFrame(log)">
             {{ log }}

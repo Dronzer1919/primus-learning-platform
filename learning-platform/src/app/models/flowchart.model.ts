@@ -59,6 +59,8 @@ export interface FlowNode {
   strikethrough?: boolean;
   /** Horizontal alignment of the label text. */
   align?: 'left' | 'center' | 'right';
+  /** Vertical alignment of the label text within the shape. Defaults to 'middle'. */
+  valign?: 'top' | 'middle' | 'bottom';
   /** Text colour. */
   textColor?: string;
   /** Line height as a percentage, e.g. 120 for 120%. */

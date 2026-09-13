@@ -1,5 +1,14 @@
 @use 'breakpoints' as *;
 
+// Counter-scale for the editing chrome that lives *inside* the zoomed
+// `.canvas-content` layer — connect handles, resize grips, the rotate handle.
+// The shapes themselves should scale with the zoom; their handles should not,
+// or zooming out to fit a diagram on a phone would shrink every grip below
+// finger size. Dividing a length by the live zoom (`--z`, bound from the
+// template) cancels the layer's transform exactly, so these stay put at their
+// on-screen size whatever the zoom level.
+$z: var(--z, 1);
+
 :host {
   display: block;
   height: 100%;
@@ -43,14 +52,14 @@
     min-width: 0;
 
     > ion-icon {
-      font-size: 28px;
+      font-size: fluid(20px, 28px);
       color: var(--ion-color-primary);
       flex-shrink: 0;
     }
 
     h1 {
       margin: 0;
-      font-size: 18px;
+      font-size: fluid(14px, 18px);
       font-weight: 700;
     }
 
@@ -109,6 +118,11 @@
   @include below('lg') {
     flex-direction: column;
     min-width: 0;
+    // The bands below are sized in vh/px, so a tall properties sheet on a short
+    // screen could otherwise push the last band past the bottom of the page,
+    // where nothing scrolls it back into reach. The canvas shrinks to its own
+    // floor first; this is the backstop.
+    overflow: hidden;
   }
 }
 
@@ -132,7 +146,7 @@ $bar-height: 49px;
     flex: 1;
     margin: 0;
     text-align: center;
-    font-size: 14px;
+    font-size: fluid(12px, 14px);
     font-weight: 700;
     color: var(--editor-fg);
   }
@@ -169,9 +183,15 @@ $bar-height: 49px;
 }
 
 // --- Palette ------------------------------------------------------------
+// Desktop three-column workbench targets a 15/70/15 split (palette | canvas | properties):
+// flex-basis is a real percentage of `.flow-body`'s width, clamped so it neither
+// shrinks to nothing on a narrow laptop nor balloons to a huge empty panel on an
+// ultra-wide monitor — whatever's left goes to the canvas via its own `flex: 1`.
 .palette {
-  width: 188px;
-  flex-shrink: 0;
+  // The `var()` reflects the live drag from `.panel-resize-divider`; the clamp()
+  // floor/ceiling still holds even while dragging, since Pointer clamps the
+  // value in JS too but this is the CSS-side backstop.
+  flex: 0 0 clamp(188px, var(--palette-w, 15%), 300px);
   min-height: 0;
   background: var(--editor-header-bg);
   border-right: 1px solid var(--editor-border);
@@ -179,8 +199,12 @@ $bar-height: 49px;
   flex-direction: column;
 
   // Stacked: a horizontal strip above the canvas, so the head row would only
-  // steal height — the toolbar toggle still hides/shows the whole strip.
+  // steal height — the toolbar toggle still hides/shows the whole strip. `flex:
+  // none` matters here: `.flow-body` switches to `flex-direction: column` at this
+  // breakpoint, and the desktop `flex-basis` above would otherwise size this
+  // panel's *height* instead of leaving it to content.
   @include below('lg') {
+    flex: none;
     width: 100%;
     border-right: none;
     border-bottom: 1px solid var(--editor-border);
@@ -191,11 +215,153 @@ $bar-height: 49px;
   }
 }
 
+// --- Side panel resize dividers ------------------------------------------
+// One sits between the palette and the canvas, the other between the canvas
+// and the properties panel — see startPanelResize() in the component. Only
+// meaningful on the desktop side-by-side layout: once the panels stack as
+// horizontal strips (below `lg`), a horizontal-drag width divider has nothing
+// to do, so it's removed rather than left as dead chrome.
+// The little pill "grip" centered on a divider — purely decorative (the
+// divider element itself carries the pointerdown handler and the wider hit
+// area below), it just makes the drag affordance obvious at a glance instead
+// of a bare 5px line.
+.resize-chip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--editor-header-bg);
+  border: 1px solid var(--editor-border);
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  z-index: 2;
+
+  ion-icon {
+    font-size: 12px;
+    color: color-mix(in srgb, var(--editor-fg), transparent 25%);
+  }
+
+  .chip-dots span {
+    display: block;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--editor-fg), transparent 45%);
+  }
+}
+
+.panel-resize-divider {
+  width: 5px;
+  flex-shrink: 0;
+  background: var(--editor-border);
+  cursor: col-resize;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 1;
+  touch-action: none;
+
+  &:hover, &:active {
+    background: var(--ion-color-primary);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0 -4px; // wider hit area than the visible seam
+  }
+
+  @include touch {
+    &::after {
+      inset: 0 -10px;
+    }
+  }
+
+  @include below('lg') {
+    display: none;
+  }
+
+  // Tall narrow pill with the two dot-pairs stacked above/below the icon.
+  .resize-chip {
+    flex-direction: column;
+    gap: 5px;
+    width: 18px;
+    height: 46px;
+    padding: 6px 0;
+
+    .chip-dots {
+      display: flex;
+      gap: 3px;
+    }
+  }
+}
+
+// The properties panel's bottom-sheet handle in the stacked (mobile) layout —
+// see startPropsHeightResize() in the component. Sits right above the panel
+// in the stacked column, so a vertical drag there reads naturally as "resize
+// this sheet's height". The mirror image of `.panel-resize-divider` above:
+// hidden on desktop, where the properties panel is a side column instead.
+.panel-vresize-divider {
+  display: none;
+  height: 6px;
+  width: 100%;
+  flex-shrink: 0;
+  background: var(--editor-border);
+  cursor: row-resize;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 1;
+  touch-action: none;
+
+  &:hover, &:active {
+    background: var(--ion-color-primary);
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -4px 0; // wider hit area than the visible seam
+  }
+
+  @include touch {
+    &::after {
+      inset: -10px 0;
+    }
+  }
+
+  @include below('lg') {
+    display: block;
+  }
+
+  // Wide short pill with the two dot-pairs stacked left/right of the icon —
+  // the 90°-rotated counterpart of `.panel-resize-divider`'s chip above.
+  .resize-chip {
+    flex-direction: row;
+    gap: 5px;
+    width: 46px;
+    height: 18px;
+    padding: 0 6px;
+
+    .chip-dots {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+  }
+}
+
 .palette-scroll {
   flex: 1;
   min-height: 0;
   padding: 12px 10px;
   overflow-y: auto;
+  scroll-behavior: smooth;
+  // Same iOS/Android WebView fixes as `.props-panel` — see its comments.
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
 
@@ -237,6 +403,11 @@ $bar-height: 49px;
 
     &:active {
       cursor: grabbing;
+      // Tap feedback for touch, where the hover rule above never fires and a
+      // tap is the whole interaction — without it, tapping a shape looks like
+      // nothing happened until the shape appears on the canvas.
+      border-color: var(--ion-color-primary);
+      background: color-mix(in srgb, var(--ion-color-primary), transparent 88%);
     }
   }
 
@@ -317,8 +488,21 @@ $bar-height: 49px;
     }
 
     .palette-item {
-      width: 56px;
+      width: 58px;
       flex-shrink: 0;
+      // The strip is the primary way to add a shape on a phone (drag & drop
+      // never fires on touch), so each tile has to be a comfortable tap target.
+      padding: 6px 2px 5px;
+    }
+
+    .palette-preview {
+      height: 26px;
+    }
+
+    // 9px is legible in a desktop side panel at reading distance; in a scrolling
+    // strip on a phone it is not.
+    .palette-label {
+      font-size: 10px;
     }
 
     // Multi-sentence instructions do not belong in a scrolling strip; the same
@@ -336,11 +520,16 @@ $bar-height: 49px;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  // Anchors the floating zoom controls over the canvas.
+  position: relative;
 
-  // Once stacked, the canvas must still be the tallest band — without a floor it
-  // collapses to nothing when the properties panel opens.
+  // Once stacked, the canvas must still keep a usable band of its own — but the
+  // floor has to stay small enough that it plus the palette strip, the toolbar
+  // and an open properties sheet still fit the viewport. A 45vh floor here (the
+  // previous value) overflowed the page on a phone the moment the properties
+  // sheet was opened, pushing the sheet's own controls off the bottom.
   @include below('lg') {
-    min-height: 45vh;
+    min-height: 140px;
   }
 }
 
@@ -372,8 +561,26 @@ $bar-height: 49px;
     min-width: 0;
   }
 
+  // The head-row height only exists to line the toolbar up with the two panel
+  // heads beside it; once the panels stack, those heads are gone and the height
+  // is just chrome taken from the canvas.
+  @include below('lg') {
+    min-height: 44px;
+    gap: 6px;
+
+    // On a wide toolbar the spacer right-aligns the two view toggles over the
+    // panel they control. Once the buttons wrap, it does the opposite: a
+    // flex:1 spacer fills the rest of the first row and forces those toggles
+    // onto a second one, costing a whole row of canvas height to show two
+    // icon buttons. They read fine inline at this width.
+    .toolbar-spacer {
+      display: none;
+    }
+  }
+
   @include below('sm') {
     padding: 6px 8px;
+    gap: 5px;
 
     .toolbar-note {
       // Full-width so the hint reads as its own line rather than squeezing the buttons.
@@ -384,6 +591,36 @@ $bar-height: 49px;
     // Icon-only once space is tight; the title attribute still names them.
     .panel-btn span {
       display: none;
+    }
+
+    // The ion-button actions (Delete/Copy/Paste/Clear/Save session) go icon-only
+    // the same way — visually hidden rather than `display:none` so a screen
+    // reader still gets the name, matching the .btn-label treatment already
+    // used for this in the playground toolbar.
+    ion-button .btn-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    // Tight enough that the whole action row — shapes, delete, copy, paste,
+    // clear, save, background, properties — fits on one line at 360px instead
+    // of wrapping onto a second one that costs the canvas ~50px of height.
+    ion-button {
+      --padding-start: 5px;
+      --padding-end: 5px;
+    }
+
+    .panel-btn {
+      gap: 4px;
+      padding: 0 7px;
+    }
+
+    ion-button ion-icon[slot='start'] {
+      margin-inline-end: 0;
     }
   }
 }
@@ -400,13 +637,13 @@ $bar-height: 49px;
   border-radius: 6px;
   background: var(--playground-page-bg);
   color: var(--editor-fg);
-  font-size: 12px;
+  font-size: fluid(11px, 12px);
   font-weight: 600;
   cursor: pointer;
   transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
 
   ion-icon {
-    font-size: 15px;
+    font-size: fluid(14px, 15px);
   }
 
   // The direction the panel will slide back in from.
@@ -428,6 +665,16 @@ $bar-height: 49px;
   &:disabled {
     opacity: 0.45;
     cursor: not-allowed;
+  }
+}
+
+// Only exists in the stacked layout, where the side panels become bands and
+// lose their own head rows (see the "Shapes" toggle in the toolbar).
+.stacked-only {
+  display: none;
+
+  @include below('lg') {
+    display: inline-flex;
   }
 }
 
@@ -589,20 +836,55 @@ $bar-height: 49px;
   position: relative;
   flex: 1;
   overflow: auto;
+  // One-finger drags still pan the canvas, but a two-finger pinch is ours, not
+  // the browser's page zoom — `onCanvasTouchMove` turns it into a canvas zoom
+  // instead. Without this the browser claims the gesture first and the diagram
+  // never scales, only the whole page does.
+  touch-action: pan-x pan-y;
+  // A shape dragged/resized past the visible edge just scrolls out of view —
+  // it isn't lost, but OS-default overlay scrollbars are invisible until
+  // actively touched (especially on mobile), so it can look like the shape
+  // was clipped instead of merely off-screen. A always-visible, styled
+  // scrollbar makes "there's more this way, scroll to see it" obvious instead.
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--editor-fg), transparent 25%) color-mix(in srgb, var(--editor-fg), transparent 90%);
+
+  &::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: color-mix(in srgb, var(--editor-fg), transparent 92%);
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--editor-fg), transparent 25%);
+    border-radius: 6px;
+    border: 1px solid var(--playground-page-bg);
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--editor-fg), transparent 10%);
+  }
+
   background-color: var(--playground-page-bg);
-  // Default: dotted grid
+  // Default: dotted grid. `--bg-scale` is the live zoom level (bound from the
+  // template): the pattern is painted on the scroll container, not inside the
+  // scaled layer, so it has to be scaled by hand or the dots would drift away
+  // from the shapes that were snapped to them.
   background-image: radial-gradient(
     color-mix(in srgb, var(--editor-fg), transparent 82%) 1px,
     transparent 1px
   );
-  background-size: 20px 20px;
+  background-size: calc(20px * var(--bg-scale, 1)) calc(20px * var(--bg-scale, 1));
 
   // Grid lines
   &.canvas-bg-grid {
     background-image:
       linear-gradient(color-mix(in srgb, var(--editor-fg), transparent 88%) 1px, transparent 1px),
       linear-gradient(90deg, color-mix(in srgb, var(--editor-fg), transparent 88%) 1px, transparent 1px);
-    background-size: 24px 24px;
+    background-size: calc(24px * var(--bg-scale, 1)) calc(24px * var(--bg-scale, 1));
   }
 
   // Plain — no background pattern
@@ -612,6 +894,127 @@ $bar-height: 49px;
 
   &.connecting {
     cursor: crosshair;
+  }
+
+  // Scrollbars eat real estate on a small screen, and a phone shows overlay
+  // ones anyway — the zoom controls and "fit to screen" are what make
+  // off-screen shapes findable there.
+  @include below('lg') {
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+  }
+}
+
+// The scaled footprint of the drawing surface: this is what gives the canvas
+// its scroll range. Never smaller than the viewport, so a zoomed-out diagram
+// still fills the visible area instead of sitting in a corner.
+.canvas-sizer {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+// The unzoomed drawing surface. Everything inside it (nodes, edges, handles)
+// is positioned in plain canvas coordinates; this transform is the only place
+// the zoom level is applied.
+.canvas-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+// --- Zoom controls ------------------------------------------------------
+// A floating cluster over the canvas rather than more toolbar buttons: the
+// toolbar is already the tightest row on a phone, and zoom belongs next to the
+// thing it zooms.
+.zoom-bar {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--editor-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--editor-header-bg), transparent 8%);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+
+  .zoom-btn,
+  .zoom-level {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 30px;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--editor-fg);
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--ion-color-primary), transparent 85%);
+      color: var(--ion-color-primary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ion-color-primary);
+      outline-offset: -2px;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  }
+
+  .zoom-btn {
+    width: 30px;
+
+    ion-icon {
+      font-size: 16px;
+    }
+  }
+
+  // Doubles as the "back to 100%" button, so it is labelled by its own value.
+  .zoom-level {
+    min-width: 46px;
+    padding: 0 6px;
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  // Fingers need more than a 30px circle, and there is room for it: the bar
+  // floats over the canvas rather than competing for toolbar space.
+  @include touch {
+    gap: 3px;
+    padding: 4px;
+
+    .zoom-btn,
+    .zoom-level {
+      height: 38px;
+    }
+
+    .zoom-btn {
+      width: 38px;
+
+      ion-icon { font-size: 18px; }
+    }
+
+    .zoom-level {
+      min-width: 54px;
+      font-size: 13px;
+    }
   }
 }
 
@@ -644,11 +1047,13 @@ $bar-height: 49px;
     }
   }
 
-  // Wide invisible area for easier edge clicking
+  // Wide invisible area for easier edge clicking. Counter-scaled like the
+  // handles: the line it sits on may be two screen pixels wide when zoomed out,
+  // but the target you have to hit stays the same size.
   .edge-hit {
     fill: none;
     stroke: transparent;
-    stroke-width: 14;
+    stroke-width: calc(14px / #{$z});
     pointer-events: stroke;
     cursor: pointer;
   }
@@ -674,9 +1079,13 @@ $bar-height: 49px;
   .edge-bend-handle {
     fill: #fff;
     stroke: var(--ion-color-primary);
-    stroke-width: 2.5;
+    stroke-width: calc(2.5px / #{$z});
     cursor: grab;
     pointer-events: all;
+    touch-action: none;
+    // `r` is a CSS property for SVG geometry, so the handle counter-scales the
+    // same way the HTML handles do (the r="7" attribute is the fallback).
+    r: calc(7px / #{$z});
 
     &:hover {
       fill: var(--ion-color-primary);
@@ -684,6 +1093,12 @@ $bar-height: 49px;
 
     &:active {
       cursor: grabbing;
+    }
+
+    // A 7px radius is hard to land a finger on; SVG geometry attributes are
+    // themselves CSS-stylable, so this widens the hit area without touching the template.
+    @include touch {
+      r: calc(11px / #{$z});
     }
   }
 }
@@ -763,19 +1178,40 @@ $bar-height: 49px;
 .node-label {
   position: relative;
   z-index: 1;
+  box-sizing: border-box;
   font-size: 13px;
   text-align: center;
+  // Padding (including any shape-specific inset, e.g. a parallelogram's
+  // slanted corners) comes from labelStyle()/labelBoxStyle() inline —
+  // this is just a sane fallback if that binding is ever missing.
   padding: 4px;
-  // Fill the node so text-align (from the Text panel) actually shifts the text.
+  // Fills the node so text-align shifts the text and the vertical alignment
+  // (align-items, from labelBoxStyle()) has the full shape height to move
+  // short text within, not just the height its own content needs.
   width: 100%;
+  height: 100%;
   max-width: 100%;
   outline: none;
   word-break: break-word;
   pointer-events: none;
+  overflow: hidden;
+  // A plain flexbox whose single item is the clamped text below. The legacy
+  // `-webkit-box` this used to be cannot do both jobs at once: with a
+  // line-clamp on it, its `-webkit-box-pack` vertical alignment is ignored.
+  display: flex;
 
   &.text-only {
     color: var(--editor-fg);
   }
+}
+
+// The text itself. Clamped to a whole number of lines by labelClampStyle(),
+// so text too long for its shape ends in "…" on the last line that fits
+// rather than having the next line sliced in half by the shape's outline.
+.node-label-text {
+  display: block;
+  width: 100%;
+  min-width: 0;
 
   // Shapes are dropped blank, so hint at how to fill them in — on hover only.
   &:empty::after {
@@ -789,6 +1225,16 @@ $bar-height: 49px;
   .node:hover &:empty::after {
     opacity: 1;
   }
+
+  // There is no hover on a touch screen, so the hint above would never appear —
+  // and it is the only thing that says how to get text into a shape. Shown
+  // permanently instead, worded for the gesture that actually works there.
+  @include touch {
+    &:empty::after {
+      content: 'Double-tap';
+      opacity: 1;
+    }
+  }
 }
 
 // A real form control, so keyboard input Just Works regardless of the parent's
@@ -797,13 +1243,16 @@ $bar-height: 49px;
   position: relative;
   z-index: 2;
   width: 100%;
+  height: 100%;
   box-sizing: border-box;
   margin: 0;
   padding: 4px;
   border: none;
   outline: none;
   resize: none;
-  overflow: hidden;
+  // Typing past the shape's height scrolls inside it instead of visually
+  // growing the textarea past the shape's outline.
+  overflow-y: auto;
   background: transparent;
   color: var(--editor-fg);
   font-family: inherit;
@@ -818,8 +1267,8 @@ $bar-height: 49px;
 .connect-handle {
   position: absolute;
   z-index: 3;
-  width: 20px;
-  height: 20px;
+  width: calc(20px / #{$z});
+  height: calc(20px / #{$z});
   padding: 0;
   display: flex;
   align-items: center;
@@ -831,50 +1280,55 @@ $bar-height: 49px;
   cursor: crosshair;
   opacity: 0;
   transition: opacity 0.15s ease, transform 0.1s ease;
+  // Without this, a finger drag on the handle pans the canvas instead of
+  // dragging out a connection — same reason `.node` sets it (see startConnect).
+  touch-action: none;
 
   ion-icon {
-    font-size: 12px;
+    font-size: calc(12px / #{$z});
   }
 
   &:hover {
     transform: scale(1.15);
   }
 
+  // The negative margins are half the width above, so the handle stays centred
+  // on its edge — they have to be divided by the same zoom.
   &.handle-top {
-    top: -26px;
+    top: calc(-26px / #{$z});
     left: 50%;
-    margin-left: -10px;
+    margin-left: calc(-10px / #{$z});
   }
 
   &.handle-right {
-    right: -26px;
+    right: calc(-26px / #{$z});
     top: 50%;
-    margin-top: -10px;
+    margin-top: calc(-10px / #{$z});
   }
 
   &.handle-bottom {
-    bottom: -26px;
+    bottom: calc(-26px / #{$z});
     left: 50%;
-    margin-left: -10px;
+    margin-left: calc(-10px / #{$z});
   }
 
   &.handle-left {
-    left: -26px;
+    left: calc(-26px / #{$z});
     top: 50%;
-    margin-top: -10px;
+    margin-top: calc(-10px / #{$z});
   }
 
   // A 20px circle is hard to hit and even harder to drag from with a finger.
   @include touch {
-    width: 28px;
-    height: 28px;
+    width: calc(28px / #{$z});
+    height: calc(28px / #{$z});
 
-    ion-icon { font-size: 15px; }
+    ion-icon { font-size: calc(15px / #{$z}); }
 
-    &.handle-top { top: -34px; margin-left: -14px; }
-    &.handle-right { right: -34px; margin-top: -14px; }
-    &.handle-bottom { bottom: -34px; margin-left: -14px; }
-    &.handle-left { left: -34px; margin-top: -14px; }
+    &.handle-top { top: calc(-34px / #{$z}); margin-left: calc(-14px / #{$z}); }
+    &.handle-right { right: calc(-34px / #{$z}); margin-top: calc(-14px / #{$z}); }
+    &.handle-bottom { bottom: calc(-34px / #{$z}); margin-left: calc(-14px / #{$z}); }
+    &.handle-left { left: calc(-34px / #{$z}); margin-top: calc(-14px / #{$z}); }
   }
 
   // Reveal on hover/selection; keep visible on the source while dragging.
@@ -897,8 +1351,8 @@ $bar-height: 49px;
 .resize-handle {
   position: absolute;
   z-index: 4;
-  width: 10px;
-  height: 10px;
+  width: calc(10px / #{$z});
+  height: calc(10px / #{$z});
   box-sizing: border-box;
   border: 1.5px solid var(--ion-color-primary);
   border-radius: 2px;
@@ -922,8 +1376,8 @@ $bar-height: 49px;
   // Fingers need a bigger target than a 10px square — rh-n (top) and rh-w (left)
   // included, so scaling from those edges is as reachable as the corners.
   @include touch {
-    width: 20px;
-    height: 20px;
+    width: calc(20px / #{$z});
+    height: calc(20px / #{$z});
   }
 }
 
@@ -935,12 +1389,12 @@ $bar-height: 49px;
 .rotate-handle {
   position: absolute;
   z-index: 5;
-  top: -54px;
+  top: calc(-54px / #{$z});
   left: 50%;
-  width: 20px;
-  height: 20px;
+  width: calc(20px / #{$z});
+  height: calc(20px / #{$z});
   margin: 0;
-  margin-left: -10px;
+  margin-left: calc(-10px / #{$z});
   padding: 0;
   display: flex;
   align-items: center;
@@ -957,15 +1411,15 @@ $bar-height: 49px;
     position: absolute;
     top: 100%;
     left: 50%;
-    width: 1.5px;
-    height: 34px;
+    width: calc(1.5px / #{$z});
+    height: calc(34px / #{$z});
     background: var(--ion-color-primary);
     opacity: 0.6;
     transform: translateX(-50%);
   }
 
   ion-icon {
-    font-size: 12px;
+    font-size: calc(12px / #{$z});
     pointer-events: none;
   }
 
@@ -978,39 +1432,69 @@ $bar-height: 49px;
   }
 
   @include touch {
-    width: 28px;
-    height: 28px;
-    margin-left: -14px;
-    top: -62px;
+    width: calc(28px / #{$z});
+    height: calc(28px / #{$z});
+    margin-left: calc(-14px / #{$z});
+    top: calc(-62px / #{$z});
 
-    ion-icon { font-size: 15px; }
+    ion-icon { font-size: calc(15px / #{$z}); }
   }
 }
 
 // --- Properties / Text panel -------------------------------------------
 .props-panel {
-  width: 240px;
-  flex-shrink: 0;
+  // Same 15/70/15 workbench target as the palette — see its comment above.
+  flex: 0 0 clamp(240px, var(--props-w, 15%), 320px);
   background: var(--editor-header-bg);
   border-left: 1px solid var(--editor-border);
   // No top padding: the head row spans the full width and provides its own.
   padding: 0 14px 20px;
   overflow-y: auto;
+  // Animates programmatic scrolls (e.g. a focused control scrolling into
+  // view) instead of jumping instantly; manual touch/wheel scrolling is
+  // already smooth via the browser's own momentum scrolling either way.
+  scroll-behavior: smooth;
+  // Without this, iOS/older Android WebViews can leave a nested scroll
+  // container stuck after its height or content changes (e.g. dragging
+  // `.panel-vresize-divider`, or picking a shape with a different property
+  // list) — a finger swipe does nothing until some unrelated DOM mutation
+  // forces the browser to recompute the scrollable area.
+  -webkit-overflow-scrolling: touch;
+  // Android Chrome can otherwise occasionally hand a scroll gesture that
+  // starts inside this panel up to an ancestor (the page, the canvas behind
+  // it) instead of scrolling the panel itself — `contain` keeps it local.
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 4px;
 
-  // Bottom sheet once stacked: it only appears while a shape is selected, so capping
-  // it at 40vh keeps the shape being edited visible above it.
+  // Bottom sheet once stacked: capping its height keeps the shape being edited
+  // visible above it. That cap is user-draggable via `.panel-vresize-divider`
+  // (see startPropsHeightResize() in the component) — the var reflects the
+  // live drag, clamped in JS between 20vh and 70vh. `flex: none` for the same
+  // reason as the palette — the column layout must not read the desktop
+  // flex-basis as a height.
   @include below('lg') {
+    // `0 1 auto`, not `none`: the sheet must be allowed to shrink when the
+    // canvas is already at its floor, otherwise a tall drag pushes its own
+    // controls off the bottom of the screen. Its content scrolls, so a shrunk
+    // sheet loses nothing.
+    flex: 0 1 auto;
+    min-height: 0;
     width: 100%;
-    max-height: 40vh;
-    flex-shrink: 0;
+    max-height: var(--props-h, 40vh);
     border-left: none;
     border-top: 1px solid var(--editor-border);
+    border-radius: 14px 14px 0 0;
     padding: 0 14px 16px;
     // Sits above the canvas, which scrolls under it.
     box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.25);
+
+    // Matches the sheet's rounded top so the sticky head doesn't square off
+    // the corners as soon as the panel is scrolled.
+    .panel-head {
+      border-radius: 14px 14px 0 0;
+    }
   }
 
   // Cancel the panel's side padding so the head reads as a bar, and keep it in
@@ -1119,6 +1603,12 @@ $bar-height: 49px;
 
   &.align-group {
     margin-top: 2px;
+
+    // Second radiogroup right after the first (horizontal align, then vertical
+    // align) — extra space so the two rows don't read as one control.
+    & + &.align-group {
+      margin-top: 10px;
+    }
   }
 }
 
@@ -1282,12 +1772,12 @@ $bar-height: 49px;
   color: color-mix(in srgb, var(--editor-fg), transparent 55%);
 
   ion-icon {
-    font-size: 48px;
+    font-size: fluid(36px, 48px);
   }
 
   p {
     margin: 0;
-    font-size: 14px;
+    font-size: fluid(12px, 14px);
   }
 }
 

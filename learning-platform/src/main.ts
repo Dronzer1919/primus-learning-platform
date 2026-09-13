@@ -27,6 +27,9 @@ import {
   caretUpOutline, caretDownOutline, caretForwardOutline, caretBackOutline,
   // The rotate handle drawn above a selected shape.
   syncOutline,
+  // Canvas zoom controls, the grips on the two panel resize dividers, and the
+  // stacked-layout toggle that folds the shapes strip away.
+  removeOutline, scanOutline, swapHorizontalOutline, swapVerticalOutline, chevronUpOutline,
   // Flowchart saved sessions: the toolbar button, the open-session marker in the
   // header and the empty state inside the sessions modal.
   timeOutline, bookmarkOutline, folderOpenOutline,
@@ -77,6 +80,7 @@ addIcons({
   clipboardOutline,
   caretUpOutline, caretDownOutline, caretForwardOutline, caretBackOutline,
   syncOutline,
+  removeOutline, scanOutline, swapHorizontalOutline, swapVerticalOutline, chevronUpOutline,
   timeOutline, bookmarkOutline, folderOpenOutline,
   playBackOutline, playForwardOutline, playSkipForwardOutline, pauseOutline, serverOutline,
   warningOutline,

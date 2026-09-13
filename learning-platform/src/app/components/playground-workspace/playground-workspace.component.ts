@@ -75,7 +75,7 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
   private resizeStartX = 0;
   private resizeStartW = 0;
   private resizeHostW = 0;
-  private readonly onResizeMoveRef = (e: MouseEvent) => this.onResizeMove(e);
+  private readonly onResizeMoveRef = (e: PointerEvent) => this.onResizeMove(e);
   private readonly onResizeEndRef = () => this.onResizeEnd();
 
   // Web Project (HTML/CSS/JS) state
@@ -152,8 +152,9 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    document.removeEventListener('mousemove', this.onResizeMoveRef);
-    document.removeEventListener('mouseup', this.onResizeEndRef);
+    document.removeEventListener('pointermove', this.onResizeMoveRef);
+    document.removeEventListener('pointerup', this.onResizeEndRef);
+    document.removeEventListener('pointercancel', this.onResizeEndRef);
     this.accordionMql?.removeEventListener('change', this.onAccordionChangeRef);
     clearTimeout(this.celebrationCheckTimer);
     clearTimeout(this.celebrationHideTimer);
@@ -221,17 +222,26 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
       + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
   }
 
-  startResize(event: MouseEvent): void {
+  /**
+   * Pointer events (not mouse events) so dragging the divider resizes the split
+   * from a finger drag too — `touch-action: none` on `.resize-divider` stops the
+   * page from scrolling underneath it, same pattern as the flowchart's handles.
+   */
+  startResize(event: PointerEvent): void {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+      return;
+    }
     event.preventDefault();
     this.resizing = true;
     this.resizeStartX = event.clientX;
     this.resizeStartW = this.editorWidthPercent;
     this.resizeHostW = (event.currentTarget as HTMLElement).parentElement?.offsetWidth ?? 800;
-    document.addEventListener('mousemove', this.onResizeMoveRef);
-    document.addEventListener('mouseup', this.onResizeEndRef);
+    document.addEventListener('pointermove', this.onResizeMoveRef);
+    document.addEventListener('pointerup', this.onResizeEndRef);
+    document.addEventListener('pointercancel', this.onResizeEndRef);
   }
 
-  private onResizeMove(event: MouseEvent): void {
+  private onResizeMove(event: PointerEvent): void {
     if (!this.resizing) return;
     const dx = event.clientX - this.resizeStartX;
     const dPercent = (dx / this.resizeHostW) * 100;
@@ -241,8 +251,9 @@ export class PlaygroundWorkspaceComponent implements OnInit, OnDestroy {
 
   private onResizeEnd(): void {
     this.resizing = false;
-    document.removeEventListener('mousemove', this.onResizeMoveRef);
-    document.removeEventListener('mouseup', this.onResizeEndRef);
+    document.removeEventListener('pointermove', this.onResizeMoveRef);
+    document.removeEventListener('pointerup', this.onResizeEndRef);
+    document.removeEventListener('pointercancel', this.onResizeEndRef);
   }
 
   runCode(): void {

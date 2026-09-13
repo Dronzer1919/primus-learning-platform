@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, DestroyRef, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule, Location } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
@@ -109,6 +109,295 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     this.showProps = !this.showProps;
   }
 
+  // --- Canvas zoom --------------------------------------------------------
+  // The canvas draws at a fixed logical scale (a 160px shape is 160 model px at
+  // every zoom level) and `.canvas-content` is CSS-scaled on top of that, so
+  // nothing in the geometry below has to know about zoom — only the two places
+  // that convert between screen pixels and canvas coordinates do.
+  /** Matches the `lg` breakpoint in the .scss, where the panels stop being columns. */
+  private static readonly STACKED_MAX_WIDTH = 992;
+
+  private get isNarrowScreen(): boolean {
+    return window.innerWidth <= FlowchartComponent.STACKED_MAX_WIDTH;
+  }
+
+  readonly minZoom = 0.25;
+  readonly maxZoom = 3;
+  zoom = 1;
+  /** Fixed stops so the +/- buttons step through familiar percentages. */
+  private readonly zoomStops = [0.25, 0.4, 0.5, 0.65, 0.8, 1, 1.25, 1.5, 2, 2.5, 3];
+
+  get zoomPercent(): number {
+    return Math.round(this.zoom * 100);
+  }
+
+  /**
+   * The drawing area, in unzoomed px: far enough right/down to hold every shape
+   * plus room to keep building. `.canvas-sizer` is this multiplied by the zoom,
+   * which is what actually gives the canvas its scrollbars — a CSS transform
+   * alone does not reliably grow a scroll container's scrollable area.
+   */
+  get contentWidth(): number {
+    let max = 0;
+    for (const n of this.diagram.nodes) {
+      max = Math.max(max, n.x + n.w);
+    }
+    return Math.ceil(max + 400);
+  }
+
+  get contentHeight(): number {
+    let max = 0;
+    for (const n of this.diagram.nodes) {
+      max = Math.max(max, n.y + n.h);
+    }
+    return Math.ceil(max + 400);
+  }
+
+  zoomIn(): void {
+    const next = this.zoomStops.find((z) => z > this.zoom + 0.001);
+    this.setZoom(next ?? this.maxZoom);
+  }
+
+  zoomOut(): void {
+    const next = [...this.zoomStops].reverse().find((z) => z < this.zoom - 0.001);
+    this.setZoom(next ?? this.minZoom);
+  }
+
+  resetZoom(): void {
+    this.setZoom(1);
+  }
+
+  /**
+   * Scales the view so the whole diagram fits, and scrolls to its top-left.
+   * Never zooms past 100%: a two-shape diagram blown up to fill a phone screen
+   * is more disorienting than a small one.
+   */
+  zoomToFit(): void {
+    const el = this.canvasRef.nativeElement;
+    if (this.diagram.nodes.length === 0) {
+      this.setZoom(1);
+      return;
+    }
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const n of this.diagram.nodes) {
+      minX = Math.min(minX, n.x);
+      minY = Math.min(minY, n.y);
+      maxX = Math.max(maxX, n.x + n.w);
+      maxY = Math.max(maxY, n.y + n.h);
+    }
+    const pad = 32;
+    const w = maxX - minX + pad * 2;
+    const h = maxY - minY + pad * 2;
+    const fit = Math.min(el.clientWidth / w, el.clientHeight / h, 1);
+    this.zoom = Math.min(this.maxZoom, Math.max(this.minZoom, fit));
+    // The sizer's width/height are bindings, so they only take their new value
+    // once change detection has run — assigning scroll offsets before that
+    // would clamp them against the old (smaller) scrollable area.
+    this.cdr.detectChanges();
+    el.scrollLeft = Math.max(0, (minX - pad) * this.zoom);
+    el.scrollTop = Math.max(0, (minY - pad) * this.zoom);
+  }
+
+  /**
+   * Applies a new zoom level while keeping the canvas point under `anchor`
+   * (default: the middle of the viewport) pinned to the same spot on screen —
+   * otherwise every zoom step throws the user somewhere else in the diagram.
+   */
+  private setZoom(next: number, anchor?: { clientX: number; clientY: number }): void {
+    const clamped = Math.min(this.maxZoom, Math.max(this.minZoom, next));
+    if (Math.abs(clamped - this.zoom) < 0.0005) {
+      return;
+    }
+    const el = this.canvasRef.nativeElement;
+    const rect = el.getBoundingClientRect();
+    const ax = anchor ? anchor.clientX - rect.left : el.clientWidth / 2;
+    const ay = anchor ? anchor.clientY - rect.top : el.clientHeight / 2;
+    const canvasX = (el.scrollLeft + ax) / this.zoom;
+    const canvasY = (el.scrollTop + ay) / this.zoom;
+    this.zoom = clamped;
+    this.cdr.detectChanges();
+    el.scrollLeft = Math.max(0, canvasX * clamped - ax);
+    el.scrollTop = Math.max(0, canvasY * clamped - ay);
+  }
+
+  /** Ctrl/Cmd + wheel zooms about the pointer, as in every other diagram tool. */
+  onCanvasWheel(event: WheelEvent): void {
+    if (!event.ctrlKey && !event.metaKey) {
+      return;
+    }
+    event.preventDefault();
+    this.setZoom(this.zoom * (event.deltaY < 0 ? 1.12 : 1 / 1.12), event);
+  }
+
+  // Pinch-to-zoom. Touch events rather than pointer events here because the two
+  // fingers have to be read together: the canvas needs the distance between
+  // them, which `event.touches` gives directly and pointer events would make us
+  // track by hand.
+  private pinchStartDist = 0;
+  private pinchStartZoom = 1;
+
+  onCanvasTouchStart(event: TouchEvent): void {
+    if (event.touches.length === 2) {
+      // The first finger may well have landed on a shape and already started a
+      // drag (or a resize, or a connection). A second finger means the gesture
+      // was a pinch all along, so those are ended here — otherwise the shape
+      // would go skidding across the canvas while the view zooms.
+      this.endActiveDrag();
+      this.pinchStartDist = this.touchDistance(event);
+      this.pinchStartZoom = this.zoom;
+    }
+  }
+
+  /** Finishes whatever drag is in flight, exactly as lifting the finger would. */
+  private endActiveDrag(): void {
+    if (this.movingNodeId) {
+      this.onMoveEnd();
+    }
+    if (this.resizingNodeId) {
+      this.onResizeEnd();
+    }
+    if (this.rotatingNodeId) {
+      this.onRotateEnd();
+    }
+    if (this.connectFromId) {
+      this.onConnectEnd();
+    }
+    if (this.movingEdgeId) {
+      this.onEdgeMoveEnd();
+    }
+  }
+
+  onCanvasTouchMove(event: TouchEvent): void {
+    if (event.touches.length !== 2 || this.pinchStartDist <= 0) {
+      return;
+    }
+    // Stops the browser from panning the canvas (or zooming the page) mid-pinch.
+    event.preventDefault();
+    const [a, b] = [event.touches[0], event.touches[1]];
+    this.setZoom(this.pinchStartZoom * (this.touchDistance(event) / this.pinchStartDist), {
+      clientX: (a.clientX + b.clientX) / 2,
+      clientY: (a.clientY + b.clientY) / 2
+    });
+  }
+
+  onCanvasTouchEnd(event: TouchEvent): void {
+    if (event.touches.length < 2) {
+      this.pinchStartDist = 0;
+    }
+  }
+
+  private touchDistance(event: TouchEvent): number {
+    const [a, b] = [event.touches[0], event.touches[1]];
+    return Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+  }
+
+  // --- Side panel resize (palette / properties) ---------------------------
+  // Desktop starts at a 15/70/15 split (see the .scss), but that's a starting
+  // point, not a limit — these dividers let it be dragged within a sane range.
+  // The floor matches that starting width: these panels can grow but not
+  // shrink past it, so the canvas can't crowd them down to an unusable sliver.
+  readonly panelMinPct = 15;
+  readonly panelMaxPct = 35;
+  paletteWidthPercent = 15;
+  propsWidthPercent = 15;
+  private resizingPanel: 'palette' | 'props' | null = null;
+  private panelResizeStartX = 0;
+  private panelResizeStartPct = 0;
+  private panelResizeHostW = 0;
+  private readonly onPanelResizeMoveRef = (e: PointerEvent) => this.onPanelResizeMove(e);
+  private readonly onPanelResizeEndRef = () => this.onPanelResizeEnd();
+
+  /**
+   * Pointer events (not mouse events) so dragging either divider resizes its
+   * panel from a finger drag too — `touch-action: none` on `.panel-resize-divider`
+   * stops the canvas from scrolling underneath it.
+   */
+  startPanelResize(event: PointerEvent, panel: 'palette' | 'props'): void {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    this.resizingPanel = panel;
+    this.panelResizeStartX = event.clientX;
+    this.panelResizeStartPct = panel === 'palette' ? this.paletteWidthPercent : this.propsWidthPercent;
+    // The divider's parent is `.flow-body`, whose width the percentages are relative to.
+    this.panelResizeHostW = (event.currentTarget as HTMLElement).parentElement?.offsetWidth ?? 900;
+    document.addEventListener('pointermove', this.onPanelResizeMoveRef);
+    document.addEventListener('pointerup', this.onPanelResizeEndRef);
+    document.addEventListener('pointercancel', this.onPanelResizeEndRef);
+  }
+
+  private onPanelResizeMove(event: PointerEvent): void {
+    if (!this.resizingPanel) {
+      return;
+    }
+    const dPercent = ((event.clientX - this.panelResizeStartX) / this.panelResizeHostW) * 100;
+    // The palette's divider sits on its right edge (dragging right grows it);
+    // the properties panel's divider sits on its left edge (dragging right
+    // shrinks it) — so the same rightward drag has opposite sign for each.
+    const signed = this.resizingPanel === 'palette' ? dPercent : -dPercent;
+    const next = Math.min(this.panelMaxPct, Math.max(this.panelMinPct, this.panelResizeStartPct + signed));
+    if (this.resizingPanel === 'palette') {
+      this.paletteWidthPercent = next;
+    } else {
+      this.propsWidthPercent = next;
+    }
+  }
+
+  private onPanelResizeEnd(): void {
+    this.resizingPanel = null;
+    document.removeEventListener('pointermove', this.onPanelResizeMoveRef);
+    document.removeEventListener('pointerup', this.onPanelResizeEndRef);
+    document.removeEventListener('pointercancel', this.onPanelResizeEndRef);
+  }
+
+  // --- Properties panel height resize (mobile/stacked bottom sheet) -------
+  // Below `lg` the properties panel becomes a bottom sheet capped at a max
+  // height (see the .scss) instead of a side column, so its handle drags
+  // vertically and resizes height, not width.
+  readonly propsHeightMinVh = 20;
+  // Below this the canvas band would be squeezed to its own floor and the sheet
+  // would start eating into the toolbar above it.
+  readonly propsHeightMaxVh = 60;
+  propsHeightVh = 40;
+  private resizingPropsHeight = false;
+  private propsHeightStartY = 0;
+  private propsHeightStartVh = 0;
+  private readonly onPropsHeightMoveRef = (e: PointerEvent) => this.onPropsHeightResizeMove(e);
+  private readonly onPropsHeightEndRef = () => this.onPropsHeightResizeEnd();
+
+  startPropsHeightResize(event: PointerEvent): void {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    this.resizingPropsHeight = true;
+    this.propsHeightStartY = event.clientY;
+    this.propsHeightStartVh = this.propsHeightVh;
+    document.addEventListener('pointermove', this.onPropsHeightMoveRef);
+    document.addEventListener('pointerup', this.onPropsHeightEndRef);
+    document.addEventListener('pointercancel', this.onPropsHeightEndRef);
+  }
+
+  private onPropsHeightResizeMove(event: PointerEvent): void {
+    if (!this.resizingPropsHeight) {
+      return;
+    }
+    // The sheet sits below the handle, so dragging UP (negative dy) should grow it.
+    const dVh = (-(event.clientY - this.propsHeightStartY) / window.innerHeight) * 100;
+    this.propsHeightVh = Math.min(
+      this.propsHeightMaxVh,
+      Math.max(this.propsHeightMinVh, this.propsHeightStartVh + dVh)
+    );
+  }
+
+  private onPropsHeightResizeEnd(): void {
+    this.resizingPropsHeight = false;
+    document.removeEventListener('pointermove', this.onPropsHeightMoveRef);
+    document.removeEventListener('pointerup', this.onPropsHeightEndRef);
+    document.removeEventListener('pointercancel', this.onPropsHeightEndRef);
+  }
+
   // Drag-to-connect state. `connectFromId` is the source node while dragging a new
   // arrow; `connectX/Y` track the loose end (canvas coords); `connectTargetId` is
   // the node currently under the pointer (highlighted green as a drop target).
@@ -126,7 +415,7 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   private moved = false;
   private readonly onMoveRef = (e: PointerEvent) => this.onMove(e);
   private readonly onMoveEndRef = () => this.onMoveEnd();
-  private readonly onConnectMoveRef = (e: MouseEvent) => this.onConnectMove(e);
+  private readonly onConnectMoveRef = (e: PointerEvent) => this.onConnectMove(e);
   private readonly onConnectEndRef = () => this.onConnectEnd();
 
   // Rotate bookkeeping. Same pointer-event pattern as resize below.
@@ -142,7 +431,7 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   private edgeDragIsHoriz = false;
   private edgeDragStartBend = 0;
   private edgeDragStartCanvasPt = { x: 0, y: 0 };
-  private readonly onEdgeMoveRef = (e: MouseEvent) => this.onEdgeMove(e);
+  private readonly onEdgeMoveRef = (e: PointerEvent) => this.onEdgeMove(e);
   private readonly onEdgeMoveEndRef = () => this.onEdgeMoveEnd();
 
   // --- Resize bookkeeping ------------------------------------------------
@@ -169,7 +458,8 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     private location: Location,
     private router: Router,
     private alertController: AlertController,
-    private toastController: ToastController
+    private toastController: ToastController,
+    private cdr: ChangeDetectorRef
   ) {}
 
   // Return to the page the user came from (e.g. /user/home), not a hardcoded route.
@@ -184,6 +474,17 @@ export class FlowchartComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.diagram = this.store.load();
+
+    // Phones and small tablets stack the panels into bands, so an open
+    // properties sheet costs the canvas half its height before a single shape
+    // has been placed — it opens from the toolbar the moment something is
+    // selected instead. The starting zoom shrinks with the screen for the same
+    // reason: a 160px-wide shape dropped at 100% on a 360px phone fills nearly
+    // half the visible canvas, which makes the diagram impossible to lay out.
+    if (this.isNarrowScreen) {
+      this.showProps = false;
+      this.zoom = Math.min(1, Math.max(0.5, window.innerWidth / 560));
+    }
 
     // The route is public, but the sessions API is not. Signed-out visitors keep
     // the localStorage-only behaviour and never see the two session controls.
@@ -212,22 +513,76 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     document.removeEventListener('pointermove', this.onMoveRef);
     document.removeEventListener('pointerup', this.onMoveEndRef);
     document.removeEventListener('pointercancel', this.onMoveEndRef);
-    document.removeEventListener('mousemove', this.onConnectMoveRef);
-    document.removeEventListener('mouseup', this.onConnectEndRef);
-    document.removeEventListener('mousemove', this.onEdgeMoveRef);
-    document.removeEventListener('mouseup', this.onEdgeMoveEndRef);
+    document.removeEventListener('pointermove', this.onConnectMoveRef);
+    document.removeEventListener('pointerup', this.onConnectEndRef);
+    document.removeEventListener('pointercancel', this.onConnectEndRef);
+    document.removeEventListener('pointermove', this.onEdgeMoveRef);
+    document.removeEventListener('pointerup', this.onEdgeMoveEndRef);
+    document.removeEventListener('pointercancel', this.onEdgeMoveEndRef);
     this.detachResizeListeners();
     this.detachRotateListeners();
+    document.removeEventListener('pointermove', this.onPanelResizeMoveRef);
+    document.removeEventListener('pointerup', this.onPanelResizeEndRef);
+    document.removeEventListener('pointercancel', this.onPanelResizeEndRef);
+    document.removeEventListener('pointermove', this.onPropsHeightMoveRef);
+    document.removeEventListener('pointerup', this.onPropsHeightEndRef);
+    document.removeEventListener('pointercancel', this.onPropsHeightEndRef);
   }
 
-  /** Pointer position relative to the (possibly scrolled) canvas. */
+  /**
+   * Pointer position in canvas coordinates — i.e. the same space the nodes'
+   * x/y/w/h live in, so every drag, resize and rotate below can ignore zoom.
+   * Dividing by the zoom is what converts the (scaled) screen offset back into
+   * that space; without it a drag at 50% zoom would move a shape twice as far
+   * as the finger.
+   */
   private canvasPoint(event: MouseEvent): { x: number; y: number } {
     const el = this.canvasRef.nativeElement;
     const rect = el.getBoundingClientRect();
     return {
-      x: event.clientX - rect.left + el.scrollLeft,
-      y: event.clientY - rect.top + el.scrollTop
+      x: (event.clientX - rect.left + el.scrollLeft) / this.zoom,
+      y: (event.clientY - rect.top + el.scrollTop) / this.zoom
     };
+  }
+
+  /**
+   * Scrolls the canvas just enough to bring a canvas-space rectangle fully
+   * into view — called once a drag or resize ends. Without this, dragging or
+   * resizing a shape past the currently-scrolled-into-view area leaves it
+   * sitting off-screen with no indication it's still there: OS-default (and
+   * especially mobile) scrollbars are invisible until actively touched, so it
+   * can look like the shape was lost rather than merely scrolled out of view.
+   *
+   * Deliberately only called at drag-end, not on every pointermove: adjusting
+   * scrollLeft/scrollTop mid-drag would feed back into canvasPoint() (which
+   * factors in the current scroll offset), inflating the computed drag delta
+   * on the very next pointermove and compounding into runaway growth/movement
+   * even with a stationary pointer.
+   */
+  private scrollRectIntoView(
+    leftCanvas: number,
+    topCanvas: number,
+    rightCanvas: number,
+    bottomCanvas: number
+  ): void {
+    const el = this.canvasRef.nativeElement;
+    const margin = 16;
+    // scrollLeft/scrollTop are in scaled px, the arguments in canvas px.
+    const z = this.zoom;
+    const left = leftCanvas * z;
+    const top = topCanvas * z;
+    const right = rightCanvas * z;
+    const bottom = bottomCanvas * z;
+    if (right > el.scrollLeft + el.clientWidth - margin) {
+      el.scrollLeft = right - el.clientWidth + margin;
+    } else if (left < el.scrollLeft + margin) {
+      el.scrollLeft = Math.max(0, left - margin);
+    }
+    if (bottom > el.scrollTop + el.clientHeight - margin) {
+      el.scrollTop = bottom - el.clientHeight + margin;
+    } else if (top < el.scrollTop + margin) {
+      el.scrollTop = Math.max(0, top - margin);
+    }
   }
 
   // --- Adding shapes via drag & drop from the palette --------------------
@@ -261,7 +616,11 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   // of whatever part of the canvas is currently scrolled into view.
   onPaletteTap(type: ShapeType): void {
     const el = this.canvasRef.nativeElement;
-    this.addShape(type, el.scrollLeft + el.clientWidth / 2, el.scrollTop + el.clientHeight / 2);
+    this.addShape(
+      type,
+      (el.scrollLeft + el.clientWidth / 2) / this.zoom,
+      (el.scrollTop + el.clientHeight / 2) / this.zoom
+    );
   }
 
   // Adds a shape of `type` centred on a point in canvas coordinates.
@@ -324,6 +683,10 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     document.removeEventListener('pointercancel', this.onMoveEndRef);
     if (this.moved) {
       this.persist();
+      const node = this.diagram.nodes.find((n) => n.id === this.movingNodeId);
+      if (node) {
+        this.scrollRectIntoView(node.x, node.y, node.x + node.w, node.y + node.h);
+      }
     }
     this.movingNodeId = null;
   }
@@ -363,21 +726,28 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     const point = this.canvasPoint(event);
     const dir = this.resizeDir;
     const min = this.minNodeSize;
+    // Alt resizes from the shape's centre: the untouched edge mirrors the
+    // dragged one instead of staying put, so growing 20px on the right also
+    // grows 20px on the left. Doubling the raw delta here — rather than
+    // splitting it after clamping — keeps the corner-drag / proportion-lock
+    // maths below unchanged; only the final re-centring step (further down)
+    // needs to know about Alt at all.
+    const symMul = event.altKey ? 2 : 1;
     let { w, h } = start;
     let x = start.nodeX;
     let y = start.nodeY;
 
     if (dir.includes('e')) {
-      w = Math.max(min, start.w + (point.x - start.x));
+      w = Math.max(min, start.w + symMul * (point.x - start.x));
     } else if (dir.includes('w')) {
       // Dragging the left edge moves the origin as well, so the right edge stays put.
-      w = Math.max(min, start.w - (point.x - start.x));
+      w = Math.max(min, start.w - symMul * (point.x - start.x));
       x = start.nodeX + start.w - w;
     }
     if (dir.includes('s')) {
-      h = Math.max(min, start.h + (point.y - start.y));
+      h = Math.max(min, start.h + symMul * (point.y - start.y));
     } else if (dir.includes('n')) {
-      h = Math.max(min, start.h - (point.y - start.y));
+      h = Math.max(min, start.h - symMul * (point.y - start.y));
       y = start.nodeY + start.h - h;
     }
 
@@ -394,6 +764,18 @@ export class FlowchartComponent implements OnInit, OnDestroy {
       }
       if (dir.includes('n')) {
         y = start.nodeY + start.h - h;
+      }
+    }
+
+    // Re-centre on whichever axis this handle actually touches, using the
+    // final (possibly proportion-locked) width/height — works the same for a
+    // single-edge handle or a corner, and composes with Shift above.
+    if (event.altKey) {
+      if (dir.includes('e') || dir.includes('w')) {
+        x = start.nodeX + start.w / 2 - w / 2;
+      }
+      if (dir.includes('n') || dir.includes('s')) {
+        y = start.nodeY + start.h / 2 - h / 2;
       }
     }
 
@@ -417,6 +799,10 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     this.detachResizeListeners();
     if (this.resized) {
       this.persist();
+      const node = this.diagram.nodes.find((n) => n.id === this.resizingNodeId);
+      if (node) {
+        this.scrollRectIntoView(node.x, node.y, node.x + node.w, node.y + node.h);
+      }
     }
     this.resizingNodeId = null;
   }
@@ -539,13 +925,33 @@ export class FlowchartComponent implements OnInit, OnDestroy {
 
   // --- Selection ---------------------------------------------------------
 
+  // Manual double-tap bookkeeping for `onNodeClick` below. Real touch browsers
+  // are inconsistent about firing a native `dblclick` from two taps — on several
+  // Android/Chrome combinations each synthesized `click` keeps `event.detail`
+  // at 1 instead of incrementing on the second tap, so `dblclick` never fires
+  // at all and double-tap-to-edit silently does nothing. Tracking the timing of
+  // plain `click` events ourselves works identically for a mouse and a finger.
+  private lastTapNodeId: string | null = null;
+  private lastTapAt = 0;
+  private static readonly DOUBLE_TAP_MS = 400;
+
   onNodeClick(event: MouseEvent, node: FlowNode): void {
     event.stopPropagation();
     if (this.moved) {
       // This click concludes a drag — don't treat it as a select toggle.
       return;
     }
+    const now = Date.now();
+    const isDoubleTap =
+      this.lastTapNodeId === node.id && now - this.lastTapAt < FlowchartComponent.DOUBLE_TAP_MS;
+    // Reset rather than re-arm on a hit, so a third rapid tap needs a fresh pair
+    // instead of instantly re-triggering edit mode.
+    this.lastTapNodeId = isDoubleTap ? null : node.id;
+    this.lastTapAt = now;
     this.select(node.id, null);
+    if (isDoubleTap && this.editingNodeId !== node.id) {
+      this.beginEdit(node.id);
+    }
   }
 
   onEdgeClick(event: MouseEvent, edge: FlowEdge): void {
@@ -658,6 +1064,42 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   // --- Label text styling ------------------------------------------------
 
   /**
+   * Extra padding (beyond the base 4px) so the label's rectangular text box
+   * stays inside the shape's actual drawn outline instead of its full bounding
+   * box — e.g. a parallelogram's slanted sides cut into the top-left and
+   * bottom-right corners of its bounding rectangle, so text laid out edge to
+   * edge visibly spills past the outline there. The `x`/`top` figures mirror
+   * the exact corner-cut formulas `shapeFor()` uses to draw each shape, so the
+   * safe area actually lines up with what's on screen; shapes not listed here
+   * are already safe at their full bounding box (rect, ellipse, line, ...).
+   */
+  private textInset(node: FlowNode): { x: number; top: number } {
+    const w = node.w;
+    const h = node.h;
+    switch (node.type) {
+      case 'parallelogram':
+        return { x: Math.min(w * 0.25, 36), top: 0 };
+      case 'trapezoid':
+        return { x: Math.min(w * 0.2, 30), top: 0 };
+      case 'hexagon':
+        return { x: Math.min(w * 0.22, 28), top: 0 };
+      case 'step':
+        // Only the left edge notches inward (the right side's point sits
+        // outside the bounding box, so it never cuts into the text area).
+        return { x: Math.min(w * 0.2, 24), top: 0 };
+      // Diamond/triangle taper to a point, so no fixed inset makes every line
+      // fully safe — these percentages are a practical compromise (matches how
+      // most diagram tools handle it) rather than a mathematical guarantee.
+      case 'diamond':
+        return { x: w * 0.18, top: h * 0.18 };
+      case 'triangle':
+        return { x: w * 0.16, top: h * 0.32 };
+      default:
+        return { x: 0, top: 0 };
+    }
+  }
+
+  /**
    * Inline styles for a node's label/editor, derived from its text properties.
    * Shared by the rendered label and the editing <textarea> so what you type
    * looks exactly like what you get.
@@ -686,7 +1128,60 @@ export class FlowchartComponent implements OnInit, OnDestroy {
       style['color'] = node.textColor;
     }
     style['line-height'] = `${(node.lineHeight ?? this.defaultLineHeight) / 100}`;
+    const inset = this.textInset(node);
+    style['padding'] = `${4 + inset.top}px ${4 + inset.x}px 4px`;
     return style;
+  }
+
+  /**
+   * How many whole lines of this node's text fit inside its shape. The label
+   * is clipped to exactly this many, so a line is either fully shown or not
+   * shown at all.
+   */
+  private labelLineFit(node: FlowNode): { maxLines: number; lineHeightPx: number } {
+    const fontSize = node.fontSize ?? this.defaultFontSize;
+    const lineHeightPx = fontSize * ((node.lineHeight ?? this.defaultLineHeight) / 100);
+    const inset = this.textInset(node);
+    const availableH = node.h - (4 + inset.top) - 4;
+    return { maxLines: Math.max(1, Math.floor(availableH / lineHeightPx)), lineHeightPx };
+  }
+
+  /**
+   * The label's outer box: everything from labelStyle() plus the vertical
+   * alignment. This is a real flexbox rather than the legacy `-webkit-box`
+   * the clamp below needs, because the two cannot share one element —
+   * `-webkit-box-pack` (the old model's equivalent of align-items) is ignored
+   * outright once `-webkit-line-clamp` is on the same box, which is why every
+   * label used to sit at the top of its shape whatever its valign said.
+   */
+  labelBoxStyle(node: FlowNode): { [prop: string]: string } {
+    const style = this.labelStyle(node);
+    style['display'] = 'flex';
+    style['align-items'] = { top: 'flex-start', middle: 'center', bottom: 'flex-end' }[
+      node.valign ?? 'middle'
+    ];
+    return style;
+  }
+
+  /**
+   * The clamped text itself, the single flex item inside labelBoxStyle().
+   * `-webkit-line-clamp` ends the last visible line in "…" instead of cutting
+   * it off with no indication — but it only marks that line, it does not stop
+   * the lines after it from being laid out and painted, so on its own it lets
+   * the next line bleed half-visible past the shape's outline. The max-height
+   * is what actually guarantees the clip lands on a line boundary: an exact
+   * multiple of the line height, so a line is never sliced through the middle.
+   */
+  labelClampStyle(node: FlowNode): { [prop: string]: string } {
+    const { maxLines, lineHeightPx } = this.labelLineFit(node);
+    return {
+      display: '-webkit-box',
+      '-webkit-box-orient': 'vertical',
+      '-webkit-line-clamp': String(maxLines),
+      'max-height': `${maxLines * lineHeightPx}px`,
+      overflow: 'hidden',
+      width: '100%'
+    };
   }
 
   setFontFamily(family: string): void {
@@ -751,6 +1246,36 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     radios[idx]?.focus();
   }
 
+  /** Vertical alignment options, top to bottom. Drives the vertical-align radiogroup. */
+  readonly valignments: Array<'top' | 'middle' | 'bottom'> = ['top', 'middle', 'bottom'];
+
+  setValign(valign: 'top' | 'middle' | 'bottom'): void {
+    const node = this.selectedNode;
+    if (!node) {
+      return;
+    }
+    node.valign = valign;
+    this.persist();
+  }
+
+  /** Same WAI-ARIA radio pattern as onAlignKeydown, but Up/Left = previous, Down/Right = next. */
+  onValignKeydown(event: KeyboardEvent): void {
+    const order = this.valignments;
+    const current = this.selectedNode?.valign ?? 'middle';
+    let idx = order.indexOf(current);
+    if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+      idx = (idx + 1) % order.length;
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+      idx = (idx - 1 + order.length) % order.length;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    this.setValign(order[idx]);
+    const radios = (event.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="radio"]');
+    radios[idx]?.focus();
+  }
+
   setTextColor(color: string): void {
     const node = this.selectedNode;
     if (!node) {
@@ -771,8 +1296,16 @@ export class FlowchartComponent implements OnInit, OnDestroy {
 
   // --- Drag-to-connect ---------------------------------------------------
 
-  /** Begins dragging a new arrow out of `node` from one of its side handles. */
-  startConnect(event: MouseEvent, node: FlowNode): void {
+  /**
+   * Begins dragging a new arrow out of `node` from one of its side handles.
+   * Pointer events (not mouse events) so dragging a connection works from a
+   * finger drag too — `touch-action: none` on `.connect-handle` stops the
+   * canvas from scrolling underneath it, same as the move/resize/rotate handles.
+   */
+  startConnect(event: PointerEvent, node: FlowNode): void {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+      return;
+    }
     event.stopPropagation();
     event.preventDefault();
     this.connectFromId = node.id;
@@ -780,11 +1313,12 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     const point = this.canvasPoint(event);
     this.connectX = point.x;
     this.connectY = point.y;
-    document.addEventListener('mousemove', this.onConnectMoveRef);
-    document.addEventListener('mouseup', this.onConnectEndRef);
+    document.addEventListener('pointermove', this.onConnectMoveRef);
+    document.addEventListener('pointerup', this.onConnectEndRef);
+    document.addEventListener('pointercancel', this.onConnectEndRef);
   }
 
-  private onConnectMove(event: MouseEvent): void {
+  private onConnectMove(event: PointerEvent): void {
     if (!this.connectFromId) {
       return;
     }
@@ -796,8 +1330,9 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   }
 
   private onConnectEnd(): void {
-    document.removeEventListener('mousemove', this.onConnectMoveRef);
-    document.removeEventListener('mouseup', this.onConnectEndRef);
+    document.removeEventListener('pointermove', this.onConnectMoveRef);
+    document.removeEventListener('pointerup', this.onConnectEndRef);
+    document.removeEventListener('pointercancel', this.onConnectEndRef);
     const from = this.connectFromId;
     const to = this.connectTargetId;
     this.connectFromId = null;
@@ -821,33 +1356,50 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   }
 
   // --- Editing labels ----------------------------------------------------
-
-  startEditing(event: MouseEvent, node: FlowNode): void {
-    event.stopPropagation();
-    event.preventDefault();
-    this.select(node.id, null);
-    this.beginEdit(node.id);
-  }
+  // Entered via the double-tap detection in onNodeClick (above) or the F2/Enter
+  // shortcut in onKeyDown (below) — both call beginEdit() directly.
 
   /**
    * Shows a real <textarea> over the node and focuses it. A native form control
    * is used instead of a contenteditable div because contenteditable silently
    * refuses input when an ancestor sets `user-select: none` (as the draggable
    * node does), which varies by browser and is hard to get right. The <textarea>
-   * only exists in the DOM once `editingNodeId` is set, so focusing waits a tick
-   * for change detection to render it.
+   * only exists in the DOM once `editingNodeId` is set, so it needs a render
+   * before it can be focused — but that render must happen *synchronously*
+   * (`detectChanges()`, not a `setTimeout`/microtask hop) because mobile
+   * browsers only auto-show the on-screen keyboard for a `focus()` called
+   * within the same call stack as the original tap; deferring it even by a
+   * macrotask drops out of that user-activation window and the keyboard
+   * silently never opens, even though focus "succeeds" programmatically.
    */
   private beginEdit(nodeId: string): void {
     this.editingNodeId = nodeId;
-    setTimeout(() => {
-      const input = this.canvasRef.nativeElement.querySelector(
-        `[data-node-id="${nodeId}"] .node-input`
-      ) as HTMLTextAreaElement | null;
-      if (input) {
-        input.focus();
-        input.select();
+    // Double-tapping a shape is the "work on this one" gesture, so on the
+    // stacked layout — where the properties sheet starts closed to leave the
+    // canvas its full height — this is also the moment to raise the sheet.
+    // What it holds (font, size, colour, alignment) applies to the text about
+    // to be typed, and unlike the desktop side column there is nothing
+    // permanently on screen to show it otherwise.
+    const raisingSheet = this.isNarrowScreen && !this.showProps;
+    if (raisingSheet) {
+      this.showProps = true;
+    }
+    this.cdr.detectChanges();
+    const input = this.canvasRef.nativeElement.querySelector(
+      `[data-node-id="${nodeId}"] .node-input`
+    ) as HTMLTextAreaElement | null;
+    if (input) {
+      input.focus();
+      input.select();
+    }
+    // The sheet takes its height out of the canvas band, which can push the
+    // shape being edited off the top of what is left of it.
+    if (raisingSheet) {
+      const node = this.diagram.nodes.find((n) => n.id === nodeId);
+      if (node) {
+        this.scrollRectIntoView(node.x, node.y, node.x + node.w, node.y + node.h);
       }
-    });
+    }
   }
 
   /** Commit the typed text back to the node (called on blur / Enter). */
@@ -864,12 +1416,11 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   }
 
   onInputKeydown(event: KeyboardEvent, node: FlowNode): void {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      // Enter commits; Shift+Enter inserts a newline. stopPropagation keeps the
-      // window keydown handler from treating this Enter as "rename again".
-      event.preventDefault();
+    if (event.key === 'Enter') {
+      // Enter always inserts a newline like an ordinary textarea — stopPropagation
+      // just keeps the window keydown handler from treating it as "rename again".
+      // Tap/click elsewhere (blur) is what commits the label.
       event.stopPropagation();
-      (event.target as HTMLTextAreaElement).blur();
     } else if (event.key === 'Escape') {
       // Discard edits: clear the flag first so the blur handler skips the commit.
       event.preventDefault();
@@ -1282,6 +1833,12 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     this.persist();
     this.adoptSession(session);
     this.sessionsOpen = false;
+    // A diagram laid out on a desktop is usually wider than a phone screen, so
+    // reopening it there would otherwise show one corner with no sign the rest
+    // exists. Desktop keeps whatever zoom the user chose.
+    if (this.isNarrowScreen) {
+      this.zoomToFit();
+    }
     this.showToast(`Opened "${session.title}"`, 'success');
   }
 
@@ -1533,7 +2090,15 @@ export class FlowchartComponent implements OnInit, OnDestroy {
 
   // --- Edge midpoint drag -----------------------------------------------
 
-  onEdgeMidMouseDown(event: MouseEvent, g: EdgeGeometry): void {
+  /**
+   * Pointer events (not mouse events) so dragging the bend handle works from a
+   * finger drag too — `touch-action: none` on `.edge-bend-handle` stops the
+   * canvas from scrolling underneath it.
+   */
+  onEdgeMidPointerDown(event: PointerEvent, g: EdgeGeometry): void {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+      return;
+    }
     event.stopPropagation();
     event.preventDefault();
     this.select(null, g.edge.id);
@@ -1543,11 +2108,12 @@ export class FlowchartComponent implements OnInit, OnDestroy {
       ? g.edge.bend
       : (g.isHoriz ? g.bendPt.x : g.bendPt.y);
     this.edgeDragStartCanvasPt = this.canvasPoint(event);
-    document.addEventListener('mousemove', this.onEdgeMoveRef);
-    document.addEventListener('mouseup', this.onEdgeMoveEndRef);
+    document.addEventListener('pointermove', this.onEdgeMoveRef);
+    document.addEventListener('pointerup', this.onEdgeMoveEndRef);
+    document.addEventListener('pointercancel', this.onEdgeMoveEndRef);
   }
 
-  private onEdgeMove(event: MouseEvent): void {
+  private onEdgeMove(event: PointerEvent): void {
     const edge = this.diagram.edges.find((e) => e.id === this.movingEdgeId);
     if (!edge) return;
     const point = this.canvasPoint(event);
@@ -1559,8 +2125,9 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   }
 
   private onEdgeMoveEnd(): void {
-    document.removeEventListener('mousemove', this.onEdgeMoveRef);
-    document.removeEventListener('mouseup', this.onEdgeMoveEndRef);
+    document.removeEventListener('pointermove', this.onEdgeMoveRef);
+    document.removeEventListener('pointerup', this.onEdgeMoveEndRef);
+    document.removeEventListener('pointercancel', this.onEdgeMoveEndRef);
     if (this.movingEdgeId) {
       this.persist();
     }

@@ -46,7 +46,7 @@ previews and canvas nodes can both reference them by id. -->
     <!-- Shape palette. The head row is the same height as the canvas toolbar, so
          the panel title sits on the same line as the Delete / Clear buttons. -->
     @if (showPalette) {
-      <div class="palette">
+      <div class="palette" [style.--palette-w]="paletteWidthPercent + '%'">
         <div class="panel-head">
           <span class="panel-head-title">Shapes</span>
           <button
@@ -86,13 +86,25 @@ previews and canvas nodes can both reference them by id. -->
           <div class="palette-hint">
             Hover a palette shape to see what it means, then drag it onto the canvas.
             <strong>Double-click a shape (or press F2) to type inside it</strong> — Enter
-            saves, Escape cancels. Hover a shape to reveal its side arrows, then drag from
+            starts a new line, Escape cancels, and tapping elsewhere saves. Hover a shape to reveal its side arrows, then drag from
             an arrow onto another shape to connect them. Select a shape and drag any of the
-            eight square grips to resize it — hold Shift on a corner to keep its proportions.
+            eight square grips to resize it — hold Shift on a corner to keep its proportions,
+            or hold Alt to resize from the shape's centre instead of its opposite edge.
             Drag the round handle above a selected shape to rotate it a full 360° — hold
             Shift to snap to 15° steps.
             <strong>Ctrl+C / Ctrl+V</strong> copies and pastes the selected shape (Ctrl+X cuts).
           </div>
+        </div>
+      </div>
+      <div
+        class="panel-resize-divider"
+        (pointerdown)="startPanelResize($event, 'palette')"
+        title="Drag to resize"
+        >
+        <div class="resize-chip" aria-hidden="true">
+          <span class="chip-dots"><span></span><span></span></span>
+          <ion-icon name="swap-horizontal-outline"></ion-icon>
+          <span class="chip-dots"><span></span><span></span></span>
         </div>
       </div>
     }
@@ -113,6 +125,21 @@ previews and canvas nodes can both reference them by id. -->
             <span>Shapes</span>
             <ion-icon class="panel-btn-chevron" name="chevron-forward-outline"></ion-icon>
           </button>
+        } @else {
+          <!-- Stacked layout only (see `.stacked-only`): there the palette is a
+               strip above the canvas with no head row of its own, so this is the
+               only control that can fold it away and give the canvas the height
+               back. On desktop the panel's own chevron does that. -->
+          <button
+            type="button"
+            class="panel-btn stacked-only"
+            title="Hide the shapes panel"
+            (click)="togglePalette()"
+            >
+            <ion-icon name="shapes-outline"></ion-icon>
+            <span>Shapes</span>
+            <ion-icon class="panel-btn-chevron" name="chevron-up-outline"></ion-icon>
+          </button>
         }
         <ion-button
           size="small"
@@ -122,7 +149,7 @@ previews and canvas nodes can both reference them by id. -->
           (click)="deleteSelected()"
           >
           <ion-icon slot="start" name="trash-outline"></ion-icon>
-          Delete
+          <span class="btn-label">Delete</span>
         </ion-button>
         <!-- Copy / paste. Touch devices have no Ctrl+C, so these are not just a
              shortcut mirror. Cut is keyboard-only (Ctrl+X). -->
@@ -134,7 +161,7 @@ previews and canvas nodes can both reference them by id. -->
           (click)="copySelected()"
           >
           <ion-icon slot="start" name="copy-outline"></ion-icon>
-          Copy
+          <span class="btn-label">Copy</span>
         </ion-button>
         <ion-button
           size="small"
@@ -144,11 +171,11 @@ previews and canvas nodes can both reference them by id. -->
           (click)="pasteClipboard()"
           >
           <ion-icon slot="start" name="clipboard-outline"></ion-icon>
-          Paste
+          <span class="btn-label">Paste</span>
         </ion-button>
         <ion-button size="small" fill="outline" (click)="clear()">
           <ion-icon slot="start" name="refresh-outline"></ion-icon>
-          Clear
+          <span class="btn-label">Clear</span>
         </ion-button>
 
         <!-- Save menu. Nothing to export from an empty canvas, so it is disabled
@@ -195,7 +222,7 @@ previews and canvas nodes can both reference them by id. -->
             (click)="openSaveDialog()"
             >
             <ion-icon slot="start" name="cloud-upload-outline"></ion-icon>
-            {{ isSavingSession ? 'Saving…' : 'Save session' }}
+            <span class="btn-label">{{ isSavingSession ? 'Saving…' : 'Save session' }}</span>
           </ion-button>
           <button
             type="button"
@@ -247,185 +274,223 @@ previews and canvas nodes can both reference them by id. -->
         [class.canvas-bg-plain]="canvasBg === 'plain'"
         [class.canvas-bg-grid]="canvasBg === 'grid'"
         [class.connecting]="connectFromId"
+        [style.--bg-scale]="zoom"
         (dragover)="onCanvasDragOver($event)"
         (drop)="onCanvasDrop($event)"
         (click)="onCanvasClick()"
+        (wheel)="onCanvasWheel($event)"
+        (touchstart)="onCanvasTouchStart($event)"
+        (touchmove)="onCanvasTouchMove($event)"
+        (touchend)="onCanvasTouchEnd($event)"
+        (touchcancel)="onCanvasTouchEnd($event)"
         >
-        <!-- Edges -->
-        <svg class="edges">
-          <defs>
-            <marker
-              id="flow-arrow"
-              viewBox="0 0 10 10"
-              refX="8"
-              refY="5"
-              markerWidth="10"
-              markerHeight="10"
-              orient="auto-start-reverse"
-              >
-              <path d="M 0 1 L 9 5 L 0 9 Z"></path>
-            </marker>
-          </defs>
-          @for (g of edgeGeometries; track trackEdge($index, g)) {
-            <!-- Wide transparent hit area for easier edge selection -->
-            <polyline
-              class="edge-hit"
-              [attr.points]="g.points"
-              (click)="onEdgeClick($event, g.edge)"
-            ></polyline>
-            <!-- Visible edge line -->
-            <polyline
-              class="edge"
-              [class.selected]="selectedEdgeId === g.edge.id"
-              [attr.points]="g.points"
-              [attr.marker-end]="edgeMarkerEnd(g.edge)"
-              [attr.marker-start]="edgeMarkerStart(g.edge)"
-              [attr.stroke-dasharray]="edgeDashArray(g.edge)"
-              [attr.stroke]="g.edge.color || null"
-              [style.color]="g.edge.color || null"
-              (click)="onEdgeClick($event, g.edge)"
-            ></polyline>
-            <!-- Draggable bend-point handle (visible only when edge is selected) -->
-            @if (selectedEdgeId === g.edge.id && g.edge.routing !== 'straight') {
-              <circle
-                class="edge-bend-handle"
-                [attr.cx]="g.bendPt.x"
-                [attr.cy]="g.bendPt.y"
-                r="7"
-                (mousedown)="onEdgeMidMouseDown($event, g)"
-              ></circle>
-            }
-          }
-
-          <!-- Live preview while dragging a new connection -->
-          @if (connectPreview; as p) {
-            <polyline
-              class="edge-preview"
-              [attr.points]="p.points"
-              marker-end="url(#flow-arrow)"
-            ></polyline>
-          }
-        </svg>
-
-        <!-- Nodes -->
-        @for (v of nodeViews; track trackNode($index, v)) {
+        <!-- Two nested wrappers so the canvas can zoom: `.canvas-content` is the
+             unzoomed drawing surface everything is positioned on (so the geometry
+             in the component never has to think about zoom), and `.canvas-sizer`
+             carries its scaled footprint — a CSS transform on its own does not
+             reliably grow a scroll container's scrollable area, so without the
+             sizer a zoomed-in diagram could not be scrolled to. -->
+        <div
+          class="canvas-sizer"
+          [style.width.px]="contentWidth * zoom"
+          [style.height.px]="contentHeight * zoom"
+          >
+          <!-- `--z` is the live zoom level. The drag/resize/rotate handles inside
+               divide their own sizes by it so they stay the same size on screen
+               however far the diagram is zoomed out — otherwise zooming out to
+               fit a phone screen would shrink every grip below finger size. -->
           <div
-            class="node"
-            [attr.data-node-id]="v.node.id"
-            [class.selected]="selectedNodeId === v.node.id"
-            [class.connect-source]="connectFromId === v.node.id"
-            [class.connect-target]="connectTargetId === v.node.id"
-            [style.left.px]="v.node.x"
-            [style.top.px]="v.node.y"
-            [style.width.px]="v.node.w"
-            [style.height.px]="v.node.h"
-            [style.--node-fill]="v.node.fill"
-            [style.--node-stroke]="v.node.stroke"
-            [style.transform]="v.node.rotation ? 'rotate(' + v.node.rotation + 'deg)' : null"
-            (pointerdown)="onNodePointerDown($event, v.node)"
-            (click)="onNodeClick($event, v.node)"
-            (dblclick)="startEditing($event, v.node)"
+            class="canvas-content"
+            [style.width.px]="contentWidth"
+            [style.height.px]="contentHeight"
+            [style.--z]="zoom"
+            [style.transform]="'scale(' + zoom + ')'"
             >
-            @if (v.shape.kind !== 'none') {
-              <svg
-                class="shape-svg"
-                [attr.viewBox]="'0 0 ' + v.node.w + ' ' + v.node.h"
-                preserveAspectRatio="none"
-                >
-                <ng-container
-                  *ngTemplateOutlet="shapeTpl; context: { r: v.shape, w: v.node.w, h: v.node.h }"
-                ></ng-container>
-              </svg>
-            }
-            @if (editingNodeId !== v.node.id) {
-              <div
-                class="node-label"
-                [class.text-only]="v.node.type === 'text'"
-                [ngStyle]="labelStyle(v.node)"
-              >{{ v.node.text }}</div>
-            }
-            @if (editingNodeId === v.node.id) {
-              <textarea
-                class="node-input"
-                [ngStyle]="labelStyle(v.node)"
-                [value]="v.node.text"
-                (mousedown)="$event.stopPropagation()"
-                (click)="$event.stopPropagation()"
-                (keydown)="onInputKeydown($event, v.node)"
-                (blur)="commitEdit($event, v.node)"
-              ></textarea>
-            }
-            <!-- Directional connection handles: drag from one onto another shape to link. -->
-            <button
-              type="button"
-              class="connect-handle handle-top"
-              title="Drag to another shape to connect"
-              (mousedown)="startConnect($event, v.node)"
-              >
-              <ion-icon name="caret-up-outline"></ion-icon>
-            </button>
-            <button
-              type="button"
-              class="connect-handle handle-right"
-              title="Drag to another shape to connect"
-              (mousedown)="startConnect($event, v.node)"
-              >
-              <ion-icon name="caret-forward-outline"></ion-icon>
-            </button>
-            <button
-              type="button"
-              class="connect-handle handle-bottom"
-              title="Drag to another shape to connect"
-              (mousedown)="startConnect($event, v.node)"
-              >
-              <ion-icon name="caret-down-outline"></ion-icon>
-            </button>
-            <button
-              type="button"
-              class="connect-handle handle-left"
-              title="Drag to another shape to connect"
-              (mousedown)="startConnect($event, v.node)"
-              >
-              <ion-icon name="caret-back-outline"></ion-icon>
-            </button>
-            <!-- Resize grips, on the selected shape only. Hidden while its label is
-                 being edited or a connection is being dragged, so they never sit on
-                 top of the textarea or steal the drop target. Also hidden while the
-                 shape is rotated: the drag math below works in unrotated canvas
-                 coordinates, so a diagonal drag on a rotated shape would resize in
-                 the wrong direction — reset rotation to 0 (or use the W/H fields,
-                 which work at any angle) to resize, then rotate again. -->
-            @if (selectedNodeId === v.node.id && editingNodeId !== v.node.id && !connectFromId && !v.node.rotation) {
-              @for (dir of resizeHandles; track dir) {
-                <span
-                  class="resize-handle rh-{{ dir }}"
-                  aria-hidden="true"
-                  title="Drag to resize"
-                  (pointerdown)="startResize($event, v.node, dir)"
-                  (mousedown)="$event.stopPropagation()"
-                  (click)="$event.stopPropagation()"
-                ></span>
+            <!-- Edges -->
+            <svg class="edges">
+              <defs>
+                <marker
+                  id="flow-arrow"
+                  viewBox="0 0 10 10"
+                  refX="8"
+                  refY="5"
+                  markerWidth="10"
+                  markerHeight="10"
+                  orient="auto-start-reverse"
+                  >
+                  <path d="M 0 1 L 9 5 L 0 9 Z"></path>
+                </marker>
+              </defs>
+              @for (g of edgeGeometries; track trackEdge($index, g)) {
+                <!-- Wide transparent hit area for easier edge selection -->
+                <polyline
+                  class="edge-hit"
+                  [attr.points]="g.points"
+                  (click)="onEdgeClick($event, g.edge)"
+                ></polyline>
+                <!-- Visible edge line -->
+                <polyline
+                  class="edge"
+                  [class.selected]="selectedEdgeId === g.edge.id"
+                  [attr.points]="g.points"
+                  [attr.marker-end]="edgeMarkerEnd(g.edge)"
+                  [attr.marker-start]="edgeMarkerStart(g.edge)"
+                  [attr.stroke-dasharray]="edgeDashArray(g.edge)"
+                  [attr.stroke]="g.edge.color || null"
+                  [style.color]="g.edge.color || null"
+                  (click)="onEdgeClick($event, g.edge)"
+                ></polyline>
+                <!-- Draggable bend-point handle (visible only when edge is selected) -->
+                @if (selectedEdgeId === g.edge.id && g.edge.routing !== 'straight') {
+                  <circle
+                    class="edge-bend-handle"
+                    [attr.cx]="g.bendPt.x"
+                    [attr.cy]="g.bendPt.y"
+                    r="7"
+                    (pointerdown)="onEdgeMidPointerDown($event, g)"
+                  ></circle>
+                }
               }
-            }
-            <!-- Rotate handle: drag around the shape's centre to spin it a full
-                 360°. Hold Shift while dragging to snap to 15° steps. -->
-            @if (selectedNodeId === v.node.id && editingNodeId !== v.node.id && !connectFromId) {
-              <button
-                type="button"
-                class="rotate-handle"
-                title="Drag to rotate — hold Shift to snap to 15°"
-                aria-label="Rotate shape"
-                (pointerdown)="startRotate($event, v.node)"
-                (mousedown)="$event.stopPropagation()"
-                (click)="$event.stopPropagation()"
-                >
-                <ion-icon name="sync-outline"></ion-icon>
-              </button>
-            }
-          </div>
-        }
 
-        <!-- Empty state -->
+              <!-- Live preview while dragging a new connection -->
+              @if (connectPreview; as p) {
+                <polyline
+                  class="edge-preview"
+                  [attr.points]="p.points"
+                  marker-end="url(#flow-arrow)"
+                ></polyline>
+              }
+            </svg>
+
+            <!-- Nodes -->
+            @for (v of nodeViews; track trackNode($index, v)) {
+              <div
+                class="node"
+                [attr.data-node-id]="v.node.id"
+                [class.selected]="selectedNodeId === v.node.id"
+                [class.connect-source]="connectFromId === v.node.id"
+                [class.connect-target]="connectTargetId === v.node.id"
+                [style.left.px]="v.node.x"
+                [style.top.px]="v.node.y"
+                [style.width.px]="v.node.w"
+                [style.height.px]="v.node.h"
+                [style.--node-fill]="v.node.fill"
+                [style.--node-stroke]="v.node.stroke"
+                [style.transform]="v.node.rotation ? 'rotate(' + v.node.rotation + 'deg)' : null"
+                (pointerdown)="onNodePointerDown($event, v.node)"
+                (click)="onNodeClick($event, v.node)"
+                >
+                @if (v.shape.kind !== 'none') {
+                  <svg
+                    class="shape-svg"
+                    [attr.viewBox]="'0 0 ' + v.node.w + ' ' + v.node.h"
+                    preserveAspectRatio="none"
+                    >
+                    <ng-container
+                      *ngTemplateOutlet="shapeTpl; context: { r: v.shape, w: v.node.w, h: v.node.h }"
+                    ></ng-container>
+                  </svg>
+                }
+                @if (editingNodeId !== v.node.id) {
+                  <!-- Two elements, not one: the outer box does the vertical
+                       alignment and the inner span carries the line clamp.
+                       They cannot be the same element — see labelBoxStyle(). -->
+                  <div
+                    class="node-label"
+                    [class.text-only]="v.node.type === 'text'"
+                    [ngStyle]="labelBoxStyle(v.node)"
+                    ><span
+                      class="node-label-text"
+                      [ngStyle]="labelClampStyle(v.node)"
+                    >{{ v.node.text }}</span></div>
+                }
+                @if (editingNodeId === v.node.id) {
+                  <textarea
+                    class="node-input"
+                    [ngStyle]="labelStyle(v.node)"
+                    [value]="v.node.text"
+                    (mousedown)="$event.stopPropagation()"
+                    (click)="$event.stopPropagation()"
+                    (keydown)="onInputKeydown($event, v.node)"
+                    (blur)="commitEdit($event, v.node)"
+                  ></textarea>
+                }
+                <!-- Directional connection handles: drag from one onto another shape to link. -->
+                <button
+                  type="button"
+                  class="connect-handle handle-top"
+                  title="Drag to another shape to connect"
+                  (pointerdown)="startConnect($event, v.node)"
+                  >
+                  <ion-icon name="caret-up-outline"></ion-icon>
+                </button>
+                <button
+                  type="button"
+                  class="connect-handle handle-right"
+                  title="Drag to another shape to connect"
+                  (pointerdown)="startConnect($event, v.node)"
+                  >
+                  <ion-icon name="caret-forward-outline"></ion-icon>
+                </button>
+                <button
+                  type="button"
+                  class="connect-handle handle-bottom"
+                  title="Drag to another shape to connect"
+                  (pointerdown)="startConnect($event, v.node)"
+                  >
+                  <ion-icon name="caret-down-outline"></ion-icon>
+                </button>
+                <button
+                  type="button"
+                  class="connect-handle handle-left"
+                  title="Drag to another shape to connect"
+                  (pointerdown)="startConnect($event, v.node)"
+                  >
+                  <ion-icon name="caret-back-outline"></ion-icon>
+                </button>
+                <!-- Resize grips, on the selected shape only. Hidden while its label is
+                     being edited or a connection is being dragged, so they never sit on
+                     top of the textarea or steal the drop target. Also hidden while the
+                     shape is rotated: the drag math below works in unrotated canvas
+                     coordinates, so a diagonal drag on a rotated shape would resize in
+                     the wrong direction — reset rotation to 0 (or use the W/H fields,
+                     which work at any angle) to resize, then rotate again. -->
+                @if (selectedNodeId === v.node.id && editingNodeId !== v.node.id && !connectFromId && !v.node.rotation) {
+                  @for (dir of resizeHandles; track dir) {
+                    <span
+                      class="resize-handle rh-{{ dir }}"
+                      aria-hidden="true"
+                      title="Drag to resize"
+                      (pointerdown)="startResize($event, v.node, dir)"
+                      (mousedown)="$event.stopPropagation()"
+                      (click)="$event.stopPropagation()"
+                    ></span>
+                  }
+                }
+                <!-- Rotate handle: drag around the shape's centre to spin it a full
+                     360°. Hold Shift while dragging to snap to 15° steps. -->
+                @if (selectedNodeId === v.node.id && editingNodeId !== v.node.id && !connectFromId) {
+                  <button
+                    type="button"
+                    class="rotate-handle"
+                    title="Drag to rotate — hold Shift to snap to 15°"
+                    aria-label="Rotate shape"
+                    (pointerdown)="startRotate($event, v.node)"
+                    (mousedown)="$event.stopPropagation()"
+                    (click)="$event.stopPropagation()"
+                    >
+                    <ion-icon name="sync-outline"></ion-icon>
+                  </button>
+                }
+              </div>
+            }
+
+          </div>
+        </div>
+
+        <!-- Empty state. Outside the scaled wrappers on purpose: it is a message
+             about the canvas, not something drawn on it, so it should stay the
+             same size at every zoom level. -->
         @if (diagram.nodes.length === 0) {
           <div class="canvas-empty">
             <ion-icon name="shapes-outline"></ion-icon>
@@ -435,15 +500,84 @@ previews and canvas nodes can both reference them by id. -->
           </div>
         }
       </div>
+
+      <!-- Zoom controls, floating over the bottom-right of the canvas. These are
+           the only way to zoom on a phone that has no keyboard for Ctrl+wheel,
+           and the "fit" button is the way back when a diagram has been dragged
+           somewhere off screen. -->
+      <div class="zoom-bar" role="group" aria-label="Canvas zoom">
+        <button
+          type="button"
+          class="zoom-btn"
+          title="Zoom out"
+          aria-label="Zoom out"
+          [disabled]="zoom <= minZoom"
+          (click)="zoomOut()"
+          >
+          <ion-icon name="remove-outline"></ion-icon>
+        </button>
+        <button
+          type="button"
+          class="zoom-level"
+          title="Reset zoom to 100%"
+          aria-label="Reset zoom to 100 percent"
+          (click)="resetZoom()"
+          >{{ zoomPercent }}%</button>
+        <button
+          type="button"
+          class="zoom-btn"
+          title="Zoom in"
+          aria-label="Zoom in"
+          [disabled]="zoom >= maxZoom"
+          (click)="zoomIn()"
+          >
+          <ion-icon name="add-outline"></ion-icon>
+        </button>
+        <button
+          type="button"
+          class="zoom-btn"
+          title="Fit the whole diagram on screen"
+          aria-label="Fit the whole diagram on screen"
+          (click)="zoomToFit()"
+          >
+          <ion-icon name="scan-outline"></ion-icon>
+        </button>
+      </div>
     </div>
 
     <!-- Properties / Text panel. Shown or hidden purely by its own toggle, like the
          shapes palette; the controls inside wait for a selection. -->
     @if (showProps) {
       <div
+        class="panel-resize-divider"
+        (pointerdown)="startPanelResize($event, 'props')"
+        title="Drag to resize"
+        >
+        <div class="resize-chip" aria-hidden="true">
+          <span class="chip-dots"><span></span><span></span></span>
+          <ion-icon name="swap-horizontal-outline"></ion-icon>
+          <span class="chip-dots"><span></span><span></span></span>
+        </div>
+      </div>
+      <!-- Stacked (mobile) layout only: the panel above is a bottom sheet, so
+           its handle drags vertically to resize height instead of width. -->
+      <div
+        class="panel-vresize-divider"
+        (pointerdown)="startPropsHeightResize($event)"
+        title="Drag to resize height"
+        >
+        <div class="resize-chip" aria-hidden="true">
+          <span class="chip-dots"><span></span><span></span></span>
+          <ion-icon name="swap-vertical-outline"></ion-icon>
+          <span class="chip-dots"><span></span><span></span></span>
+        </div>
+      </div>
+      <div
         class="props-panel"
         role="region"
         aria-labelledby="props-heading"
+        [style.--props-w]="propsWidthPercent + '%'"
+        [style.--props-h]="propsHeightVh + 'vh'"
         >
         <div class="panel-head">
           <button
@@ -746,6 +880,64 @@ previews and canvas nodes can both reference them by id. -->
                 <line x1="7" y1="6.5" x2="14" y2="6.5" />
                 <line x1="2" y1="10" x2="14" y2="10" />
                 <line x1="7" y1="13.5" x2="14" y2="13.5" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Vertical alignment — same WAI-ARIA radio pattern as the horizontal
+               group above, one row down. -->
+          <div
+            class="btn-group align-group"
+            role="radiogroup"
+            aria-label="Vertical alignment"
+            (keydown)="onValignKeydown($event)"
+          >
+            <button
+              type="button"
+              class="icon-btn"
+              role="radio"
+              [class.active]="(sel.valign ?? 'middle') === 'top'"
+              [attr.aria-checked]="(sel.valign ?? 'middle') === 'top'"
+              [attr.tabindex]="(sel.valign ?? 'middle') === 'top' ? 0 : -1"
+              aria-label="Align top"
+              (click)="setValign('top')"
+            >
+              <svg class="align-icon" viewBox="0 0 16 16" aria-hidden="true">
+                <line x1="2" y1="2" x2="14" y2="2" />
+                <line x1="5" y1="6" x2="11" y2="6" />
+                <line x1="4" y1="10" x2="12" y2="10" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="icon-btn"
+              role="radio"
+              [class.active]="(sel.valign ?? 'middle') === 'middle'"
+              [attr.aria-checked]="(sel.valign ?? 'middle') === 'middle'"
+              [attr.tabindex]="(sel.valign ?? 'middle') === 'middle' ? 0 : -1"
+              aria-label="Align middle"
+              (click)="setValign('middle')"
+            >
+              <svg class="align-icon" viewBox="0 0 16 16" aria-hidden="true">
+                <line x1="4" y1="4" x2="12" y2="4" />
+                <line x1="2" y1="8" x2="14" y2="8" />
+                <line x1="5" y1="12" x2="11" y2="12" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="icon-btn"
+              role="radio"
+              [class.active]="(sel.valign ?? 'middle') === 'bottom'"
+              [attr.aria-checked]="(sel.valign ?? 'middle') === 'bottom'"
+              [attr.tabindex]="(sel.valign ?? 'middle') === 'bottom' ? 0 : -1"
+              aria-label="Align bottom"
+              (click)="setValign('bottom')"
+            >
+              <svg class="align-icon" viewBox="0 0 16 16" aria-hidden="true">
+                <line x1="4" y1="6" x2="12" y2="6" />
+                <line x1="5" y1="10" x2="11" y2="10" />
+                <line x1="2" y1="14" x2="14" y2="14" />
               </svg>
             </button>
           </div>

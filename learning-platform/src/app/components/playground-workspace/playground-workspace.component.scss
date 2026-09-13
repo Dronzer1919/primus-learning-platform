@@ -147,11 +147,11 @@
   transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
 
   ion-icon {
-    font-size: 20px;
+    font-size: fluid(18px, 22px);
   }
 
   .rail-text {
-    font-size: 14px;
+    font-size: fluid(12px, 14px);
     font-weight: 700;
     letter-spacing: 0.5px;
     line-height: 1;
@@ -219,20 +219,20 @@
   min-width: 0;
 
   ion-icon {
-    font-size: 28px;
+    font-size: fluid(20px, 28px);
     color: var(--editor-fg);
     flex-shrink: 0;
   }
 
   h1 {
-    font-size: 16px;
+    font-size: fluid(13px, 16px);
     margin: 0;
     font-weight: 700;
     color: var(--editor-fg);
   }
 
   p {
-    font-size: 12px;
+    font-size: fluid(11px, 12px);
     margin: 0;
     color: color-mix(in srgb, var(--editor-fg), transparent 35%);
   }
@@ -546,6 +546,9 @@
   transition: background 0.15s;
   position: relative;
   z-index: 1;
+  // Pointer events now drive the drag (see startResize) — without this a finger
+  // drag scrolls the page instead of resizing the split.
+  touch-action: none;
 
   &:hover, &:active {
     background: var(--ion-color-primary, #3880ff);
@@ -557,12 +560,19 @@
     inset: 0 -4px; // wider hit area
   }
 
-  // Stacked panes make a horizontal drag meaningless, and the handler is mousedown-only
-  // so there is nothing to offer a touch device anyway. It becomes a plain seam.
+  // A coarse pointer needs a wider hit area than a mouse cursor gets away with.
+  @include touch {
+    &::after {
+      inset: 0 -10px;
+    }
+  }
+
+  // Stacked panes make a horizontal drag meaningless — it becomes a plain seam.
   @include below('lg') {
     width: 100%;
     height: 4px;
     cursor: default;
+    touch-action: auto;
 
     &:hover, &:active {
       background: var(--editor-border);
@@ -577,6 +587,7 @@
     width: 5px;
     height: auto;
     cursor: col-resize;
+    touch-action: none;
 
     &:hover, &:active {
       background: var(--ion-color-primary, #3880ff);
