@@ -17,6 +17,16 @@
       <ion-icon *ngIf="lang.id !== 'typescript'" [name]="lang.icon"></ion-icon>
       <ion-icon *ngIf="lang.locked" name="lock-closed-outline" class="lock-badge"></ion-icon>
     </div>
+
+    <!-- Signed-in users' sessions live on the backend; signed-out visitors' saves
+         live on this device only — same list UI, different route (see app.routes.ts). -->
+    <div
+      class="rail-item rail-sessions"
+      [routerLink]="(authService.isLoggedIn$ | async) ? '/user/playground-sessions' : '/playground-sessions'"
+      title="My sessions"
+    >
+      <ion-icon name="folder-open-outline"></ion-icon>
+    </div>
   </div>
 
   <div class="playground-main">
@@ -272,7 +282,11 @@
 <ng-template #celebrationTpl>
   <div class="run-success" *ngIf="runSucceeded">
     <hr class="run-success-hr" />
-    <div class="run-success-text">================ code executed successfully ================</div>
+    <div class="run-success-text">
+      <span class="run-success-line" aria-hidden="true"></span>
+      <span class="run-success-label">code executed successfully</span>
+      <span class="run-success-line" aria-hidden="true"></span>
+    </div>
     <div class="run-success-anim" *ngIf="showCelebration">
       <div class="celebration-emoji">🎉</div>
       <span

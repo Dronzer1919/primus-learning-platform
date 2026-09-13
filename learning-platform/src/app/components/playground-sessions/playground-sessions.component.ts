@@ -2,28 +2,47 @@ import { Component, OnInit, AfterViewChecked, ViewChild, ChangeDetectorRef, Dest
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, RouterModule } from '@angular/router';
 import { IonicModule, ToastController, AlertController } from '@ionic/angular';
+import { Observable } from 'rxjs';
 import { PlaygroundSessionService } from '../../services/playground-session.service';
+import { LocalPlaygroundSessionService } from '../../services/local-playground-session.service';
+import { AuthService } from '../../services/auth.service';
 import { PlaygroundSession } from '../../models/playground-session.model';
+import { LocalPlaygroundSession } from '../../models/local-session.model';
 import { PlaygroundWorkspaceComponent } from '../playground-workspace/playground-workspace.component';
+
+type AnyPlaygroundSession = PlaygroundSession | LocalPlaygroundSession;
+
+/** Whichever store backs the current visit — backend for signed-in users, IndexedDB for guests. */
+interface PlaygroundSessionSource {
+  getSessions(): Observable<AnyPlaygroundSession[]>;
+  createSession(title?: string): Observable<AnyPlaygroundSession>;
+  updateSession(id: string, data: Partial<AnyPlaygroundSession>): Observable<AnyPlaygroundSession>;
+  deleteSession(id: string): Observable<void>;
+}
 
 @Component({
   selector: 'app-playground-sessions',
   templateUrl: './playground-sessions.component.html',
   styleUrls: ['./playground-sessions.component.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, FormsModule, PlaygroundWorkspaceComponent]
+  imports: [IonicModule, CommonModule, FormsModule, RouterModule, PlaygroundWorkspaceComponent]
 })
 export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
   @ViewChild(PlaygroundWorkspaceComponent) workspace!: PlaygroundWorkspaceComponent;
 
-  sessions: PlaygroundSession[] = [];
-  activeSession: PlaygroundSession | null = null;
+  sessions: AnyPlaygroundSession[] = [];
+  activeSession: AnyPlaygroundSession | null = null;
   editingTitle = '';
   loading = false;
   isSaving = false;
   isCreating = false;
-  private pendingSession: PlaygroundSession | null = null;
+  private pendingSession: AnyPlaygroundSession | null = null;
+
+  /** True for a signed-out visitor — the guest banner and local-only messaging key off this. */
+  isGuest = false;
+  private source!: PlaygroundSessionSource;
 
   // Every request below is tied to this. Without it, leaving the page mid-load
   // leaves the response to arrive at a destroyed component and write to fields
@@ -32,13 +51,20 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
 
   constructor(
     private pgSessionService: PlaygroundSessionService,
+    private localPgSessionService: LocalPlaygroundSessionService,
+    private authService: AuthService,
+    private route: ActivatedRoute,
     private cdr: ChangeDetectorRef,
     private toastController: ToastController,
     private alertController: AlertController
   ) {}
 
   ngOnInit(): void {
-    this.loadSessions();
+    this.isGuest = !this.authService.isAuthenticated();
+    this.source = this.isGuest ? this.localPgSessionService : this.pgSessionService;
+    // Deep-linked from the sidebar's drafts panel, e.g. /user/playground-sessions?sessionId=...
+    const requestedId = this.route.snapshot.queryParamMap.get('sessionId') ?? undefined;
+    this.loadSessions(requestedId);
   }
 
   ngAfterViewChecked(): void {
@@ -54,7 +80,7 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
 
   loadSessions(selectId?: string): void {
     this.loading = true;
-    this.pgSessionService.getSessions().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.source.getSessions().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (sessions) => {
         // Normalised first: everything below indexes and searches this list, and
         // a non-array response (an error page, a changed envelope) would throw
@@ -81,11 +107,11 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
     });
   }
 
-  selectSession(session: PlaygroundSession): void {
+  selectSession(session: AnyPlaygroundSession): void {
     this.applySession(session);
   }
 
-  private applySession(session: PlaygroundSession): void {
+  private applySession(session: AnyPlaygroundSession): void {
     this.activeSession = session;
     this.editingTitle = session.title;
     if (this.workspace) {
@@ -96,7 +122,7 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
     }
   }
 
-  private doLoadSession(session: PlaygroundSession): void {
+  private doLoadSession(session: AnyPlaygroundSession): void {
     if (!this.workspace) return;
     this.workspace.selectedMode = session.mode;
     this.workspace.htmlCode = session.htmlCode;
@@ -116,7 +142,7 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
     if (this.isCreating) return;
     this.isCreating = true;
 
-    this.pgSessionService.createSession().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.source.createSession().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: (session) => {
         this.isCreating = false;
         this.sessions = [session, ...this.sessions];
@@ -171,7 +197,7 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
       tsCode: this.workspace.tsCode,
       selectedTab: this.workspace.selectedTab,
     };
-    this.pgSessionService.updateSession(this.activeSession._id, data).pipe(
+    this.source.updateSession(this.activeSession._id, data).pipe(
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
       next: (updated) => {
@@ -187,7 +213,7 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
     });
   }
 
-  renameSession(session: PlaygroundSession): void {
+  renameSession(session: AnyPlaygroundSession): void {
     const title = prompt('Rename session', session.title);
     if (!title || !title.trim()) return;
 
@@ -195,7 +221,7 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
     // with a 400, and there is no reason to make the round trip to find out.
     const trimmed = title.trim().slice(0, 120);
 
-    this.pgSessionService
+    this.source
       .updateSession(session._id, { title: trimmed })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
@@ -212,7 +238,7 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
       });
   }
 
-  async deleteSession(session: PlaygroundSession, event?: Event): Promise<void> {
+  async deleteSession(session: AnyPlaygroundSession, event?: Event): Promise<void> {
     event?.stopPropagation();
     const alert = await this.alertController.create({
       header: 'Delete Session',
@@ -225,7 +251,7 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
           role: 'destructive',
           cssClass: 'alert-button-danger',
           handler: () => {
-            this.pgSessionService
+            this.source
               .deleteSession(session._id)
               .pipe(takeUntilDestroyed(this.destroyRef))
               .subscribe({
@@ -261,7 +287,7 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
     return item._id;
   }
 
-  private replaceSession(updated: PlaygroundSession): void {
+  private replaceSession(updated: AnyPlaygroundSession): void {
     this.sessions = this.sessions.map(s => s._id === updated._id ? updated : s);
   }
 

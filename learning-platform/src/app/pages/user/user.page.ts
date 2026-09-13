@@ -1,4 +1,5 @@
-import { Component, OnInit, OnDestroy, ViewChild, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, HostListener, DestroyRef, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule, RouterOutlet, NavigationEnd } from '@angular/router';
@@ -7,7 +8,9 @@ import { combineLatest, Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { ContentService } from '../../services/content.service';
+import { PlaygroundSessionService } from '../../services/playground-session.service';
 import { User } from '../../models/user.model';
+import { PlaygroundSession } from '../../models/playground-session.model';
 import { LanguageTab, LanguagePlatform, DifficultyLevel } from '../../models/content.model';
 
 // A language tab plus whether it has any content (tabs without data are disabled + moved right)
@@ -79,9 +82,19 @@ export class UserPage implements OnInit, OnDestroy {
     { id: 'expert', label: 'Expert', icon: 'trophy-outline', color: 'secondary' }
   ];
 
+  // Sidebar "drafts" panel: a quick-access slide-in listing recent playground
+  // sessions, so a session can be reopened without leaving whatever topic is
+  // on screen. Purely additive over the existing sidebar — never toggled by
+  // anything the sidebar itself already does.
+  draftsOpen = false;
+  draftsLoading = false;
+  draftSessions: PlaygroundSession[] = [];
+  private readonly destroyRef = inject(DestroyRef);
+
   constructor(
     private authService: AuthService,
     private contentService: ContentService,
+    private pgSessionService: PlaygroundSessionService,
     private router: Router
   ) {}
 
@@ -260,6 +273,37 @@ export class UserPage implements OnInit, OnDestroy {
 
   navigateToPlaygroundSessions() {
     this.router.navigate(['/user/playground-sessions']);
+  }
+
+  // ---- Sidebar drafts panel ----
+  openDrafts(): void {
+    this.draftsOpen = true;
+    this.draftsLoading = true;
+    this.pgSessionService
+      .getSessions()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (sessions) => {
+          this.draftSessions = Array.isArray(sessions) ? sessions : [];
+          this.draftsLoading = false;
+        },
+        error: () => {
+          this.draftsLoading = false;
+        }
+      });
+  }
+
+  closeDrafts(): void {
+    this.draftsOpen = false;
+  }
+
+  openDraft(session: PlaygroundSession): void {
+    this.draftsOpen = false;
+    this.router.navigate(['/user/playground-sessions'], { queryParams: { sessionId: session._id } });
+  }
+
+  formatDraftDate(dateStr: string): string {
+    return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
   }
 
   navigateToNotes() {

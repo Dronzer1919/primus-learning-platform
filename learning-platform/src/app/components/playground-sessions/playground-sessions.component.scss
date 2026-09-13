@@ -32,6 +32,21 @@
     h2 { margin: 0; font-size: 1.1rem; font-weight: 700; }
   }
 
+  .pgs-guest-banner {
+    margin: 0 16px 12px;
+    padding: 8px 10px;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: var(--ion-color-medium-shade, #666);
+    background: var(--ion-color-warning-tint, #fff6e0);
+    border-radius: 6px;
+
+    a {
+      font-weight: 600;
+      text-decoration: underline;
+    }
+  }
+
   .pgs-list {
     overflow-y: auto;
     padding: 0 8px 16px;

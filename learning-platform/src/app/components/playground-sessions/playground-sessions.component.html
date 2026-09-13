@@ -9,6 +9,12 @@
       </ion-button>
     </div>
 
+    <div *ngIf="isGuest" class="pgs-guest-banner">
+      Saved on this device only.
+      <a [routerLink]="['/login']" [queryParams]="{ returnUrl: '/playground-sessions' }">Log in</a>
+      to sync to your account.
+    </div>
+
     <div class="pgs-list">
       <div
         *ngFor="let session of sessions; trackBy: trackById"

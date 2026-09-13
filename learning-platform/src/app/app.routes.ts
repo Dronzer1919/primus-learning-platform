@@ -116,6 +116,17 @@ export const routes: Routes = [
     loadComponent: () => import('./components/code-playground/code-playground.component').then((m) => m.CodePlaygroundComponent),
   },
   {
+    // Standalone playground sessions library. Public so guests can reach it —
+    // PlaygroundSessionsComponent itself swaps between the backend service and
+    // IndexedDB-backed local service depending on auth state. Logged-in users
+    // can also reach the identical component via 'user/playground-sessions'.
+    path: 'playground-sessions',
+    loadComponent: () =>
+      import('./components/playground-sessions/playground-sessions.component').then(
+        (m) => m.PlaygroundSessionsComponent
+      ),
+  },
+  {
     // Standalone flowchart / diagram builder.
     path: 'flowchart',
     loadComponent: () => import('./components/flowchart/flowchart.component').then((m) => m.FlowchartComponent),
