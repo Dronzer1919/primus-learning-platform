@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, OnChanges, OnDestroy, SimpleChanges } from '@angular/core';
+import { Component, ElementRef, Input, Output, EventEmitter, OnChanges, OnDestroy, SimpleChanges } from '@angular/core';
 
 import { IonicModule } from '@ionic/angular';
 import { JsTraceService, TraceResult, TraceStep } from '../../services/js-trace.service';
@@ -12,6 +12,33 @@ interface VarView {
   name: string;
   value: string;
 }
+
+interface DryRunCell {
+  /** Display value, or '—' when the variable is not in scope yet at this step. */
+  value: string;
+  /** True when the value differs from the previous step (drives the highlight). */
+  changed: boolean;
+}
+
+interface DryRunRow {
+  index: number;
+  line: number;
+  code: string;
+  cells: DryRunCell[];
+  logs: string[];
+  /**
+   * True when the trace jumped back to an earlier line within the same innermost
+   * loop — i.e. a new iteration began. Rendered as a divider, so passes read as
+   * groups like a hand-written dry-run table.
+   */
+  iterStart: boolean;
+}
+
+/**
+ * Rendering every step of a big trace as table rows would outweigh the trace cap
+ * itself; classroom-sized dry runs fit comfortably under this.
+ */
+const MAX_DRY_RUN_ROWS = 600;
 
 /** Collapsible sections of the mobile accordion. 'code' is the host's editor pane. */
 export type VizSection = 'code' | 'flow' | 'memory' | 'console';
@@ -51,6 +78,12 @@ export class JsVisualizerComponent implements OnChanges, OnDestroy {
   playing = false;
   speed = 600; // ms between steps in play mode
 
+  /** 'stepper' is the classic line-highlight view; 'dryrun' is the trace table. */
+  view: 'stepper' | 'dryrun' = 'stepper';
+  dryRunColumns: string[] = [];
+  dryRunRows: DryRunRow[] = [];
+  dryRunTruncated = false;
+
   /**
    * Set once stepping has reached the final step of a trace. Gates the console section
    * in accordion mode: output is only offered after the whole run has been seen.
@@ -62,7 +95,7 @@ export class JsVisualizerComponent implements OnChanges, OnDestroy {
   private _current = 0;
   private timer: any = null;
 
-  constructor(private traceService: JsTraceService) {}
+  constructor(private traceService: JsTraceService, private host: ElementRef<HTMLElement>) {}
 
   get current(): number {
     return this._current;
@@ -73,6 +106,7 @@ export class JsVisualizerComponent implements OnChanges, OnDestroy {
     if (this.totalSteps > 0 && value >= this.totalSteps - 1) {
       this.hasRunToEnd = true;
     }
+    this.scrollActiveRowIntoView();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -92,9 +126,80 @@ export class JsVisualizerComponent implements OnChanges, OnDestroy {
     this.current = 0;
     this.codeLines = this.code.split('\n').map((text, i) => ({ number: i + 1, text }));
     this.result = this.traceService.trace(this.code);
+    this.buildDryRun();
     // Cleared last: the `current` setter above still sees the previous trace's step
     // count, so an earlier reset could otherwise be undone by a stale `atEnd`.
     this.hasRunToEnd = false;
+  }
+
+  setView(view: 'stepper' | 'dryrun'): void {
+    if (this.view === view) return;
+    this.view = view;
+    // Land with the active row visible instead of at the top of the table.
+    this.scrollActiveRowIntoView();
+  }
+
+  /** Clicking a table row jumps the shared step cursor there (both views follow it). */
+  selectRow(index: number): void {
+    this.pause();
+    this.current = index;
+  }
+
+  /**
+   * Flattens the trace into the dry-run table: one column per variable (in order of
+   * first appearance), one row per step.
+   */
+  private buildDryRun(): void {
+    const steps = this.result?.steps ?? [];
+    const columns: string[] = [];
+    const seen: Record<string, true> = {};
+    for (const s of steps) {
+      for (const name of Object.keys(s.vars)) {
+        if (!seen[name]) {
+          seen[name] = true;
+          columns.push(name);
+        }
+      }
+    }
+
+    const limit = Math.min(steps.length, MAX_DRY_RUN_ROWS);
+    this.dryRunTruncated = steps.length > limit;
+
+    const rows: DryRunRow[] = [];
+    let prev: TraceStep | null = null;
+    for (let i = 0; i < limit; i++) {
+      const step = steps[i];
+      const cells = columns.map((name) => {
+        const has = name in step.vars;
+        // First row stays unhighlighted — everything is "new" there, which is noise.
+        const changed = !!prev && has && step.vars[name] !== prev.vars[name];
+        return { value: has ? step.vars[name] : '—', changed };
+      });
+      const innermost = step.loops[step.loops.length - 1];
+      const prevInnermost = prev?.loops[prev.loops.length - 1];
+      rows.push({
+        index: i,
+        line: step.line,
+        code: this.codeLines[step.line - 1]?.text.trim() ?? '',
+        cells,
+        logs: step.logs,
+        iterStart:
+          prev !== null && innermost !== undefined && innermost === prevInnermost && step.line <= prev.line
+      });
+      prev = step;
+    }
+
+    this.dryRunColumns = columns;
+    this.dryRunRows = rows;
+  }
+
+  private scrollActiveRowIntoView(): void {
+    if (this.view !== 'dryrun') return;
+    const index = this._current;
+    // Deferred so the click/interval handler's change detection has painted the row.
+    setTimeout(() => {
+      this.host.nativeElement.querySelector(`[data-row="${index}"]`)?.scrollIntoView({ block: 'nearest' });
+    });
   }
 
   /** True while `section` is expanded (or whenever the accordion is off). */

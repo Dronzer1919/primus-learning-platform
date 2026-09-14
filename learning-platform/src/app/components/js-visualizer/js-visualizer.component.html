@@ -5,6 +5,24 @@
       <ion-icon name="git-network-outline"></ion-icon>
       <span>Visual Flow</span>
     </div>
+    @if (totalSteps > 0) {
+      <div class="viz-views" role="tablist" aria-label="Visualizer view">
+        <button
+          type="button"
+          class="viz-view"
+          [class.active]="view === 'stepper'"
+          [attr.aria-selected]="view === 'stepper'"
+          (click)="setView('stepper')"
+          >Stepper</button>
+        <button
+          type="button"
+          class="viz-view"
+          [class.active]="view === 'dryrun'"
+          [attr.aria-selected]="view === 'dryrun'"
+          (click)="setView('dryrun')"
+          >Dry Run</button>
+      </div>
+    }
     @if (result) {
       <div class="viz-badges">
         <span class="badge time" title="Time complexity (estimated)">
@@ -53,7 +71,7 @@
     </div>
   }
 
-  @if (totalSteps > 0) {
+  @if (totalSteps > 0 && view === 'stepper') {
     <!-- Below `lg` this becomes an accordion: `accordion` swaps the panel titles for
          buttons and `.acc-closed` collapses everything but the open section. Above it
          the same markup renders as the two-column layout, because isOpen() is
@@ -162,6 +180,57 @@
           </div>
         }
       </div>
+    </div>
+  }
+
+  <!-- Dry Run: the whole trace as a table — one row per executed statement, one
+       column per variable, like a hand-written dry-run trace. Shares the step cursor
+       with the stepper view, so Play/Prev/Next walk the highlighted row and clicking
+       a row jumps both views there. -->
+  @if (totalSteps > 0 && view === 'dryrun') {
+    <div class="dryrun-wrap">
+      <table class="dryrun-table">
+        <thead>
+          <tr>
+            <th class="col-step" title="Step number">#</th>
+            <th class="col-line" title="Source line">Ln</th>
+            <th class="col-code">Statement</th>
+            @for (col of dryRunColumns; track col) {
+              <th class="col-var">{{ col }}</th>
+            }
+            <th class="col-out">Output</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of dryRunRows; track row.index) {
+            <tr
+              class="dryrun-row"
+              [attr.data-row]="row.index"
+              [class.active]="row.index === current"
+              [class.iter-start]="row.iterStart"
+              (click)="selectRow(row.index)"
+              >
+              <td class="col-step">{{ row.index + 1 }}</td>
+              <td class="col-line">{{ row.line }}</td>
+              <td class="col-code">{{ row.code }}</td>
+              @for (cell of row.cells; track $index) {
+                <td class="col-var" [class.changed]="cell.changed">{{ cell.value }}</td>
+              }
+              <td class="col-out">
+                @for (log of row.logs; track $index) {
+                  <div>{{ log }}</div>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (dryRunTruncated) {
+        <div class="viz-message warn">
+          <ion-icon name="warning-outline"></ion-icon>
+          <span>Showing the first {{ dryRunRows.length }} of {{ totalSteps }} steps.</span>
+        </div>
+      }
     </div>
   }
 

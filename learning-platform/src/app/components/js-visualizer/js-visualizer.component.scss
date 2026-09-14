@@ -113,6 +113,46 @@
   }
 }
 
+// Stepper / Dry Run segmented toggle in the header.
+.viz-views {
+  display: inline-flex;
+  flex-shrink: 0;
+  border: 1px solid var(--editor-border, #30363d);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.viz-view {
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, var(--editor-fg, #e6edf3), transparent 30%);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  & + & {
+    border-left: 1px solid var(--editor-border, #30363d);
+  }
+
+  &:hover {
+    color: var(--editor-fg, #e6edf3);
+  }
+
+  &.active {
+    background: color-mix(in srgb, #2dd4a7, transparent 84%);
+    color: #2dd4a7;
+  }
+
+  &:focus-visible {
+    outline: 2px solid #2dd4a7;
+    outline-offset: -2px;
+  }
+}
+
 .viz-progress {
   height: 3px;
   background: var(--editor-border, #30363d);
@@ -319,6 +359,95 @@
   line-height: 1.5;
   color: color-mix(in srgb, var(--editor-fg, #e6edf3), transparent 10%);
   word-break: break-word;
+}
+
+// ---- Dry Run table --------------------------------------------------------
+.dryrun-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 10px;
+  border: 1px solid var(--editor-border, #30363d);
+  border-radius: 8px;
+  background: var(--editor-bg, #0d1117);
+}
+
+.dryrun-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Fira Code', 'Consolas', monospace;
+  font-size: 12px;
+
+  th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--editor-header-bg, #161b22);
+    text-align: left;
+    font-weight: 600;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--editor-border, #30363d);
+    white-space: nowrap;
+  }
+
+  th.col-var {
+    color: #58a6ff;
+  }
+
+  td {
+    padding: 5px 10px;
+    border-bottom: 1px solid color-mix(in srgb, var(--editor-border, #30363d), transparent 45%);
+    vertical-align: top;
+    white-space: nowrap;
+  }
+
+  .col-step,
+  .col-line {
+    color: color-mix(in srgb, var(--editor-fg, #e6edf3), transparent 55%);
+    text-align: right;
+    width: 1%;
+    user-select: none;
+  }
+
+  .col-code {
+    color: color-mix(in srgb, var(--editor-fg, #e6edf3), transparent 15%);
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  td.col-var {
+    color: #2dd4a7;
+
+    // The value this statement just changed — the cells your eye should follow,
+    // like the circled entries in a hand-written trace.
+    &.changed {
+      color: #f0b429;
+      font-weight: 700;
+      background: color-mix(in srgb, #f0b429, transparent 90%);
+    }
+  }
+
+  .col-out {
+    color: color-mix(in srgb, var(--editor-fg, #e6edf3), transparent 30%);
+  }
+}
+
+.dryrun-row {
+  cursor: pointer;
+
+  &:hover td {
+    background: color-mix(in srgb, var(--editor-fg, #e6edf3), transparent 94%);
+  }
+
+  &.active td {
+    background: color-mix(in srgb, #2dd4a7, transparent 86%);
+  }
+
+  // First row of a new loop iteration — draws the "pass" boundary.
+  &.iter-start td {
+    border-top: 2px solid color-mix(in srgb, #8b5cf6, transparent 45%);
+  }
 }
 
 .viz-controls {
