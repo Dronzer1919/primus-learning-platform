@@ -9,6 +9,7 @@ import { filter } from 'rxjs/operators';
 import { AuthService } from '../../services/auth.service';
 import { ContentService } from '../../services/content.service';
 import { PlaygroundSessionService } from '../../services/playground-session.service';
+import { NavHistoryService } from '../../services/nav-history.service';
 import { User } from '../../models/user.model';
 import { PlaygroundSession } from '../../models/playground-session.model';
 import { LanguageTab, LanguagePlatform, DifficultyLevel } from '../../models/content.model';
@@ -54,6 +55,8 @@ export class UserPage implements OnInit, OnDestroy {
   // content on first paint. Above it, the sidebar is part of the layout and starts open.
   isSidebarOpen = !UserPage.isOverlayViewport();
   hideSidebar = false;
+  // /user/home is the shell's own root: the phone back button is pointless there.
+  isShellHome = false;
 
   // Last known side of the overlay boundary, so a resize only resets the drawer when
   // the layout mode actually changes (see onViewportResize).
@@ -95,6 +98,7 @@ export class UserPage implements OnInit, OnDestroy {
     private authService: AuthService,
     private contentService: ContentService,
     private pgSessionService: PlaygroundSessionService,
+    private navHistory: NavHistoryService,
     private router: Router
   ) {}
 
@@ -142,6 +146,22 @@ export class UserPage implements OnInit, OnDestroy {
   // discard the user's expanded/collapsed choice when they navigate back to a topic.
   private applyRouteFlags(url: string): void {
     this.hideSidebar = UserPage.SIDEBAR_HIDDEN_ROUTES.some((route) => url.includes(route));
+    this.isShellHome = url.split('?')[0].split('#')[0] === '/user/home';
+  }
+
+  /**
+   * Shown on every route under this shell, and on /user/home itself once the visitor
+   * has been somewhere in the app (they may have come in from the compiler at /).
+   * Hidden only on a cold landing at /user/home, where back has nowhere to go.
+   */
+  get showBackButton(): boolean {
+    return !this.isShellHome || this.navHistory.canGoBack;
+  }
+
+  // Back control for the phone toolbar. /user/home is this shell's own root, so it
+  // falls back there rather than out to the marketing/compiler root.
+  goBack(): void {
+    this.navHistory.back('/user/home');
   }
 
   toggleSidebar() {

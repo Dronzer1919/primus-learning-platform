@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { IonicModule } from '@ionic/angular';
 import { AuthService } from '../../services/auth.service';
+import { NavHistoryService } from '../../services/nav-history.service';
 import { User } from '../../models/user.model';
 import { ThemeSelectorComponent } from '../../components/theme-selector/theme-selector.component';
 
@@ -46,8 +47,25 @@ export class AdminPage implements OnInit {
 
   constructor(
     private authService: AuthService,
+    private navHistory: NavHistoryService,
     private router: Router
   ) {}
+
+  /**
+   * Shown on every admin child route, and on the dashboard itself once the visitor has
+   * been somewhere in the app. Hidden only on a cold landing at /admin, where back
+   * would be a no-op.
+   */
+  get showBackButton(): boolean {
+    const path = this.router.url.split('?')[0].split('#')[0];
+    return path !== '/admin' || this.navHistory.canGoBack;
+  }
+
+  // Back control for the phone toolbar. Falls back to the dashboard, which is this
+  // shell's own root, rather than out of the admin area.
+  goBack(): void {
+    this.navHistory.back('/admin');
+  }
 
   ngOnInit() {
     this.currentUser = this.authService.currentUserValue;

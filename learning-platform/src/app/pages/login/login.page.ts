@@ -7,6 +7,7 @@ import { IonicModule } from '@ionic/angular';
 import { friendlyMessage } from '../../interceptors/error.interceptor';
 import { NotificationService } from '../../core/notification.service';
 import { AuthService } from '../../services/auth.service';
+import { NavHistoryService } from '../../services/nav-history.service';
 import { OtpService } from '../../services/otp.service';
 import { LoginCredentials } from '../../models/user.model';
 import { ThemeSelectorComponent } from '../../components/theme-selector/theme-selector.component';
@@ -78,16 +79,19 @@ export class LoginPage implements AfterViewInit, OnDestroy {
     private router: Router,
     private route: ActivatedRoute,
     private ngZone: NgZone,
+    private navHistory: NavHistoryService,
     private location: Location
   ) {}
 
   // Back arrow: leave the forgot-password flow first, otherwise go to the previous page.
+  // Login is often the entry point (an emailed link, a returnUrl redirect), so this goes
+  // through NavHistoryService rather than location.back(), which would exit the app.
   goBack(): void {
     if (this.mode === 'forgot') {
       this.backToLogin();
       return;
     }
-    this.location.back();
+    this.navHistory.back('/');
   }
 
 

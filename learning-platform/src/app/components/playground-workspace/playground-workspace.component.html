@@ -1,5 +1,7 @@
-<div class="playground-container" [class.fullscreen]="isFullscreen">
-  <div class="rail" *ngIf="showModeTabs">
+<div class="playground-container" [class.fullscreen]="isFullscreen" [class.mobile]="isMobile">
+  <!-- Desktop language rail. Below `md` its contents move into the drawer behind the
+       app bar's hamburger: a permanent 56px rail costs a phone a sixth of its width. -->
+  <div class="rail" *ngIf="showModeTabs && !isMobile">
     <!-- Ganpati blessing: small in the rail, enlarges on hover -->
     <div class="rail-deity" title="Ganpati Bappa Morya">
       <img src="assets/icon/ganpati.webp" alt="Ganpati" class="rail-deity-thumb" />
@@ -22,7 +24,7 @@
          live on this device only — same list UI, different route (see app.routes.ts). -->
     <div
       class="rail-item rail-sessions"
-      [routerLink]="(authService.isLoggedIn$ | async) ? '/user/playground-sessions' : '/playground-sessions'"
+      [routerLink]="sessionsLink"
       title="My sessions"
     >
       <ion-icon name="folder-open-outline"></ion-icon>
@@ -30,7 +32,31 @@
   </div>
 
   <div class="playground-main">
-    <div class="compiler-header" *ngIf="showHeader">
+    <!-- Mobile app bar. Stands in for .compiler-header, which needs two rows on a phone
+         to fit the same actions; here they live behind the hamburger and the avatar. -->
+    <div class="mobile-appbar" *ngIf="showHeader && isMobile">
+      <!-- Omitted only on a cold start at the app root, where back would leave the app.
+           Reached from anywhere else — including a deep link to /user/playground — the
+           bar carries a way out. -->
+      <app-back-button *ngIf="showBackButton" [defaultHref]="backHref"></app-back-button>
+      <button type="button" class="appbar-btn" aria-label="Open menu" (click)="mobileMenuOpen = true">
+        <ion-icon name="menu-outline"></ion-icon>
+      </button>
+      <div class="appbar-title">
+        <ion-icon name="code-slash-outline"></ion-icon>
+        <h1>Learning Platform</h1>
+      </div>
+      <button
+        type="button"
+        class="appbar-btn appbar-avatar"
+        [attr.aria-label]="(authService.isLoggedIn$ | async) ? 'Your account' : 'Sign in'"
+        [routerLink]="(authService.isLoggedIn$ | async) ? '/user/home' : '/login'"
+      >
+        <ion-icon name="person-outline"></ion-icon>
+      </button>
+    </div>
+
+    <div class="compiler-header" *ngIf="showHeader && !isMobile">
       <div class="brand">
         <ion-icon [name]="modeIcon"></ion-icon>
         <div>
@@ -100,7 +126,12 @@
         </div>
       </div>
 
-      <div class="playground-body web-mode" [style.--editor-w]="editorWidthPercent + '%'">
+      <div
+        class="playground-body web-mode"
+        [style.--editor-w]="editorWidthPercent + '%'"
+        [style.--editor-h]="editorHeightPercent !== null ? editorHeightPercent + '%' : null"
+        [class.v-sized]="editorHeightPercent !== null"
+        >
         <div class="editor-section">
           <app-code-editor
             *ngIf="selectedTab === 'html'"
@@ -125,6 +156,7 @@
             <div class="console-header">
               <ion-icon name="terminal-outline"></ion-icon>
               Console
+              <ng-container *ngIf="isMobile" [ngTemplateOutlet]="statusPillTpl"></ng-container>
             </div>
             <div class="console-output">
               <div *ngFor="let log of consoleOutput" class="console-line" [class.console-error]="isErrorLine(log)" [class.console-frame]="isErrorFrame(log)">
@@ -137,9 +169,14 @@
           </div>
         </div>
 
-        <div class="resize-divider" (pointerdown)="startResize($event)" title="Drag to resize"></div>
+        <div class="resize-divider" (pointerdown)="startResize($event)" title="Drag to resize" role="separator"></div>
 
-        <div class="preview-section">
+        <!-- On a phone the preview only appears once there is something to preview.
+             Before the first Run it is a 22vh placeholder taking height from the one
+             pane that is actually in use; desktop keeps both panes, where the split is
+             the point. Reset/Clear empty `output` and fold it away again. -->
+        <div class="preview-section" *ngIf="!isMobile || output">
+          <ng-container *ngTemplateOutlet="panelHeadTpl; context: { $implicit: 'Preview', icon: 'eye-outline' }"></ng-container>
           <div class="preview-content">
             <div *ngIf="output" class="web-render" [innerHTML]="output"></div>
             <div *ngIf="!output" class="preview-empty">
@@ -189,6 +226,8 @@
         class="playground-body single-editor"
         [class.accordion]="mobileAccordion && showVisualizer"
         [style.--editor-w]="editorWidthPercent + '%'"
+        [style.--editor-h]="editorHeightPercent !== null ? editorHeightPercent + '%' : null"
+        [class.v-sized]="editorHeightPercent !== null"
         >
         <div class="editor-section" [class.acc-closed]="!isSectionOpen('code')">
           <!-- Accordion header for the editable source. Only rendered while the
@@ -208,15 +247,18 @@
           </button>
           <app-code-editor [value]="jsOnlyCode" (valueChange)="jsOnlyCode = $event" language="javascript"></app-code-editor>
         </div>
-        <div class="resize-divider" (pointerdown)="startResize($event)" title="Drag to resize"></div>
+        <div class="resize-divider" (pointerdown)="startResize($event)" title="Drag to resize" role="separator"></div>
         <div class="output-panel" *ngIf="!showVisualizer">
-          <div *ngFor="let log of jsOnlyConsole" class="console-line" [class.console-error]="isErrorLine(log)" [class.console-frame]="isErrorFrame(log)">
-            {{ log }}
+          <ng-container *ngTemplateOutlet="panelHeadTpl; context: { $implicit: 'Output', icon: 'terminal-outline' }"></ng-container>
+          <div class="output-scroll">
+            <div *ngFor="let log of jsOnlyConsole" class="console-line" [class.console-error]="isErrorLine(log)" [class.console-frame]="isErrorFrame(log)">
+              {{ log }}
+            </div>
+            <div *ngIf="jsOnlyConsole.length === 0" class="console-empty">
+              Console output will appear here...
+            </div>
+            <ng-container *ngTemplateOutlet="celebrationTpl"></ng-container>
           </div>
-          <div *ngIf="jsOnlyConsole.length === 0" class="console-empty">
-            Console output will appear here...
-          </div>
-          <ng-container *ngTemplateOutlet="celebrationTpl"></ng-container>
         </div>
         <div class="output-panel visualizer-panel" *ngIf="showVisualizer">
           <app-js-visualizer
@@ -259,24 +301,148 @@
         </div>
       </div>
 
-      <div class="playground-body single-editor" [style.--editor-w]="editorWidthPercent + '%'">
+      <div
+        class="playground-body single-editor"
+        [style.--editor-w]="editorWidthPercent + '%'"
+        [style.--editor-h]="editorHeightPercent !== null ? editorHeightPercent + '%' : null"
+        [class.v-sized]="editorHeightPercent !== null"
+        >
         <div class="editor-section">
           <app-code-editor [value]="tsCode" (valueChange)="tsCode = $event" language="typescript"></app-code-editor>
         </div>
-        <div class="resize-divider" (pointerdown)="startResize($event)" title="Drag to resize"></div>
+        <div class="resize-divider" (pointerdown)="startResize($event)" title="Drag to resize" role="separator"></div>
         <div class="output-panel">
-          <div *ngFor="let log of tsConsole" class="console-line" [class.console-error]="isErrorLine(log)" [class.console-frame]="isErrorFrame(log)">
-            {{ log }}
+          <ng-container *ngTemplateOutlet="panelHeadTpl; context: { $implicit: 'Output', icon: 'terminal-outline' }"></ng-container>
+          <div class="output-scroll">
+            <div *ngFor="let log of tsConsole" class="console-line" [class.console-error]="isErrorLine(log)" [class.console-frame]="isErrorFrame(log)">
+              {{ log }}
+            </div>
+            <div *ngIf="tsConsole.length === 0" class="console-empty">
+              Console output will appear here...
+            </div>
+            <ng-container *ngTemplateOutlet="celebrationTpl"></ng-container>
           </div>
-          <div *ngIf="tsConsole.length === 0" class="console-empty">
-            Console output will appear here...
-          </div>
-          <ng-container *ngTemplateOutlet="celebrationTpl"></ng-container>
         </div>
       </div>
     </ng-container>
   </div>
+
+  <!-- Slide-over menu behind the app bar's hamburger: the rail's language list plus the
+       header actions that no longer fit on a phone. Mobile only. -->
+  <div class="drawer-scrim" *ngIf="showMobileDrawer && mobileMenuOpen" (click)="mobileMenuOpen = false"></div>
+  <aside class="mobile-drawer" *ngIf="showMobileDrawer" [class.open]="mobileMenuOpen" [attr.aria-hidden]="!mobileMenuOpen">
+    <div class="drawer-head">
+      <ion-icon name="code-slash-outline"></ion-icon>
+      <span>Learning Platform</span>
+      <button type="button" class="drawer-close" aria-label="Close menu" (click)="mobileMenuOpen = false">
+        <ion-icon name="close-outline"></ion-icon>
+      </button>
+    </div>
+
+    <p class="drawer-label">Language</p>
+    <button
+      type="button"
+      class="drawer-item"
+      *ngFor="let lang of languages"
+      [class.active]="selectedMode === lang.id"
+      [class.locked]="lang.locked"
+      (click)="selectModeFromDrawer(lang)"
+    >
+      <ion-icon [name]="lang.icon"></ion-icon>
+      <span>{{ lang.label }}</span>
+      <ion-icon *ngIf="lang.locked" name="lock-closed-outline" class="drawer-trail"></ion-icon>
+    </button>
+
+    <p class="drawer-label">Workspace</p>
+    <a class="drawer-item" [routerLink]="sessionsLink" (click)="mobileMenuOpen = false">
+      <ion-icon name="folder-open-outline"></ion-icon><span>My sessions</span>
+    </a>
+    <a class="drawer-item" routerLink="/flowchart" (click)="mobileMenuOpen = false">
+      <ion-icon name="git-network-outline"></ion-icon><span>Flowchart</span>
+    </a>
+    <a class="drawer-item" routerLink="/user/notes" (click)="mobileMenuOpen = false">
+      <ion-icon name="bookmark-outline"></ion-icon><span>Notes</span>
+    </a>
+
+    <p class="drawer-label">Appearance</p>
+    <div class="drawer-theme">
+      <app-theme-selector></app-theme-selector>
+      <span>Theme</span>
+    </div>
+
+    <div class="drawer-foot">
+      <ion-button *ngIf="(authService.isLoggedIn$ | async); else drawerSignIn" expand="block" size="small" (click)="logout(); mobileMenuOpen = false">
+        <ion-icon slot="start" name="log-out-outline"></ion-icon>
+        Logout
+      </ion-button>
+      <ng-template #drawerSignIn>
+        <ion-button expand="block" size="small" routerLink="/login" (click)="mobileMenuOpen = false">
+          <ion-icon slot="start" name="log-in-outline"></ion-icon>
+          Sign In
+        </ion-button>
+      </ng-template>
+    </div>
+  </aside>
+
+  <!-- Bottom action bar. Desktop gets these from .tab-actions and .toolbar-actions, both
+       hidden below `md`; on a phone they live here instead, where a thumb reaches them. -->
+  <nav class="mobile-actionbar" *ngIf="isMobile" aria-label="Playground actions">
+    <button type="button" class="bar-item" [class.active]="activeBarItem === 'run'" (click)="activeBarItem = 'run'; runActiveMode()">
+      <ion-icon name="play-outline"></ion-icon>
+      <span>Run</span>
+    </button>
+    <button type="button" class="bar-item" *ngIf="showSave" [class.active]="activeBarItem === 'save'" (click)="activeBarItem = 'save'; saveClick.emit()">
+      <ion-icon name="save-outline"></ion-icon>
+      <span>Save</span>
+    </button>
+    <ng-container *ngIf="selectedMode === 'web'">
+      <button
+        type="button"
+        class="bar-item"
+        [class.active]="activeBarItem === 'console'"
+        [attr.aria-pressed]="showConsole"
+        (click)="activeBarItem = 'console'; showConsole = !showConsole"
+      >
+        <ion-icon name="terminal-outline"></ion-icon>
+        <span>Console</span>
+      </button>
+      <button type="button" class="bar-item" [class.active]="activeBarItem === 'reset'" (click)="activeBarItem = 'reset'; resetCode()">
+        <ion-icon name="refresh-outline"></ion-icon>
+        <span>Reset</span>
+      </button>
+    </ng-container>
+    <button
+      type="button"
+      class="bar-item"
+      *ngIf="selectedMode === 'javascript'"
+      [class.active]="activeBarItem === 'visualize'"
+      (click)="activeBarItem = 'visualize'; visualizeJavaScript()"
+    >
+      <ion-icon name="git-network-outline"></ion-icon>
+      <span>Visualize</span>
+    </button>
+    <button type="button" class="bar-item" [class.active]="activeBarItem === 'clear'" (click)="activeBarItem = 'clear'; clearActiveMode()">
+      <ion-icon name="trash-outline"></ion-icon>
+      <span>Clear</span>
+    </button>
+  </nav>
 </div>
+
+<!-- Panel header (mobile only): names the pane and reports the last run's outcome —
+     something the desktop layout gets for free from having both panes in view. -->
+<ng-template #panelHeadTpl let-title let-icon="icon">
+  <div class="panel-head" *ngIf="isMobile">
+    <ion-icon [name]="icon"></ion-icon>
+    <span class="panel-head-title">{{ title }}</span>
+    <ng-container *ngTemplateOutlet="statusPillTpl"></ng-container>
+  </div>
+</ng-template>
+
+<ng-template #statusPillTpl>
+  <span class="status-pill" [ngClass]="'status-' + outputStatus">
+    <span class="status-dot"></span>{{ outputStatusLabel }}
+  </span>
+</ng-template>
 
 <!-- 🎉 Shown in-flow below the output after a clean run: divider, success line, animation -->
 <ng-template #celebrationTpl>

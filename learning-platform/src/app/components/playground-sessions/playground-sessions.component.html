@@ -2,6 +2,9 @@
   <!-- Sidebar: saved playground sessions -->
   <aside class="pgs-sidebar">
     <div class="pgs-header">
+      <!-- Standalone route only. Under /user the shell's toolbar already carries a back
+           button, and two arrows in stacked bands read as a mistake. -->
+      <app-back-button *ngIf="isStandaloneRoute" defaultHref="/"></app-back-button>
       <h2>Playground</h2>
       <ion-button size="small" (click)="createSession()">
         <ion-icon slot="start" name="add-outline"></ion-icon>

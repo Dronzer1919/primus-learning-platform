@@ -1,9 +1,17 @@
 <ion-header class="user-header">
   <ion-toolbar color="primary">
     <ion-buttons slot="start">
+      <!-- Phone back control for every route under this shell. It stands in for the
+           "Topics" shortcut below — same intent, but it returns to wherever the user
+           actually came from rather than to one fixed destination. Hidden on
+           /user/home, which is this shell's own root. -->
+      <ion-button class="mobile-back" *ngIf="showBackButton" (click)="goBack()" aria-label="Go back">
+        <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
+      </ion-button>
+
       <!-- On the full-width routes (notes/sessions) the sidebar is not rendered, so the menu
            toggle has nothing to toggle. Swap it for a way back to the topic view. -->
-      <ion-button *ngIf="hideSidebar" (click)="navigateHome()" title="Back to topics">
+      <ion-button *ngIf="hideSidebar" class="hide-on-mobile" (click)="navigateHome()" title="Back to topics">
         <ion-icon slot="start" name="arrow-back-outline"></ion-icon>
         Topics
       </ion-button>

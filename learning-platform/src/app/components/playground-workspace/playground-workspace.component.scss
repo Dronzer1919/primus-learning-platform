@@ -582,19 +582,14 @@
     }
   }
 
-  // Stacked panes make a horizontal drag meaningless — it becomes a plain seam.
+  // Stacked panes: the same divider drags up and down instead.
   @include below('lg') {
     width: 100%;
-    height: 4px;
-    cursor: default;
-    touch-action: auto;
-
-    &:hover, &:active {
-      background: var(--editor-border);
-    }
+    height: 5px;
+    cursor: row-resize;
 
     &::after {
-      inset: 0;
+      inset: -6px 0;
     }
   }
 
@@ -750,7 +745,14 @@
 .preview-content {
   flex: 1;
   position: relative;
-  overflow: auto;
+  // min-height: 0 lets this flex child be shorter than its content, which is what
+  // makes it scroll instead of stretching and being clipped by .preview-section.
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-x pan-y;
 
   // In-page web preview (no iframe). The user's HTML/CSS is injected here; its
   // styles apply globally by design, since there is no iframe to isolate them.
@@ -884,5 +886,592 @@
     20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
     80% { opacity: 1; }
     100% { opacity: 0; }
+  }
+}
+
+// ===========================================================================
+// Phone layout (below `md`)
+// ---------------------------------------------------------------------------
+// The desktop chrome — 56px language rail, two-row header, two toolbar button
+// groups — spends most of a phone screen on controls. Here the rail and header
+// move behind a hamburger drawer, the buttons move into a fixed bottom bar, and
+// the editor/output panes become stacked cards.
+//
+// Every colour below is a theme variable or a color-mix of one, so the mobile
+// chrome follows the theme selector exactly as the desktop chrome does. The one
+// exception is the console surface, which stays a dark terminal in every theme.
+// ===========================================================================
+
+// Height of the fixed action bar; panes reserve this much so nothing ends up
+// permanently under it.
+$actionbar-h: 62px;
+
+.playground-container.mobile {
+  // The soft wash behind the cards, so the rounded panes read as raised. Fades
+  // out by 40% so long output isn't tinted.
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--ion-color-primary), transparent 93%),
+      var(--playground-page-bg) 40%
+    );
+}
+
+// --- App bar ---------------------------------------------------------------
+.mobile-appbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  padding-top: calc(8px + env(safe-area-inset-top));
+  background: color-mix(in srgb, var(--editor-header-bg), transparent 8%);
+  border-bottom: 1px solid color-mix(in srgb, var(--editor-border), transparent 40%);
+  backdrop-filter: blur(8px);
+  flex-shrink: 0;
+}
+
+.appbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  // 44px is the smallest comfortable touch target; the icon inside is smaller.
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--editor-fg);
+  cursor: pointer;
+
+  ion-icon {
+    font-size: 26px;
+  }
+
+  &:active {
+    background: color-mix(in srgb, var(--editor-fg), transparent 88%);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ion-color-primary);
+    outline-offset: -2px;
+  }
+}
+
+.appbar-avatar {
+  background: color-mix(in srgb, var(--ion-color-primary), transparent 86%);
+  color: var(--ion-color-primary);
+
+  ion-icon {
+    font-size: 22px;
+  }
+}
+
+.appbar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+
+  ion-icon {
+    font-size: 26px;
+    color: var(--ion-color-primary);
+    flex-shrink: 0;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: fluid(17px, 20px, 320px, 480px);
+    font-weight: 800;
+    letter-spacing: -0.2px;
+    color: var(--editor-fg);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+// --- Drawer ----------------------------------------------------------------
+.drawer-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 1100;
+  animation: drawer-scrim-in 0.18s ease both;
+}
+
+@keyframes drawer-scrim-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.mobile-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(300px, 84vw);
+  z-index: 1101;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: calc(12px + env(safe-area-inset-top)) 10px calc(12px + env(safe-area-inset-bottom));
+  background: var(--editor-header-bg);
+  border-right: 1px solid var(--editor-border);
+  box-shadow: 6px 0 28px rgba(0, 0, 0, 0.28);
+  overflow-y: auto;
+  // Kept in the DOM (rather than *ngIf'd) so the panel slides rather than blinks.
+  transform: translateX(-102%);
+  visibility: hidden;
+  transition: transform 0.22s ease, visibility 0.22s;
+
+  &.open {
+    transform: translateX(0);
+    visibility: visible;
+  }
+}
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px 12px;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--editor-fg);
+
+  > ion-icon {
+    font-size: 22px;
+    color: var(--ion-color-primary);
+  }
+}
+
+.drawer-close {
+  margin-left: auto;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: color-mix(in srgb, var(--editor-fg), transparent 30%);
+  cursor: pointer;
+
+  ion-icon { font-size: 22px; }
+}
+
+.drawer-label {
+  margin: 12px 8px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--editor-fg), transparent 55%);
+}
+
+.drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 46px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--editor-fg);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+
+  ion-icon {
+    font-size: 20px;
+    color: color-mix(in srgb, var(--editor-fg), transparent 35%);
+    flex-shrink: 0;
+  }
+
+  &:active {
+    background: color-mix(in srgb, var(--editor-fg), transparent 90%);
+  }
+
+  &.active {
+    background: color-mix(in srgb, var(--ion-color-primary), transparent 86%);
+    color: var(--ion-color-primary);
+
+    ion-icon { color: var(--ion-color-primary); }
+  }
+
+  &.locked {
+    color: color-mix(in srgb, var(--editor-fg), transparent 55%);
+  }
+
+  .drawer-trail {
+    margin-left: auto;
+    font-size: 15px;
+  }
+}
+
+.drawer-theme {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--editor-fg);
+}
+
+.drawer-foot {
+  margin-top: auto;
+  padding-top: 16px;
+}
+
+// --- Tabs, panes and cards -------------------------------------------------
+@include below('md') {
+  // Both button groups are reproduced in the bottom action bar; leaving them here
+  // too would cost a second toolbar row for duplicates.
+  .tab-actions,
+  .toolbar-actions {
+    display: none;
+  }
+
+  .toolbar {
+    gap: 0;
+    padding: 10px 10px 0;
+    background: transparent;
+    border-bottom: none;
+  }
+
+  .file-tabs {
+    gap: 6px;
+    width: 100%;
+  }
+
+  .file-tab {
+    gap: 8px;
+    padding: 9px 14px;
+    border-radius: 12px 12px 0 0;
+    font-size: 14px;
+    font-weight: 600;
+    // Reserve the active tab's accent so selecting one doesn't shift the row.
+    border-bottom: 3px solid transparent;
+
+    // Brand chips rather than bare glyphs — at tab size the logos need the
+    // contrast of their own tinted square to stay readable.
+    ion-icon {
+      box-sizing: border-box;
+      width: 26px;
+      height: 26px;
+      padding: 4px;
+      border-radius: 7px;
+      font-size: 18px;
+      background: color-mix(in srgb, var(--editor-fg), transparent 92%);
+    }
+
+    ion-icon[name='logo-html5'] { background: rgba(227, 79, 38, 0.14); }
+    ion-icon[name='logo-css3'] { background: rgba(21, 114, 182, 0.14); }
+    ion-icon[name='logo-javascript'] { background: rgba(232, 184, 0, 0.18); }
+
+    &.active {
+      background: var(--editor-bg);
+      border-color: var(--editor-border);
+      // Overrides the desktop rule that blends this edge into the editor below —
+      // the editor is a detached card here, so the tab needs its own accent.
+      border-bottom-color: var(--ion-color-primary);
+      box-shadow: 0 -1px 6px rgba(0, 0, 0, 0.06);
+    }
+  }
+
+  .playground-body {
+    gap: 10px;
+    padding: 10px 10px calc(#{$actionbar-h} + env(safe-area-inset-bottom));
+    box-sizing: border-box;
+  }
+
+  // Card treatment for both panes.
+  .editor-section,
+  .preview-section,
+  .output-panel {
+    position: relative;
+    border: 1px solid var(--editor-border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  }
+
+  .playground-body.web-mode,
+  .playground-body.single-editor {
+    .editor-section {
+      border-right: none;
+      border-bottom: 1px solid var(--editor-border);
+      // Lower than the `lg` floors: the app bar, tabs and action bar have already
+      // taken ~170px, and at 45vh + 30vh the pair overflows a shorter phone.
+      min-height: 38vh;
+    }
+
+    .preview-section,
+    .output-panel {
+      min-height: 22vh;
+    }
+  }
+
+  // A grab handle between the stacked cards: the card gap stands in for the seam, and
+  // the pill is what a thumb looks for. Negative margins keep the spacing unchanged.
+  .resize-divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    height: 18px;
+    margin: -9px 0;
+    background: transparent;
+
+    &::before {
+      content: '';
+      width: 44px;
+      height: 5px;
+      border-radius: 3px;
+      background: color-mix(in srgb, var(--editor-fg), transparent 70%);
+      transition: background-color 0.15s ease, width 0.15s ease;
+    }
+
+    &::after { inset: -6px 0; }
+
+    // Landscape phones put the panes side by side, where this handle does not fit.
+    @include short-viewport { display: none; }
+
+    &:hover,
+    &:active {
+      background: transparent;
+
+      &::before {
+        width: 60px;
+        background: var(--ion-color-primary);
+      }
+    }
+  }
+
+  // --- Panel header + status pill -----------------------------------------
+  .panel-head,
+  .console-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    flex-shrink: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--editor-fg);
+    background: color-mix(in srgb, var(--ion-color-success), transparent 92%);
+    border-bottom: 1px solid color-mix(in srgb, var(--editor-border), transparent 40%);
+
+    > ion-icon {
+      font-size: 19px;
+      color: var(--ion-color-success);
+    }
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    background: color-mix(in srgb, var(--editor-fg), transparent 92%);
+    color: color-mix(in srgb, var(--editor-fg), transparent 25%);
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+
+    &.status-ready {
+      background: color-mix(in srgb, var(--ion-color-success), transparent 86%);
+      color: color-mix(in srgb, var(--ion-color-success), #000 18%);
+    }
+
+    &.status-error {
+      background: color-mix(in srgb, var(--ion-color-danger), transparent 86%);
+      color: color-mix(in srgb, var(--ion-color-danger), #000 12%);
+    }
+  }
+
+  // --- Console surface -----------------------------------------------------
+  // A terminal reads as a terminal in every theme, so this pane keeps its dark
+  // surface rather than following --playground-surface-bg.
+  .output-panel {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .output-scroll,
+  .console-output {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 12px 14px;
+    background: #111827;
+    color: #e6edf3;
+  }
+
+  .console-line,
+  .output-panel .console-line {
+    color: #e6edf3;
+  }
+
+  .console-line.console-error,
+  .output-panel .console-line.console-error {
+    color: #ff7b72;
+  }
+
+  .console-empty {
+    color: #8b949e;
+  }
+
+  .console-section {
+    border-top: 1px solid var(--editor-border);
+  }
+
+  // The visualizer brings its own header and surface.
+  .visualizer-panel {
+    background: var(--playground-surface-bg);
+  }
+
+  .preview-empty ion-icon {
+    font-size: 54px;
+  }
+}
+
+// --- Dragged vertical split --------------------------------------------------
+// Once the user drags a stacked split, their height replaces the vh-based defaults.
+// Scoped to stacked, non-landscape layouts (landscape goes back to a row split) and
+// written late with extra specificity so it wins over the phone card rules above.
+@media (max-width: 992px) and (min-height: 520.02px) {
+  .playground-container .playground-body.v-sized:not(.accordion) {
+    .editor-section {
+      flex: 0 0 var(--editor-h);
+      min-height: 80px;
+    }
+
+    .preview-section,
+    .output-panel {
+      flex: 1 1 0;
+      min-height: 80px;
+    }
+  }
+}
+
+// --- Bottom action bar -----------------------------------------------------
+// Tab-bar layout: evenly spaced items, icon over name, all in one uniform style. The
+// tinted pill marks the last-tapped item (Run by default).
+.mobile-actionbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 900;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  gap: 4px;
+  padding: 6px 8px;
+  padding-bottom: calc(6px + env(safe-area-inset-bottom));
+  background: var(--editor-header-bg);
+  border-top: 1px solid var(--editor-border);
+  box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.12);
+
+  .bar-item {
+    --item-color: color-mix(in srgb, var(--editor-fg), transparent 40%);
+    --item-bg: transparent;
+
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 88px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 7px 4px 6px;
+    border: none;
+    border-radius: 16px;
+    background: var(--item-bg);
+    color: var(--item-color);
+    font: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.1;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+
+    // Explicit rather than inherited, so the glyph always matches its label.
+    ion-icon {
+      font-size: 22px;
+      color: var(--item-color);
+      flex-shrink: 0;
+    }
+
+    span {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    &:active { transform: scale(0.94); }
+
+    &:focus-visible {
+      outline: 2px solid var(--ion-color-primary);
+      outline-offset: -2px;
+    }
+  }
+
+  // One look for every item; the highlight follows whichever one was tapped last.
+  .bar-item.active {
+    --item-color: var(--ion-color-primary, #7c6cf2);
+    --item-bg: color-mix(in srgb, var(--ion-color-primary, #7c6cf2), transparent 84%);
+  }
+}
+
+// Phone-only. The template already drops it via `isMobile`; this is the backstop so the
+// bar can never show on a desktop/web layout, where .toolbar-actions has these actions.
+@include above('md') {
+  .mobile-actionbar { display: none !important; }
+}
+
+// The bar is chrome, not content — a landscape phone needs its height for the editor,
+// so the names go and only the icons stay.
+@include short-viewport {
+  .mobile-actionbar .bar-item {
+    padding: 6px 4px;
+
+    span { display: none; }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-drawer {
+    transition: none;
+  }
+
+  .drawer-scrim {
+    animation: none;
   }
 }

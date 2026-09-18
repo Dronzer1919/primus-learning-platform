@@ -11,6 +11,7 @@ import { FlowchartSessionService } from '../../services/flowchart-session.servic
 import { LocalFlowchartSessionService, LocalFlowchartSessionPayload } from '../../services/local-flowchart-session.service';
 import { GuestSavePromptService } from '../../core/guest-save-prompt.service';
 import { AuthService } from '../../services/auth.service';
+import { NavHistoryService } from '../../services/nav-history.service';
 import { FlowchartSession, FlowchartSessionPayload } from '../../models/flowchart-session.model';
 import { LocalFlowchartSession } from '../../models/local-session.model';
 import {
@@ -475,17 +476,18 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     private router: Router,
     private alertController: AlertController,
     private toastController: ToastController,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private navHistory: NavHistoryService
   ) {}
 
   // Return to the page the user came from (e.g. /user/home), not a hardcoded route.
   // Falls back to the home page if the flowchart was opened directly (no history).
+  //
+  // The check belongs in NavHistoryService, not here: window.history.length counts
+  // entries from before the app loaded, so it reports "can go back" for a visitor who
+  // arrived on a shared /flowchart link and sends them off the site.
   goBack(): void {
-    if (window.history.length > 1) {
-      this.location.back();
-    } else {
-      this.router.navigate(['/']);
-    }
+    this.navHistory.back('/');
   }
 
   ngOnInit(): void {

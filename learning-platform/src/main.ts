@@ -40,7 +40,10 @@ import {
   // and the mobile "Topics" shortcut. All of these were rendering blank: an unregistered
   // name makes <ion-icon> fall back to fetching /svg/<name>.svg, which this build does not
   // serve, so the request 404s and nothing paints.
-  chevronDownOutline, eyeOutline, eyeOffOutline, pinOutline, logoYoutube, libraryOutline
+  chevronDownOutline, eyeOutline, eyeOffOutline, pinOutline, logoYoutube, libraryOutline,
+  // The playground's mobile action bar. Its buttons are icon-only, so an unregistered
+  // name here is not a missing glyph next to a label — it is an invisible button.
+  ellipsisHorizontal, play
 } from 'ionicons/icons';
 import { authInterceptor } from './app/interceptors/auth.interceptor';
 import { dedupeInterceptor } from './app/interceptors/dedupe.interceptor';
@@ -84,7 +87,8 @@ addIcons({
   timeOutline, bookmarkOutline, folderOpenOutline,
   playBackOutline, playForwardOutline, playSkipForwardOutline, pauseOutline, serverOutline,
   warningOutline,
-  chevronDownOutline, eyeOutline, eyeOffOutline, pinOutline, logoYoutube, libraryOutline
+  chevronDownOutline, eyeOutline, eyeOffOutline, pinOutline, logoYoutube, libraryOutline,
+  ellipsisHorizontal, play
 });
 
 // Production hardening, installed before Angular starts so nothing slips through

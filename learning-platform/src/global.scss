@@ -418,6 +418,26 @@ table {
   }
 }
 
+/* Back controls inside `ion-toolbar` headers (user shell, admin shell, landing).
+   Phones have no visible browser chrome to go back with and no room for the full
+   navigation these pages show on desktop, so each gets an explicit back button
+   below `md` — and drops the wider shortcut it replaces.
+
+   Custom, non-Ionic headers use <app-back-button>, which gates itself the same way. */
+.mobile-back {
+  display: none;
+}
+
+@include below('md') {
+  .mobile-back {
+    display: block;
+  }
+
+  .hide-on-mobile {
+    display: none !important;
+  }
+}
+
 /* Ionic overlays are viewport-anchored, so they need their own caps rather than
    inheriting a page container's max-width. */
 ion-popover {

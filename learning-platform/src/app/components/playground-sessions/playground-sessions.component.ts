@@ -2,7 +2,7 @@ import { Component, OnInit, AfterViewChecked, ViewChild, ChangeDetectorRef, Dest
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { IonicModule, ToastController, AlertController } from '@ionic/angular';
 import { Observable } from 'rxjs';
 import { PlaygroundSessionService } from '../../services/playground-session.service';
@@ -11,6 +11,7 @@ import { AuthService } from '../../services/auth.service';
 import { PlaygroundSession } from '../../models/playground-session.model';
 import { LocalPlaygroundSession } from '../../models/local-session.model';
 import { PlaygroundWorkspaceComponent } from '../playground-workspace/playground-workspace.component';
+import { BackButtonComponent } from '../back-button/back-button.component';
 
 type AnyPlaygroundSession = PlaygroundSession | LocalPlaygroundSession;
 
@@ -27,7 +28,7 @@ interface PlaygroundSessionSource {
   templateUrl: './playground-sessions.component.html',
   styleUrls: ['./playground-sessions.component.scss'],
   standalone: true,
-  imports: [IonicModule, CommonModule, FormsModule, RouterModule, PlaygroundWorkspaceComponent]
+  imports: [IonicModule, CommonModule, FormsModule, RouterModule, PlaygroundWorkspaceComponent, BackButtonComponent]
 })
 export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
   @ViewChild(PlaygroundWorkspaceComponent) workspace!: PlaygroundWorkspaceComponent;
@@ -54,10 +55,19 @@ export class PlaygroundSessionsComponent implements OnInit, AfterViewChecked {
     private localPgSessionService: LocalPlaygroundSessionService,
     private authService: AuthService,
     private route: ActivatedRoute,
+    private router: Router,
     private cdr: ChangeDetectorRef,
     private toastController: ToastController,
     private alertController: AlertController
   ) {}
+
+  /**
+   * True on the public /playground-sessions route. Under /user the same component
+   * renders inside UserPage, whose toolbar already carries a back button.
+   */
+  get isStandaloneRoute(): boolean {
+    return !this.router.url.startsWith('/user/');
+  }
 
   ngOnInit(): void {
     this.isGuest = !this.authService.isAuthenticated();

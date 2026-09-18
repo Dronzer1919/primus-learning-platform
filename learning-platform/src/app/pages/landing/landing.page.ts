@@ -5,6 +5,7 @@ import { IonicModule } from '@ionic/angular';
 import { ThemeSelectorComponent } from '../../components/theme-selector/theme-selector.component';
 import { PlaygroundWorkspaceComponent } from '../../components/playground-workspace/playground-workspace.component';
 import { AuthService } from '../../services/auth.service';
+import { NavHistoryService } from '../../services/nav-history.service';
 
 @Component({
   selector: 'app-landing',
@@ -16,5 +17,9 @@ import { AuthService } from '../../services/auth.service';
 export class LandingPage {
   // Public: the header binds to authService.isLoggedIn$ to pick between the
   // signed-in and signed-out actions.
-  constructor(public authService: AuthService) {}
+  constructor(public authService: AuthService, private navHistory: NavHistoryService) {}
+
+  goBack(): void {
+    this.navHistory.back('/');
+  }
 }

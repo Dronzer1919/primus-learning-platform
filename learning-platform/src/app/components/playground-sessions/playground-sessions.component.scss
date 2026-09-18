@@ -26,10 +26,13 @@
   .pgs-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: 4px;
     padding: 16px;
 
-    h2 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+    // Pushes "New" to the far edge, leaving the back button and title grouped at the
+    // start. space-between would have spread all three apart once the back button
+    // joined the row on mobile.
+    h2 { margin: 0 auto 0 0; font-size: 1.1rem; font-weight: 700; }
   }
 
   .pgs-guest-banner {

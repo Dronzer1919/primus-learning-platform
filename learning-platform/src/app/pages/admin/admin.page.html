@@ -1,6 +1,12 @@
 <ion-header class="admin-header">
   <ion-toolbar color="primary">
     <ion-buttons slot="start">
+      <!-- The sidebar is this shell's only navigation, and on a phone it is an overlay
+           the user has to open first. A back control gets them out of a child manager
+           (topics, issues, language tabs) without that detour. -->
+      <ion-button class="mobile-back" *ngIf="showBackButton" (click)="goBack()" aria-label="Go back">
+        <ion-icon slot="icon-only" name="arrow-back-outline"></ion-icon>
+      </ion-button>
       <ion-button (click)="toggleSidebar()">
         <ion-icon slot="icon-only" name="menu-outline"></ion-icon>
       </ion-button>
