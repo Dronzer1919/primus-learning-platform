@@ -124,6 +124,174 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     this.showProps = !this.showProps;
   }
 
+  // --- Mobile layout (below `lg`) -----------------------------------------
+  // Phones get an app-style shell instead of the desktop workbench: a canvas,
+  // one bottom sheet at a time (shapes, style or more) and a bottom tab bar.
+  // The style sheet *is* the properties panel, so its visibility stays
+  // `showProps`; the other two sheets only exist in the mobile markup.
+  mobileSheet: 'shapes' | 'more' | null = 'shapes';
+  /** Index into `paletteGroups` for the shapes sheet's tabs. */
+  shapeTab = 0;
+  /** Source shape while the "link" action waits for a target tap. */
+  linkFromId: string | null = null;
+
+  // Touch stand-ins for the desktop modifier keys, toggled from the "More"
+  // sheet: Shift on a resize corner, Alt while resizing, Shift while rotating.
+  lockAspect = false;
+  resizeFromCenter = false;
+  snapRotation = false;
+
+  /** Where the selected connection's action bar sits (its bend point). */
+  get selectedEdgeAnchor(): { x: number; y: number } | null {
+    if (!this.selectedEdgeId) {
+      return null;
+    }
+    return this.edgeGeometries.find((g) => g.edge.id === this.selectedEdgeId)?.bendPt ?? null;
+  }
+
+  get activeMobileSheet(): 'shapes' | 'style' | 'more' | null {
+    return this.showProps ? 'style' : this.mobileSheet;
+  }
+
+  toggleMobileSheet(sheet: 'shapes' | 'style' | 'more'): void {
+    const opening = this.activeMobileSheet !== sheet;
+    this.showProps = opening && sheet === 'style';
+    this.mobileSheet = opening && sheet !== 'style' ? sheet : null;
+  }
+
+  /** Tap-to-connect: the touch equivalent of dragging from a side handle. */
+  startLink(): void {
+    if (this.linkFromId) {
+      this.linkFromId = null;
+      return;
+    }
+    if (!this.selectedNodeId) {
+      this.showToast('Select a shape first, then tap Connect', 'medium');
+      return;
+    }
+    this.linkFromId = this.selectedNodeId;
+  }
+
+  /** Text tab: edit the selected shape's label, or drop a new text box. */
+  onTextTool(): void {
+    if (!this.selectedNodeId) {
+      this.onPaletteTap('text');
+    }
+    if (this.selectedNodeId) {
+      this.beginEdit(this.selectedNodeId);
+    }
+  }
+
+  editSelected(): void {
+    if (this.selectedNodeId) {
+      this.beginEdit(this.selectedNodeId);
+    }
+  }
+
+  /** Copies the selected shape in place, leaving the clipboard alone. */
+  duplicateSelected(): void {
+    const node = this.selectedNode;
+    if (!node) {
+      return;
+    }
+    const copy: FlowNode = { ...node, id: this.newId(), x: node.x + 20, y: node.y + 20 };
+    this.diagram.nodes.push(copy);
+    this.select(copy.id, null);
+    this.persist();
+  }
+
+  /** Header "Save": the same save-session flow as the desktop toolbar. */
+  onHeaderSave(): void {
+    if (this.canUseSessions) {
+      this.openSaveDialog();
+    } else {
+      this.openGuestSaveDialog();
+    }
+  }
+
+  // --- Autosave status ------------------------------------------------------
+  // Every change is mirrored to localStorage in persist(); the mobile header
+  // says so, with how long ago. `now` ticks so "2m ago" keeps counting.
+  private lastSavedAt: number | null = null;
+  private now = Date.now();
+  private clockTimer: ReturnType<typeof setInterval> | null = null;
+
+  get autosaveLabel(): string {
+    if (!this.lastSavedAt) {
+      return 'Autosaved';
+    }
+    const mins = Math.floor((this.now - this.lastSavedAt) / 60000);
+    if (mins < 1) {
+      return 'Autosaved · just now';
+    }
+    return mins < 60 ? `Autosaved · ${mins}m ago` : `Autosaved · ${Math.floor(mins / 60)}h ago`;
+  }
+
+  // --- Undo / redo ----------------------------------------------------------
+  // Whole-diagram snapshots taken in persist(), which every mutation already
+  // funnels through once per gesture (drags persist on release, not per move).
+  private history: string[] = [];
+  private historyIndex = -1;
+  private static readonly HISTORY_LIMIT = 100;
+
+  get canUndo(): boolean {
+    return this.historyIndex > 0;
+  }
+
+  get canRedo(): boolean {
+    return this.historyIndex < this.history.length - 1;
+  }
+
+  undo(): void {
+    if (this.canUndo) {
+      this.historyIndex--;
+      this.restoreHistory();
+    }
+  }
+
+  redo(): void {
+    if (this.canRedo) {
+      this.historyIndex++;
+      this.restoreHistory();
+    }
+  }
+
+  private recordHistory(): void {
+    const snapshot = JSON.stringify(this.diagram);
+    if (snapshot === this.history[this.historyIndex]) {
+      return;
+    }
+    this.history = this.history.slice(0, this.historyIndex + 1);
+    this.history.push(snapshot);
+    if (this.history.length > FlowchartComponent.HISTORY_LIMIT) {
+      this.history.shift();
+    }
+    this.historyIndex = this.history.length - 1;
+  }
+
+  /** Starts a fresh history — a different diagram must not undo into the old one. */
+  private resetHistory(): void {
+    this.history = [JSON.stringify(this.diagram)];
+    this.historyIndex = 0;
+  }
+
+  private restoreHistory(): void {
+    this.diagram = JSON.parse(this.history[this.historyIndex]);
+    this.editingNodeId = null;
+    this.connectFromId = null;
+    this.linkFromId = null;
+    if (this.selectedNodeId && !this.diagram.nodes.some((n) => n.id === this.selectedNodeId)) {
+      this.selectedNodeId = null;
+    }
+    if (this.selectedEdgeId && !this.diagram.edges.some((e) => e.id === this.selectedEdgeId)) {
+      this.selectedEdgeId = null;
+    }
+    // Not persist(): that would record the restored state as a new step.
+    this.store.save(this.diagram);
+    this.dirty = true;
+    this.lastSavedAt = this.now = Date.now();
+  }
+
   // --- Canvas zoom --------------------------------------------------------
   // The canvas draws at a fixed logical scale (a 160px shape is 160 model px at
   // every zoom level) and `.canvas-content` is CSS-scaled on top of that, so
@@ -528,9 +696,15 @@ export class FlowchartComponent implements OnInit, OnDestroy {
         render: this.shapeFor(shape.type, this.previewW, this.previewH)
       }))
     }));
+
+    this.resetHistory();
+    this.clockTimer = setInterval(() => (this.now = Date.now()), 30000);
   }
 
   ngOnDestroy(): void {
+    if (this.clockTimer) {
+      clearInterval(this.clockTimer);
+    }
     document.removeEventListener('pointermove', this.onMoveRef);
     document.removeEventListener('pointerup', this.onMoveEndRef);
     document.removeEventListener('pointercancel', this.onMoveEndRef);
@@ -753,7 +927,8 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     // splitting it after clamping — keeps the corner-drag / proportion-lock
     // maths below unchanged; only the final re-centring step (further down)
     // needs to know about Alt at all.
-    const symMul = event.altKey ? 2 : 1;
+    const fromCenter = event.altKey || this.resizeFromCenter;
+    const symMul = fromCenter ? 2 : 1;
     let { w, h } = start;
     let x = start.nodeX;
     let y = start.nodeY;
@@ -773,7 +948,7 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     }
 
     // Shift on a corner keeps the original proportions, as in most editors.
-    if (event.shiftKey && dir.length === 2 && start.w > 0 && start.h > 0) {
+    if ((event.shiftKey || this.lockAspect) && dir.length === 2 && start.w > 0 && start.h > 0) {
       const ratio = start.w / start.h;
       if (w / h > ratio) {
         w = Math.max(min, h * ratio);
@@ -791,7 +966,7 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     // Re-centre on whichever axis this handle actually touches, using the
     // final (possibly proportion-locked) width/height — works the same for a
     // single-edge handle or a corner, and composes with Shift above.
-    if (event.altKey) {
+    if (fromCenter) {
       if (dir.includes('e') || dir.includes('w')) {
         x = start.nodeX + start.w / 2 - w / 2;
       }
@@ -874,7 +1049,7 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     const point = this.canvasPoint(event);
     const currentAngle = this.angleDeg(point, { x: start.centerX, y: start.centerY });
     let deg = start.nodeAngle + (currentAngle - start.pointerAngle);
-    if (event.shiftKey) {
+    if (event.shiftKey || this.snapRotation) {
       deg = Math.round(deg / this.minRotateStep) * this.minRotateStep;
     }
     node.rotation = this.normalizeDeg(deg);
@@ -962,6 +1137,18 @@ export class FlowchartComponent implements OnInit, OnDestroy {
       // This click concludes a drag — don't treat it as a select toggle.
       return;
     }
+    if (this.linkFromId) {
+      // Second tap of the "link" action: this shape is the target. Tapping the
+      // source again just cancels.
+      const from = this.linkFromId;
+      this.linkFromId = null;
+      if (from !== node.id) {
+        this.diagram.edges.push({ id: this.newId(), from, to: node.id });
+        this.persist();
+      }
+      this.select(node.id, null);
+      return;
+    }
     const now = Date.now();
     const isDoubleTap =
       this.lastTapNodeId === node.id && now - this.lastTapAt < FlowchartComponent.DOUBLE_TAP_MS;
@@ -981,6 +1168,7 @@ export class FlowchartComponent implements OnInit, OnDestroy {
   }
 
   onCanvasClick(): void {
+    this.linkFromId = null;
     this.select(null, null);
   }
 
@@ -1404,6 +1592,8 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     const raisingSheet = this.isNarrowScreen && !this.showProps;
     if (raisingSheet) {
       this.showProps = true;
+      // Only one bottom sheet at a time on a phone.
+      this.mobileSheet = null;
     }
     this.cdr.detectChanges();
     const input = this.canvasRef.nativeElement.querySelector(
@@ -1559,6 +1749,7 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     } else {
       return;
     }
+    this.linkFromId = null;
     this.select(null, null);
     this.persist();
   }
@@ -1655,6 +1846,7 @@ export class FlowchartComponent implements OnInit, OnDestroy {
           handler: () => {
             this.diagram = { nodes: [], edges: [] };
             this.connectFromId = null;
+            this.linkFromId = null;
             this.select(null, null);
             this.persist();
             this.showToast('Flowchart cleared', 'success');
@@ -1894,6 +2086,7 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     this.connectTargetId = null;
 
     this.persist();
+    this.resetHistory();
     this.adoptSession(session);
     this.sessionsOpen = false;
     // A diagram laid out on a desktop is usually wider than a phone screen, so
@@ -1936,6 +2129,7 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     this.activeTitle = '';
     this.store.saveMeta(null);
     this.persist();
+    this.resetHistory();
     this.dirty = false;
     this.sessionsOpen = false;
   }
@@ -2469,6 +2663,8 @@ export class FlowchartComponent implements OnInit, OnDestroy {
     // Every mutation funnels through here, so this is the single place the
     // "changed since the last save" flag needs to be set.
     this.dirty = true;
+    this.lastSavedAt = this.now = Date.now();
+    this.recordHistory();
   }
 
   /** Brief confirmation of an action that leaves no visible trace of itself. */

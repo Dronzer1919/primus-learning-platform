@@ -43,7 +43,11 @@ import {
   chevronDownOutline, eyeOutline, eyeOffOutline, pinOutline, logoYoutube, libraryOutline,
   // The playground's mobile action bar. Its buttons are icon-only, so an unregistered
   // name here is not a missing glyph next to a label — it is an invisible button.
-  ellipsisHorizontal, play
+  ellipsisHorizontal, play,
+  // Flowchart mobile shell: undo/redo + "more" in the header, the floating
+  // link action and the bottom tab bar's Connect / Text tabs.
+  arrowUndoOutline, arrowRedoOutline, ellipsisVertical, linkOutline, gitCommitOutline, textOutline,
+  cutOutline, duplicateOutline
 } from 'ionicons/icons';
 import { authInterceptor } from './app/interceptors/auth.interceptor';
 import { dedupeInterceptor } from './app/interceptors/dedupe.interceptor';
@@ -88,7 +92,9 @@ addIcons({
   playBackOutline, playForwardOutline, playSkipForwardOutline, pauseOutline, serverOutline,
   warningOutline,
   chevronDownOutline, eyeOutline, eyeOffOutline, pinOutline, logoYoutube, libraryOutline,
-  ellipsisHorizontal, play
+  ellipsisHorizontal, play,
+  arrowUndoOutline, arrowRedoOutline, ellipsisVertical, linkOutline, gitCommitOutline, textOutline,
+  cutOutline, duplicateOutline
 });
 
 // Production hardening, installed before Angular starts so nothing slips through

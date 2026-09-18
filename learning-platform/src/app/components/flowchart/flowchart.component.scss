@@ -89,20 +89,140 @@ $z: var(--z, 1);
     flex-shrink: 0;
   }
 
-  @include below('sm') {
-    padding: 8px 10px;
+  // Mobile app bar: brand + autosave status on the left, undo / redo / save /
+  // more on the right (see `.m-header-actions`).
+  @include below('lg') {
+    padding: 10px 12px;
+    gap: 6px;
+
+    .brand {
+      gap: 10px;
+
+      > ion-icon { font-size: 26px; }
+      > div { min-width: 0; }
+
+      h1 {
+        font-size: 17px;
+        line-height: 1.25;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      // The open session's name is not decoration — it is the only thing telling
+      // the user which diagram "Save" will overwrite.
+      p.active-session { font-size: 11px; }
+
+      p.autosave-status {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+    }
+  }
+
+  @include below('xs') {
+    padding: 8px 8px 8px 10px;
 
     .brand {
       gap: 8px;
 
       > ion-icon { font-size: 22px; }
       h1 { font-size: 15px; }
-      // The tagline duplicates the palette hint; drop it before anything functional.
-      p { display: none; }
-      // The open session's name is not decoration — it is the only thing telling
-      // the user which diagram "Save session" will overwrite.
-      p.active-session { display: flex; }
     }
+  }
+}
+
+.autosave-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ion-color-success);
+  flex-shrink: 0;
+}
+
+// Desktop keeps the workbench markup; the phone shell is separate markup, so
+// each side hides the other's pieces rather than restyling them.
+.mobile-only {
+  @include above('lg') {
+    display: none !important;
+  }
+}
+
+.desktop-only {
+  @include below('lg') {
+    display: none !important;
+  }
+}
+
+.m-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.m-icon-btn {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--editor-fg);
+  cursor: pointer;
+
+  ion-icon { font-size: 22px; }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  &.active,
+  &:active:not(:disabled) {
+    background: color-mix(in srgb, var(--ion-color-primary), transparent 88%);
+    color: var(--ion-color-primary);
+  }
+
+  @include below('xs') {
+    width: 34px;
+  }
+}
+
+.m-save-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 14px;
+  margin: 0 2px 0 6px;
+  border: none;
+  border-radius: 10px;
+  background: var(--ion-color-primary);
+  color: var(--ion-color-primary-contrast);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--ion-color-primary), transparent 70%);
+
+  ion-icon { font-size: 18px; }
+
+  &:disabled {
+    opacity: 0.5;
+    box-shadow: none;
+    cursor: default;
+  }
+
+  @include below('xs') {
+    padding: 0 10px;
+    margin-left: 4px;
   }
 }
 
@@ -198,20 +318,9 @@ $bar-height: 49px;
   display: flex;
   flex-direction: column;
 
-  // Stacked: a horizontal strip above the canvas, so the head row would only
-  // steal height — the toolbar toggle still hides/shows the whole strip. `flex:
-  // none` matters here: `.flow-body` switches to `flex-direction: column` at this
-  // breakpoint, and the desktop `flex-basis` above would otherwise size this
-  // panel's *height* instead of leaving it to content.
+  // Phones pick shapes from the `.m-sheet` bottom sheet instead.
   @include below('lg') {
-    flex: none;
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--editor-border);
-
-    .panel-head {
-      display: none;
-    }
+    display: none;
   }
 }
 
@@ -299,57 +408,51 @@ $bar-height: 49px;
   }
 }
 
-// The properties panel's bottom-sheet handle in the stacked (mobile) layout —
-// see startPropsHeightResize() in the component. Sits right above the panel
-// in the stacked column, so a vertical drag there reads naturally as "resize
-// this sheet's height". The mirror image of `.panel-resize-divider` above:
-// hidden on desktop, where the properties panel is a side column instead.
+// The Style sheet's grab handle on mobile — see startPropsHeightResize() in the
+// component. It is the rounded top of the sheet (the panel below it continues
+// the same surface), so dragging the pill up/down resizes the sheet's height.
+// Hidden on desktop, where the properties panel is a side column instead.
 .panel-vresize-divider {
   display: none;
-  height: 6px;
+  height: 24px;
   width: 100%;
   flex-shrink: 0;
-  background: var(--editor-border);
+  background: var(--editor-header-bg);
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.1);
   cursor: row-resize;
-  transition: background 0.15s;
   position: relative;
-  z-index: 1;
+  z-index: 2;
   touch-action: none;
 
-  &:hover, &:active {
+  // The grab pill.
+  &::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    width: 40px;
+    height: 5px;
+    margin-left: -20px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--editor-fg), transparent 75%);
+    transition: background 0.15s;
+  }
+
+  &:hover::before,
+  &:active::before {
     background: var(--ion-color-primary);
   }
 
+  // A taller hit area than the visible strip, reaching up over the canvas edge.
   &::after {
     content: '';
     position: absolute;
-    inset: -4px 0; // wider hit area than the visible seam
-  }
-
-  @include touch {
-    &::after {
-      inset: -10px 0;
-    }
+    inset: -10px 0 0;
   }
 
   @include below('lg') {
     display: block;
-  }
-
-  // Wide short pill with the two dot-pairs stacked left/right of the icon —
-  // the 90°-rotated counterpart of `.panel-resize-divider`'s chip above.
-  .resize-chip {
-    flex-direction: row;
-    gap: 5px;
-    width: 46px;
-    height: 18px;
-    padding: 0 6px;
-
-    .chip-dots {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
   }
 }
 
@@ -452,65 +555,6 @@ $bar-height: 49px;
       font-size: 13px;
     }
   }
-
-  // Horizontal shape strip above the canvas. Group headings stay inline as narrow
-  // labels so the "Flow / Data / …" grouping survives the reflow.
-  @include below('lg') {
-    width: 100%;
-    flex: none;
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    flex-shrink: 0;
-    -webkit-overflow-scrolling: touch;
-
-    .palette-title {
-      margin: 0;
-      white-space: nowrap;
-      flex-shrink: 0;
-      font-size: 10px;
-
-      &:not(:first-child) {
-        margin-top: 0;
-        margin-left: 8px;
-        padding-left: 10px;
-        border-left: 1px solid var(--editor-border);
-      }
-    }
-
-    .palette-grid {
-      display: flex;
-      gap: 6px;
-      flex-shrink: 0;
-    }
-
-    .palette-item {
-      width: 58px;
-      flex-shrink: 0;
-      // The strip is the primary way to add a shape on a phone (drag & drop
-      // never fires on touch), so each tile has to be a comfortable tap target.
-      padding: 6px 2px 5px;
-    }
-
-    .palette-preview {
-      height: 26px;
-    }
-
-    // 9px is legible in a desktop side panel at reading distance; in a scrolling
-    // strip on a phone it is not.
-    .palette-label {
-      font-size: 10px;
-    }
-
-    // Multi-sentence instructions do not belong in a scrolling strip; the same
-    // guidance is in each item's title/tooltip.
-    .palette-hint {
-      display: none;
-    }
-  }
 }
 
 // --- Canvas area --------------------------------------------------------
@@ -561,67 +605,10 @@ $bar-height: 49px;
     min-width: 0;
   }
 
-  // The head-row height only exists to line the toolbar up with the two panel
-  // heads beside it; once the panels stack, those heads are gone and the height
-  // is just chrome taken from the canvas.
+  // Phones get the header actions, floating canvas controls and the bottom
+  // tab bar / "More" sheet instead of this row.
   @include below('lg') {
-    min-height: 44px;
-    gap: 6px;
-
-    // On a wide toolbar the spacer right-aligns the two view toggles over the
-    // panel they control. Once the buttons wrap, it does the opposite: a
-    // flex:1 spacer fills the rest of the first row and forces those toggles
-    // onto a second one, costing a whole row of canvas height to show two
-    // icon buttons. They read fine inline at this width.
-    .toolbar-spacer {
-      display: none;
-    }
-  }
-
-  @include below('sm') {
-    padding: 6px 8px;
-    gap: 5px;
-
-    .toolbar-note {
-      // Full-width so the hint reads as its own line rather than squeezing the buttons.
-      flex-basis: 100%;
-      font-size: 11px;
-    }
-
-    // Icon-only once space is tight; the title attribute still names them.
-    .panel-btn span {
-      display: none;
-    }
-
-    // The ion-button actions (Delete/Copy/Paste/Clear/Save session) go icon-only
-    // the same way — visually hidden rather than `display:none` so a screen
-    // reader still gets the name, matching the .btn-label treatment already
-    // used for this in the playground toolbar.
-    ion-button .btn-label {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip-path: inset(50%);
-      white-space: nowrap;
-    }
-
-    // Tight enough that the whole action row — shapes, delete, copy, paste,
-    // clear, save, background, properties — fits on one line at 360px instead
-    // of wrapping onto a second one that costs the canvas ~50px of height.
-    ion-button {
-      --padding-start: 5px;
-      --padding-end: 5px;
-    }
-
-    .panel-btn {
-      gap: 4px;
-      padding: 0 7px;
-    }
-
-    ion-button ion-icon[slot='start'] {
-      margin-inline-end: 0;
-    }
+    display: none;
   }
 }
 
@@ -665,16 +652,6 @@ $bar-height: 49px;
   &:disabled {
     opacity: 0.45;
     cursor: not-allowed;
-  }
-}
-
-// Only exists in the stacked layout, where the side panels become bands and
-// lose their own head rows (see the "Shapes" toggle in the toolbar).
-.stacked-only {
-  display: none;
-
-  @include below('lg') {
-    display: inline-flex;
   }
 }
 
@@ -1016,6 +993,160 @@ $bar-height: 49px;
       font-size: 13px;
     }
   }
+
+  // Phone: a vertical pill on the right edge — zoom in, level, zoom out, fit.
+  // `order` rather than reordering the markup, which desktop shares.
+  @include below('lg') {
+    flex-direction: column;
+    right: 12px;
+    bottom: 16px;
+    gap: 2px;
+    padding: 6px 4px;
+    border-radius: 24px;
+    background: var(--editor-header-bg);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+
+    > :nth-child(3) { order: -1; } // zoom in
+    > :nth-child(1) { order: 1; }  // zoom out
+    > :nth-child(4) { order: 2; }  // fit
+
+    .zoom-btn,
+    .zoom-level {
+      height: 40px;
+    }
+
+    .zoom-btn {
+      width: 40px;
+
+      ion-icon { font-size: 22px; }
+    }
+
+    .zoom-level {
+      min-width: 0;
+      width: 44px;
+      padding: 0;
+      font-size: 12px;
+    }
+  }
+}
+
+// --- Mobile canvas overlays ------------------------------------------------
+// Floating "Style" button in the canvas's top-right corner.
+.m-style-fab {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 6;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0;
+  border: 1px solid var(--editor-border);
+  border-radius: 22px;
+  background: var(--editor-header-bg);
+  color: var(--editor-fg);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+  cursor: pointer;
+
+  ion-icon {
+    font-size: 24px;
+    color: var(--ion-color-primary);
+  }
+
+  &.active {
+    border-color: var(--ion-color-primary);
+    color: var(--ion-color-primary);
+  }
+}
+
+// "Tap another shape to connect" — top-left, clear of the Style button.
+.m-hint {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  max-width: calc(100% - 100px);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 999px;
+  background: var(--ion-color-primary);
+  color: var(--ion-color-primary-contrast);
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+
+  button {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.22);
+    color: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+}
+
+// Edit / duplicate / delete / link over the selected shape, above its rotate
+// handle. It lives inside the zoomed layer so it tracks the shape, and is
+// counter-scaled by 1/zoom (like the handles) so it stays finger-sized: the
+// transform pins its bottom-centre (or top-centre, `.below`) to the anchor
+// point, then the margin opens a fixed on-screen gap from the shape.
+.node-actions {
+  position: absolute;
+  z-index: 7;
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--editor-border);
+  border-radius: 12px;
+  background: var(--editor-header-bg);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+  transform-origin: 50% 100%;
+  transform: translate(-50%, -100%) scale(calc(1 / #{$z}));
+  margin-top: calc(-80px / #{$z});
+
+  &.below {
+    transform-origin: 50% 0;
+    transform: translate(-50%, 0) scale(calc(1 / #{$z}));
+    margin-top: calc(48px / #{$z});
+  }
+
+  // A connection's bar sits just above its bend-point handle.
+  &.edge-actions {
+    margin-top: calc(-20px / #{$z});
+  }
+
+  button {
+    width: 38px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--editor-fg);
+    cursor: pointer;
+
+    ion-icon { font-size: 19px; }
+
+    &:active,
+    &.active {
+      background: color-mix(in srgb, var(--ion-color-primary), transparent 86%);
+      color: var(--ion-color-primary);
+    }
+  }
 }
 
 .edges {
@@ -1121,6 +1252,11 @@ $bar-height: 49px;
   &.selected {
     outline: 1px dashed var(--ion-color-primary);
     outline-offset: 3px;
+
+    // Phone: the blue outline, edge dots and action bar already mark it.
+    @include below('lg') {
+      outline: none;
+    }
   }
 }
 
@@ -1166,6 +1302,12 @@ $bar-height: 49px;
 
 .node.connect-source .shape {
   stroke: var(--ion-color-primary);
+}
+
+// Source of a tap-to-connect ("link") while it waits for a target.
+.node.link-source .shape {
+  stroke: var(--ion-color-primary);
+  stroke-dasharray: 6 4;
 }
 
 // Valid drop target while dragging a connection.
@@ -1331,6 +1473,36 @@ $bar-height: 49px;
     &.handle-left { left: calc(-34px / #{$z}); margin-top: calc(-14px / #{$z}); }
   }
 
+  // Phone: ringed dots just outside each edge rather than arrows — outside so
+  // the side resize grips on the edge midpoints stay reachable — with an
+  // invisible finger-sized hit area around each.
+  @include below('lg') {
+    box-sizing: border-box;
+    width: calc(22px / #{$z});
+    height: calc(22px / #{$z});
+    border: calc(4px / #{$z}) solid var(--editor-header-bg);
+    box-shadow: 0 0 0 calc(1.5px / #{$z}) var(--ion-color-primary);
+
+    ion-icon { display: none; }
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: calc(-9px / #{$z});
+      border-radius: 50%;
+    }
+
+    &.handle-top { top: calc(-34px / #{$z}); margin-left: calc(-11px / #{$z}); }
+    &.handle-right { right: calc(-34px / #{$z}); margin-top: calc(-11px / #{$z}); }
+    &.handle-bottom { bottom: calc(-34px / #{$z}); margin-left: calc(-11px / #{$z}); }
+    &.handle-left { left: calc(-34px / #{$z}); margin-top: calc(-11px / #{$z}); }
+
+    // Keep the dots' hit areas off the edge grips.
+    &::after {
+      inset: calc(-6px / #{$z});
+    }
+  }
+
   // Reveal on hover/selection; keep visible on the source while dragging.
   .node:hover &,
   .node.selected &,
@@ -1378,6 +1550,14 @@ $bar-height: 49px;
   @include touch {
     width: calc(20px / #{$z});
     height: calc(20px / #{$z});
+  }
+
+  // Phone: finger-sized on every narrow screen, not only coarse pointers.
+  @include below('lg') {
+    width: calc(20px / #{$z});
+    height: calc(20px / #{$z});
+    border-width: calc(2px / #{$z});
+    border-radius: calc(4px / #{$z});
   }
 }
 
@@ -1439,6 +1619,23 @@ $bar-height: 49px;
 
     ion-icon { font-size: calc(15px / #{$z}); }
   }
+
+  // Phone: finger-sized, and lifted clear of the top connect dot (which sits
+  // just outside the edge there). The stem reaches back down to the shape.
+  @include below('lg') {
+    width: calc(28px / #{$z});
+    height: calc(28px / #{$z});
+    margin-left: calc(-14px / #{$z});
+    top: calc(-68px / #{$z});
+    border: calc(2px / #{$z}) solid var(--editor-header-bg);
+    box-shadow: 0 calc(2px / #{$z}) calc(6px / #{$z}) rgba(0, 0, 0, 0.25);
+
+    &::before {
+      height: calc(40px / #{$z});
+    }
+
+    ion-icon { font-size: calc(15px / #{$z}); }
+  }
 }
 
 // --- Properties / Text panel -------------------------------------------
@@ -1479,22 +1676,16 @@ $bar-height: 49px;
     // canvas is already at its floor, otherwise a tall drag pushes its own
     // controls off the bottom of the screen. Its content scrolls, so a shrunk
     // sheet loses nothing.
+    // The rounded top, grip and shadow belong to `.panel-vresize-divider`
+    // right above, which reads as the top edge of this same sheet.
     flex: 0 1 auto;
     min-height: 0;
     width: 100%;
     max-height: var(--props-h, 40vh);
     border-left: none;
-    border-top: 1px solid var(--editor-border);
-    border-radius: 14px 14px 0 0;
-    padding: 0 14px 16px;
-    // Sits above the canvas, which scrolls under it.
-    box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.25);
-
-    // Matches the sheet's rounded top so the sticky head doesn't square off
-    // the corners as soon as the panel is scrolled.
-    .panel-head {
-      border-radius: 14px 14px 0 0;
-    }
+    padding: 0 16px 16px;
+    position: relative;
+    z-index: 2;
   }
 
   // Cancel the panel's side padding so the head reads as a bar, and keep it in
@@ -1504,6 +1695,26 @@ $bar-height: 49px;
     top: 0;
     z-index: 1;
     margin: 0 -14px 4px;
+
+    // Mobile: "Style" title on the left like the other sheets, close on the right.
+    @include below('lg') {
+      margin: 0 -16px 4px;
+      padding: 0 16px 10px;
+      min-height: 0;
+      border-bottom: none;
+
+      .panel-head-title {
+        order: -1;
+        text-align: left;
+        font-size: 20px;
+      }
+
+      .panel-close {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+      }
+    }
   }
 
   // Stands in for the controls until a shape is picked, so the panel can stay
@@ -1770,6 +1981,12 @@ $bar-height: 49px;
   gap: 8px;
   pointer-events: none;
   color: color-mix(in srgb, var(--editor-fg), transparent 55%);
+  text-align: center;
+
+  // Keeps the message clear of the floating Style button and zoom pill.
+  @include below('lg') {
+    padding: 0 76px;
+  }
 
   ion-icon {
     font-size: fluid(36px, 48px);
@@ -1857,5 +2074,308 @@ $bar-height: 49px;
   .sessions-hint {
     font-size: 12.5px;
     color: color-mix(in srgb, var(--editor-fg), transparent 55%);
+  }
+}
+
+// --- Mobile bottom sheets + tab bar ---------------------------------------
+// One sheet at a time sits between the canvas and the tab bar: Shapes and
+// More are defined here; Style is the properties panel (see `.props-panel`).
+.m-sheet {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 46vh;
+  padding: 0 16px;
+  background: var(--editor-header-bg);
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.1);
+}
+
+// Tapping the grip folds the sheet away and gives the canvas its height back.
+.m-sheet-grip {
+  position: relative;
+  align-self: center;
+  flex-shrink: 0;
+  width: 64px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    right: 12px;
+    height: 5px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--editor-fg), transparent 75%);
+  }
+}
+
+// Title on the left, close on the right — the same head as the Style sheet.
+.m-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-bottom: 12px;
+
+  .panel-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+  }
+}
+
+.m-sheet-title {
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--editor-fg);
+}
+
+.m-sheet-subtitle {
+  margin: 18px 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--editor-fg), transparent 45%);
+}
+
+.m-sheet-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--editor-fg), transparent 40%);
+
+  &.error {
+    color: var(--ion-color-danger, #e5484d);
+  }
+}
+
+.m-tabs {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-bottom: 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.m-tab {
+  flex-shrink: 0;
+  height: 38px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--editor-fg), transparent 93%);
+  color: color-mix(in srgb, var(--editor-fg), transparent 35%);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &.active {
+    background: var(--ion-color-primary);
+    color: var(--ion-color-primary-contrast);
+  }
+}
+
+.m-sheet-scroll {
+  flex: 1;
+  min-height: 0;
+  margin: 0 -16px;
+  padding: 0 16px 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.m-shape-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.m-shape-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 54px;
+  padding: 10px 14px;
+  border: 1px solid var(--editor-border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--editor-fg);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+
+  > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  > ion-icon {
+    flex-shrink: 0;
+    font-size: 22px;
+  }
+
+  &.danger > ion-icon {
+    color: var(--ion-color-danger, #e5484d);
+  }
+
+  &:active:not(:disabled) {
+    border-color: var(--ion-color-primary);
+    background: color-mix(in srgb, var(--ion-color-primary), transparent 90%);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  // Wraps the theme picker's own icon button, so it has no padding of its own.
+  &.m-theme-item {
+    gap: 4px;
+    padding: 4px 14px 4px 2px;
+    cursor: default;
+  }
+
+  @include below('xs') {
+    gap: 10px;
+    padding: 10px;
+    font-size: 13px;
+  }
+}
+
+// Outline-only previews, same look as the desktop palette's.
+.m-shape-icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 26px;
+
+  // `ion-icon` variant (the Text tile).
+  font-size: 26px;
+
+  .shape,
+  .shape-line {
+    fill: none;
+    stroke: var(--editor-fg);
+    stroke-width: 1.6;
+    vector-effect: non-scaling-stroke;
+    stroke-linejoin: round;
+  }
+}
+
+.m-tabbar {
+  position: relative;
+  z-index: 3;
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  background: var(--editor-header-bg);
+  border-top: 1px solid var(--editor-border);
+
+  button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 0;
+    border: none;
+    background: transparent;
+    color: color-mix(in srgb, var(--editor-fg), transparent 35%);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+
+    &.active {
+      color: var(--ion-color-primary);
+      font-weight: 600;
+
+      .m-tab-icon {
+        background: color-mix(in srgb, var(--ion-color-primary), transparent 86%);
+      }
+    }
+  }
+
+  .m-tab-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 32px;
+    border-radius: 10px;
+
+    ion-icon {
+      font-size: 22px;
+    }
+  }
+}
+
+// Touch stand-ins for the desktop modifier keys (see the "More" sheet).
+.m-toggle-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--editor-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.m-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  color: var(--editor-fg);
+  font-size: 14px;
+  cursor: pointer;
+
+  & + & {
+    border-top: 1px solid var(--editor-border);
+  }
+
+  small {
+    display: block;
+    margin-top: 2px;
+    font-size: 12px;
+    color: color-mix(in srgb, var(--editor-fg), transparent 45%);
+  }
+
+  input {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    accent-color: var(--ion-color-primary);
+  }
+}
+
+.m-tips {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--editor-fg), transparent 25%);
+
+  li + li {
+    margin-top: 4px;
   }
 }

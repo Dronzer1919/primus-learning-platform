@@ -29,16 +29,49 @@ previews and canvas nodes can both reference them by id. -->
             {{ activeTitle }}
           </p>
         } @else {
-          <p>Drag shapes, connect them, build your diagram</p>
+          <p class="desktop-only">Drag shapes, connect them, build your diagram</p>
         }
+        <!-- Mobile subtitle: every change is already mirrored to this device. -->
+        <p class="autosave-status mobile-only">
+          <span class="autosave-dot" aria-hidden="true"></span>
+          {{ autosaveLabel }}
+        </p>
       </div>
     </div>
-    <div class="header-actions">
+    <div class="header-actions desktop-only">
       <app-theme-selector></app-theme-selector>
       <ion-button size="small" fill="outline" (click)="goBack()">
         <ion-icon slot="start" name="arrow-back-outline"></ion-icon>
         Back
       </ion-button>
+    </div>
+    <!-- Mobile header: undo / redo / save / more. Theme and Back live in the
+         "More" sheet. -->
+    <div class="m-header-actions mobile-only">
+      <button type="button" class="m-icon-btn" aria-label="Undo" [disabled]="!canUndo" (click)="undo()">
+        <ion-icon name="arrow-undo-outline"></ion-icon>
+      </button>
+      <button type="button" class="m-icon-btn" aria-label="Redo" [disabled]="!canRedo" (click)="redo()">
+        <ion-icon name="arrow-redo-outline"></ion-icon>
+      </button>
+      <button
+        type="button"
+        class="m-save-btn"
+        [disabled]="isSavingSession || !canSaveSession"
+        (click)="onHeaderSave()"
+        >
+        <ion-icon name="save-outline"></ion-icon>
+        <span>{{ isSavingSession ? 'Saving…' : 'Save' }}</span>
+      </button>
+      <button
+        type="button"
+        class="m-icon-btn"
+        aria-label="More options"
+        [class.active]="activeMobileSheet === 'more'"
+        (click)="toggleMobileSheet('more')"
+        >
+        <ion-icon name="ellipsis-vertical"></ion-icon>
+      </button>
     </div>
   </div>
 
@@ -124,21 +157,6 @@ previews and canvas nodes can both reference them by id. -->
             <ion-icon name="shapes-outline"></ion-icon>
             <span>Shapes</span>
             <ion-icon class="panel-btn-chevron" name="chevron-forward-outline"></ion-icon>
-          </button>
-        } @else {
-          <!-- Stacked layout only (see `.stacked-only`): there the palette is a
-               strip above the canvas with no head row of its own, so this is the
-               only control that can fold it away and give the canvas the height
-               back. On desktop the panel's own chevron does that. -->
-          <button
-            type="button"
-            class="panel-btn stacked-only"
-            title="Hide the shapes panel"
-            (click)="togglePalette()"
-            >
-            <ion-icon name="shapes-outline"></ion-icon>
-            <span>Shapes</span>
-            <ion-icon class="panel-btn-chevron" name="chevron-up-outline"></ion-icon>
           </button>
         }
         <ion-button
@@ -392,6 +410,7 @@ previews and canvas nodes can both reference them by id. -->
                 [class.selected]="selectedNodeId === v.node.id"
                 [class.connect-source]="connectFromId === v.node.id"
                 [class.connect-target]="connectTargetId === v.node.id"
+                [class.link-source]="linkFromId === v.node.id"
                 [style.left.px]="v.node.x"
                 [style.top.px]="v.node.y"
                 [style.width.px]="v.node.w"
@@ -507,6 +526,65 @@ previews and canvas nodes can both reference them by id. -->
               </div>
             }
 
+            <!-- Mobile only: quick actions floating over the selected shape,
+                 above its rotate handle. Counter-scaled like the handles so it
+                 stays finger-sized at any zoom; flips below the shape when
+                 there is no room above it. -->
+            @if (selectedNode; as sel) {
+              @if (editingNodeId !== sel.id && !connectFromId) {
+                <div
+                  class="node-actions mobile-only"
+                  [class.below]="sel.y * zoom < 140"
+                  [style.left.px]="sel.x + sel.w / 2"
+                  [style.top.px]="sel.y * zoom < 140 ? sel.y + sel.h : sel.y"
+                  (pointerdown)="$event.stopPropagation()"
+                  (click)="$event.stopPropagation()"
+                  >
+                  <button type="button" aria-label="Edit text" (click)="editSelected()">
+                    <ion-icon name="pencil-outline"></ion-icon>
+                  </button>
+                  <button type="button" aria-label="Duplicate" (click)="duplicateSelected()">
+                    <ion-icon name="copy-outline"></ion-icon>
+                  </button>
+                  <button type="button" aria-label="Delete" (click)="deleteSelected()">
+                    <ion-icon name="trash-outline"></ion-icon>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Connect to another shape"
+                    [class.active]="linkFromId === sel.id"
+                    (click)="startLink()"
+                    >
+                    <ion-icon name="link-outline"></ion-icon>
+                  </button>
+                </div>
+              }
+            }
+
+            <!-- Mobile only: the same bar for a selected connection, over its
+                 bend point. -->
+            @if (selectedEdgeAnchor; as pt) {
+              <div
+                class="node-actions edge-actions mobile-only"
+                [style.left.px]="pt.x"
+                [style.top.px]="pt.y"
+                (pointerdown)="$event.stopPropagation()"
+                (click)="$event.stopPropagation()"
+                >
+                <button
+                  type="button"
+                  aria-label="Connection style"
+                  [class.active]="activeMobileSheet === 'style'"
+                  (click)="toggleMobileSheet('style')"
+                  >
+                  <ion-icon name="color-palette-outline"></ion-icon>
+                </button>
+                <button type="button" aria-label="Delete connection" (click)="deleteSelected()">
+                  <ion-icon name="trash-outline"></ion-icon>
+                </button>
+              </div>
+            }
+
           </div>
         </div>
 
@@ -522,6 +600,27 @@ previews and canvas nodes can both reference them by id. -->
           </div>
         }
       </div>
+
+      <!-- Mobile only: floating Style button and the link / connect hint. -->
+      <button
+        type="button"
+        class="m-style-fab mobile-only"
+        [class.active]="activeMobileSheet === 'style'"
+        (click)="toggleMobileSheet('style')"
+        >
+        <ion-icon name="color-palette-outline"></ion-icon>
+        <span>Style</span>
+      </button>
+      @if (linkFromId || connectFromId) {
+        <div class="m-hint mobile-only" role="status">
+          @if (linkFromId) {
+            Tap another shape to connect
+            <button type="button" (click)="linkFromId = null">Cancel</button>
+          } @else {
+            Release on a shape to connect
+          }
+        </div>
+      }
 
       <!-- Zoom controls, floating over the bottom-right of the canvas. These are
            the only way to zoom on a phone that has no keyboard for Ctrl+wheel,
@@ -581,19 +680,13 @@ previews and canvas nodes can both reference them by id. -->
           <span class="chip-dots"><span></span><span></span></span>
         </div>
       </div>
-      <!-- Stacked (mobile) layout only: the panel above is a bottom sheet, so
-           its handle drags vertically to resize height instead of width. -->
+      <!-- Mobile only: the Style sheet's grab handle — drags vertically to
+           resize the sheet's height. -->
       <div
         class="panel-vresize-divider"
         (pointerdown)="startPropsHeightResize($event)"
         title="Drag to resize height"
-        >
-        <div class="resize-chip" aria-hidden="true">
-          <span class="chip-dots"><span></span><span></span></span>
-          <ion-icon name="swap-vertical-outline"></ion-icon>
-          <span class="chip-dots"><span></span><span></span></span>
-        </div>
-      </div>
+      ></div>
       <div
         class="props-panel"
         role="region"
@@ -609,9 +702,13 @@ previews and canvas nodes can both reference them by id. -->
             aria-label="Hide the properties panel"
             (click)="toggleProps()"
             >
-            <ion-icon name="chevron-forward-outline"></ion-icon>
+            <ion-icon class="desktop-only" name="chevron-forward-outline"></ion-icon>
+            <ion-icon class="mobile-only" name="chevron-down-outline"></ion-icon>
           </button>
-          <h2 class="panel-head-title" id="props-heading">{{ selectedEdge ? 'Connection' : 'Text' }}</h2>
+          <h2 class="panel-head-title" id="props-heading">
+            <span class="desktop-only">{{ selectedEdge ? 'Connection' : 'Text' }}</span>
+            <span class="mobile-only">{{ selectedEdge ? 'Connection' : 'Style' }}</span>
+          </h2>
         </div>
         @if (!selectedNode && !selectedEdge) {
           <p class="props-empty">Select a shape or arrow on the canvas to edit its properties.</p>
@@ -1115,6 +1212,188 @@ previews and canvas nodes can both reference them by id. -->
       </div>
     }
   </div>
+
+  <!-- ── Mobile shell (below `lg`) ─────────────────────────────────────────
+       The desktop palette and toolbar are hidden there; these replace them. -->
+  @if (activeMobileSheet === 'shapes') {
+    <section class="m-sheet mobile-only" aria-labelledby="m-shapes-title">
+      <button type="button" class="m-sheet-grip" aria-label="Hide shapes" (click)="toggleMobileSheet('shapes')"></button>
+      <div class="m-sheet-head">
+        <h2 class="m-sheet-title" id="m-shapes-title">Shapes</h2>
+        <button
+          type="button"
+          class="panel-close"
+          title="Hide the shapes panel"
+          aria-label="Hide the shapes panel"
+          (click)="toggleMobileSheet('shapes')"
+          >
+          <ion-icon name="chevron-down-outline"></ion-icon>
+        </button>
+      </div>
+      <div class="m-tabs" role="tablist">
+        @for (group of paletteGroups; track group.title; let i = $index) {
+          <button
+            type="button"
+            role="tab"
+            class="m-tab"
+            [class.active]="shapeTab === i"
+            [attr.aria-selected]="shapeTab === i"
+            (click)="shapeTab = i"
+            >{{ group.title }}</button>
+        }
+      </div>
+      <div class="m-sheet-scroll">
+        <div class="m-shape-grid">
+          @for (p of paletteGroups[shapeTab].items; track p.shape.type) {
+            <button type="button" class="m-shape-item" [title]="p.shape.meaning" (click)="onPaletteTap(p.shape.type)">
+              @if (p.render.kind === 'none') {
+                <!-- Text has no outline to preview. -->
+                <ion-icon class="m-shape-icon" name="text-outline" aria-hidden="true"></ion-icon>
+              } @else {
+                <svg class="m-shape-icon" viewBox="-2 -2 50 32" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                  <ng-container
+                    *ngTemplateOutlet="shapeTpl; context: { r: p.render, w: previewW, h: previewH }"
+                  ></ng-container>
+                </svg>
+              }
+              <span>{{ p.shape.label }}</span>
+            </button>
+          }
+        </div>
+      </div>
+    </section>
+  }
+
+  @if (activeMobileSheet === 'more') {
+    <section class="m-sheet mobile-only" aria-labelledby="m-more-title">
+      <button type="button" class="m-sheet-grip" aria-label="Hide options" (click)="toggleMobileSheet('more')"></button>
+      <div class="m-sheet-head">
+        <h2 class="m-sheet-title" id="m-more-title">More</h2>
+        <button
+          type="button"
+          class="panel-close"
+          title="Hide the options panel"
+          aria-label="Hide the options panel"
+          (click)="toggleMobileSheet('more')"
+          >
+          <ion-icon name="chevron-down-outline"></ion-icon>
+        </button>
+      </div>
+      <div class="m-sheet-scroll">
+        <div class="m-shape-grid">
+          <button type="button" class="m-shape-item" [disabled]="!selectedNodeId" (click)="copySelected()">
+            <ion-icon name="copy-outline"></ion-icon><span>Copy</span>
+          </button>
+          <button type="button" class="m-shape-item" [disabled]="!selectedNodeId" (click)="cutSelected()">
+            <ion-icon name="cut-outline"></ion-icon><span>Cut</span>
+          </button>
+          <button type="button" class="m-shape-item" [disabled]="!canPaste" (click)="pasteClipboard()">
+            <ion-icon name="clipboard-outline"></ion-icon><span>Paste</span>
+          </button>
+          <button type="button" class="m-shape-item" [disabled]="!selectedNodeId" (click)="duplicateSelected()">
+            <ion-icon name="duplicate-outline"></ion-icon><span>Duplicate</span>
+          </button>
+          <button type="button" class="m-shape-item danger" [disabled]="!selectedNodeId && !selectedEdgeId" (click)="deleteSelected()">
+            <ion-icon name="trash-outline"></ion-icon><span>Delete selected</span>
+          </button>
+          <button type="button" class="m-shape-item danger" (click)="clear()">
+            <ion-icon name="refresh-outline"></ion-icon><span>Clear canvas</span>
+          </button>
+          <button type="button" class="m-shape-item" (click)="openSessions($event)">
+            <ion-icon name="time-outline"></ion-icon><span>Saved sessions</span>
+          </button>
+          <button type="button" class="m-shape-item" (click)="cycleCanvasBg()">
+            <ion-icon name="grid-outline"></ion-icon><span>Background: {{ canvasBgLabel() }}</span>
+          </button>
+          <button type="button" class="m-shape-item" (click)="zoomToFit()">
+            <ion-icon name="scan-outline"></ion-icon><span>Fit to screen</span>
+          </button>
+          <div class="m-shape-item m-theme-item">
+            <app-theme-selector></app-theme-selector><span>Theme</span>
+          </div>
+        </div>
+        <!-- Touch versions of the desktop modifier keys. -->
+        <h3 class="m-sheet-subtitle">Resize &amp; rotate</h3>
+        <div class="m-toggle-list">
+          <label class="m-toggle">
+            <span>
+              Keep proportions
+              <small>Corner grips resize without stretching (Shift on desktop)</small>
+            </span>
+            <input type="checkbox" [checked]="lockAspect" (change)="lockAspect = $any($event.target).checked" />
+          </label>
+          <label class="m-toggle">
+            <span>
+              Resize from centre
+              <small>Opposite edge moves too (Alt on desktop)</small>
+            </span>
+            <input type="checkbox" [checked]="resizeFromCenter" (change)="resizeFromCenter = $any($event.target).checked" />
+          </label>
+          <label class="m-toggle">
+            <span>
+              Snap rotation to 15°
+              <small>Rotate handle jumps in steps (Shift on desktop)</small>
+            </span>
+            <input type="checkbox" [checked]="snapRotation" (change)="snapRotation = $any($event.target).checked" />
+          </label>
+        </div>
+        <h3 class="m-sheet-subtitle">Export</h3>
+        <div class="m-shape-grid">
+          <button type="button" class="m-shape-item" [disabled]="exporting || diagram.nodes.length === 0" (click)="saveAs('png')">
+            <ion-icon name="image-outline"></ion-icon><span>PNG image</span>
+          </button>
+          <button type="button" class="m-shape-item" [disabled]="exporting || diagram.nodes.length === 0" (click)="saveAs('jpg')">
+            <ion-icon name="image-outline"></ion-icon><span>JPG image</span>
+          </button>
+          <button type="button" class="m-shape-item" [disabled]="exporting || diagram.nodes.length === 0" (click)="saveAs('pdf')">
+            <ion-icon name="document-outline"></ion-icon><span>PDF document</span>
+          </button>
+          <button type="button" class="m-shape-item" (click)="goBack()">
+            <ion-icon name="arrow-back-outline"></ion-icon><span>Back</span>
+          </button>
+        </div>
+        @if (exporting) {
+          <p class="m-sheet-note">Saving…</p>
+        }
+        @if (exportError) {
+          <p class="m-sheet-note error" role="alert">{{ exportError }}</p>
+        }
+        <!-- The desktop palette's help text, reworded for touch. -->
+        <h3 class="m-sheet-subtitle">Tips</h3>
+        <ul class="m-tips">
+          <li>Tap a shape in <strong>Shapes</strong> to add it; drag it to move.</li>
+          <li><strong>Double-tap</strong> a shape (or use the pencil) to type inside it.</li>
+          <li>Drag from a blue dot onto another shape to connect them — or tap the link button, then the target.</li>
+          <li>Drag the square grips to resize and the round handle above to rotate.</li>
+          <li>Tap an arrow to restyle or delete it; drag its white dot to move the bend.</li>
+          <li>Pinch or use + / − to zoom.</li>
+        </ul>
+      </div>
+    </section>
+  }
+
+  <nav class="m-tabbar mobile-only" aria-label="Flowchart tools">
+    <button type="button" [class.active]="activeMobileSheet === 'shapes'" (click)="toggleMobileSheet('shapes')">
+      <span class="m-tab-icon"><ion-icon name="shapes-outline"></ion-icon></span>
+      Shapes
+    </button>
+    <button type="button" [class.active]="!!linkFromId" (click)="startLink()">
+      <span class="m-tab-icon"><ion-icon name="git-commit-outline"></ion-icon></span>
+      Connect
+    </button>
+    <button type="button" (click)="onTextTool()">
+      <span class="m-tab-icon"><ion-icon name="text-outline"></ion-icon></span>
+      Text
+    </button>
+    <button type="button" [class.active]="activeMobileSheet === 'style'" (click)="toggleMobileSheet('style')">
+      <span class="m-tab-icon"><ion-icon name="color-palette-outline"></ion-icon></span>
+      Style
+    </button>
+    <button type="button" [class.active]="activeMobileSheet === 'more'" (click)="toggleMobileSheet('more')">
+      <span class="m-tab-icon"><ion-icon name="ellipsis-horizontal"></ion-icon></span>
+      More
+    </button>
+  </nav>
 </div>
 
         <!-- Reusable shape renderer, shared by palette previews and canvas nodes.
