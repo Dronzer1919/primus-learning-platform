@@ -5,10 +5,14 @@
 #
 # Pulls the latest code and rebuilds/restarts the docker-compose stack (lp-mongo,
 # lp-api, lp-web), then health-checks the live URLs. Mirrors the ionic-ecom flow.
+#
+# To redeploy only the frontend (skips lp-api/lp-mongo, no `docker compose down`):
+#     SERVICES=lp-web APP_ROOT=/root/learning-platform BRANCH=dev bash deployment-scripts/deploy-hostinger.sh
 set -euo pipefail
 
 APP_ROOT="${APP_ROOT:-/var/www/learning-platform-backend}"
 BRANCH="${BRANCH:-dev}"
+SERVICES="${SERVICES:-}"   # empty = full stack (default); e.g. "lp-web" to redeploy only the frontend
 API_HEALTH_URL="${API_HEALTH_URL:-https://api.primuscodex.com/api/health}"
 FRONTEND_HEALTH_URL="${FRONTEND_HEALTH_URL:-https://primuscodex.com}"
 
@@ -36,9 +40,14 @@ main() {
 
   [[ -f backend/.env ]] || { echo "Missing backend/.env at $APP_ROOT/backend/.env" >&2; exit 1; }
 
-  log "Building and starting containers (lp-mongo, lp-api, lp-web)"
-  docker compose down
-  docker compose up -d --build
+  log "Building and starting containers (${SERVICES:-lp-mongo, lp-api, lp-web})"
+  if [[ -z "$SERVICES" ]]; then
+    docker compose down
+    docker compose up -d --build
+  else
+    docker compose build --no-cache $SERVICES
+    docker compose up -d $SERVICES
+  fi
   docker compose ps
 
   # Host nginx is static across deploys; reload best-effort (fine to skip).
@@ -48,8 +57,12 @@ main() {
 
   log "Running endpoint checks"
   sleep 5
-  health_check "$API_HEALTH_URL" "API"
-  health_check "$FRONTEND_HEALTH_URL" "Frontend"
+  if [[ -z "$SERVICES" || "$SERVICES" == *lp-api* ]]; then
+    health_check "$API_HEALTH_URL" "API"
+  fi
+  if [[ -z "$SERVICES" || "$SERVICES" == *lp-web* ]]; then
+    health_check "$FRONTEND_HEALTH_URL" "Frontend"
+  fi
 
   log "Deployment completed successfully"
 }
